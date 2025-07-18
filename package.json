@@ -1,0 +1,14 @@
+{
+  "name": "cmdgen-render-server",
+  "version": "1.0.0",
+  "description": "Secure server for CMDGEN on Render",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "cd client && npm install && npm run build"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-fetch": "^2.6.9"
+  }
+}
