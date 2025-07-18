@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { Terminal, Copy, Check, ServerCrash, Wind, Apple, BrainCircuit, Bot, ChevronDown, Wand2, Search, LogIn, LogOut, User, History, Star, Sun, Moon, FileCode2, CopyPlus, Info, X, ShieldAlert, MessageSquare } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithRedirect, signOut, onAuthStateChanged, getRedirectResult } from 'firebase/auth';
 import { getFirestore, collection, addDoc, query, onSnapshot, orderBy, limit, deleteDoc, doc, where, getDocs } from 'firebase/firestore';
 
 // --- Firebase Configuration ---
-// کلیدهای Firebase به صورت امن از متغیرهای محیطی خوانده می‌شوند
 const firebaseConfig = {
     apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
     authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
@@ -20,7 +19,6 @@ const firebaseConfig = {
 let app;
 let auth;
 let db;
-// فقط در صورتی فایربیس را راه‌اندازی کن که کلیدها موجود باشند
 if (firebaseConfig.apiKey) {
     try {
         app = initializeApp(firebaseConfig);
@@ -29,10 +27,7 @@ if (firebaseConfig.apiKey) {
     } catch (error) {
         console.error("Firebase initialization error:", error);
     }
-} else {
-    console.warn("Firebase configuration is missing. App will run without Firebase features.");
 }
-
 
 // --- Authentication Context ---
 const AuthContext = createContext();
@@ -48,12 +43,17 @@ export const AuthProvider = ({ children }) => {
             setUser(user);
             setLoading(false);
         });
+
+        getRedirectResult(auth).catch((error) => {
+            console.error("Error getting redirect result:", error);
+        });
+
         return () => unsubscribe();
     }, []);
     const loginWithGoogle = async () => {
         if (!auth) return;
         const provider = new GoogleAuthProvider();
-        try { await signInWithPopup(auth, provider); } catch (error) { console.error("Google login error:", error); }
+        try { await signInWithRedirect(auth, provider); } catch (error) { console.error("Google login error:", error); }
     };
     const logout = async () => {
         if (!auth) return;
