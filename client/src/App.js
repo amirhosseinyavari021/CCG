@@ -48,7 +48,7 @@ export const AuthProvider = ({ children }) => {
         }
 
         const unsubscribe = onAuthStateChanged(auth, (user) => {
-            console.log("Auth state changed:", user ? { uid: user.uid, displayName: user.displayName } : "No user");
+            console.log("Auth state changed:", user ? { uid: user.uid, displayName: user.displayName, email: user.email } : "No user");
             setUser(user);
             setLoading(false);
         });
@@ -67,8 +67,8 @@ export const AuthProvider = ({ children }) => {
             console.log("Starting Google login with redirect...");
             await signInWithRedirect(auth, provider);
         } catch (error) {
-            console.error("Google login error:", error.message, error.code);
-            toast.error(`Failed to sign in: ${error.message}`);
+            console.error("Google login error:", { code: error.code, message: error.message, details: error });
+            toast.error(`Failed to sign in: ${error.code} - ${error.message}`);
         }
     };
 
@@ -104,22 +104,30 @@ const AuthHandler = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        console.log("Processing redirect in AuthHandler...");
+        console.log("Processing redirect in AuthHandler at:", new Date().toISOString());
         getRedirectResult(auth)
             .then((result) => {
                 if (result) {
-                    console.log("Redirect result:", result.user.uid, result.user.displayName);
+                    console.log("Redirect result:", {
+                        uid: result.user.uid,
+                        displayName: result.user.displayName,
+                        email: result.user.email
+                    });
                     setUser(result.user);
                     toast.success("Successfully signed in!");
                     navigate("/", { replace: true });
                 } else {
-                    console.log("No redirect result available.");
+                    console.log("No redirect result available. Possible reasons: User cancelled login or already processed.");
                     navigate("/", { replace: true });
                 }
             })
             .catch((error) => {
-                console.error("Error in auth handler:", error.message, error.code);
-                toast.error(`Failed to sign in: ${error.message}`);
+                console.error("Error in auth handler:", {
+                    code: error.code,
+                    message: error.message,
+                    details: error
+                });
+                toast.error(`Failed to sign in: ${error.code} - ${error.message}`);
                 navigate("/", { replace: true });
             });
     }, [navigate, setUser]);
@@ -127,20 +135,6 @@ const AuthHandler = () => {
     return (
         <div className="flex justify-center items-center h-screen">
             <div className="text-gray-600 dark:text-gray-300">Processing login...</div>
-        </div>
-    );
-}
-            })
-            .catch((error) => {
-                console.error("Error in auth handler:", error.message, error.code);
-                toast.error(`Failed to sign in: ${error.message}`);
-                navigate("/");
-            });
-    }, [navigate, setUser]);
-
-    return (
-        <div className="flex justify-center items-center h-screen">
-            <div className="text-gray-600 dark:text-gray-300">Loading...</div>
         </div>
     );
 };
@@ -371,6 +365,7 @@ const Panel = ({ lang, onSelect, title, icon, collectionName, noItemsText }) => 
 const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavoritesToggle, onAboutToggle, onFeedbackToggle }) => {
     const { user, loginWithGoogle, logout } = useAuth();
     const t = translations[lang];
+    console.log("Header: Current user:", user ? { uid: user.uid, displayName: user.displayName, email: user.email } : "No user");
 
     return (
         <header className="py-3 px-4 md:px-8 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm z-20">
@@ -474,20 +469,20 @@ const ScriptCard = ({ filename, script_lines = [], explanation, lang, onFavorite
     };
     return (
         <div className="mt-10 max-w-3xl mx-auto opacity-100" style={{ animation: `fadeInUp 0.5s ease-out forwards` }}>
-        <Card lang={lang}>
-            <div className="flex justify-between items-center mb-3">
-                <div className="flex items-center gap-2 text-sm text-cyan-600 dark:text-cyan-400"><FileCode2 className="w-4 h-4" /><span>{filename}</span></div>
-                <button onClick={onFavoriteToggle} className="p-1.5 text-gray-400 hover:text-amber-400 transition-colors">
-                    <Star size={16} className={isFavorite ? 'fill-amber-400 text-amber-400' : ''} />
-                </button>
-            </div>
-            <CommandDisplay command={fullScript} onCopy={handleCopy} copied={copied} />
-            <div className="mt-4">
-                <h4 className="font-bold text-gray-800 dark:text-gray-200">{translations[lang].scriptExplanation}</h4>
-                <p className="mt-1 text-gray-600 dark:text-gray-300 text-sm leading-relaxed">{explanation}</p>
-            </div>
-        </Card>
-    </div>
+            <Card lang={lang}>
+                <div className="flex justify-between items-center mb-3">
+                    <div className="flex items-center gap-2 text-sm text-cyan-600 dark:text-cyan-400"><FileCode2 className="w-4 h-4" /><span>{filename}</span></div>
+                    <button onClick={onFavoriteToggle} className="p-1.5 text-gray-400 hover:text-amber-400 transition-colors">
+                        <Star size={16} className={isFavorite ? 'fill-amber-400 text-amber-400' : ''} />
+                    </button>
+                </div>
+                <CommandDisplay command={fullScript} onCopy={handleCopy} copied={copied} />
+                <div className="mt-4">
+                    <h4 className="font-bold text-gray-800 dark:text-gray-200">{translations[lang].scriptExplanation}</h4>
+                    <p className="mt-1 text-gray-600 dark:text-gray-300 text-sm leading-relaxed">{explanation}</p>
+                </div>
+            </Card>
+        </div>
     );
 };
 
