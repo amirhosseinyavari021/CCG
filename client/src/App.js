@@ -48,25 +48,10 @@ export const AuthProvider = ({ children }) => {
         }
 
         const unsubscribe = onAuthStateChanged(auth, (user) => {
-            console.log("Auth state changed:", user ? user.uid : "No user");
+            console.log("Auth state changed:", user ? { uid: user.uid, displayName: user.displayName } : "No user");
             setUser(user);
             setLoading(false);
         });
-
-        getRedirectResult(auth)
-            .then((result) => {
-                if (result) {
-                    console.log("Redirect result:", result.user);
-                    setUser(result.user);
-                    toast.success("Successfully signed in!");
-                } else {
-                    console.log("No redirect result available.");
-                }
-            })
-            .catch((error) => {
-                console.error("Error getting redirect result:", error.message, error.code);
-                toast.error(`Failed to sign in: ${error.message}`);
-            });
 
         return () => unsubscribe();
     }, []);
@@ -119,17 +104,32 @@ const AuthHandler = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
+        console.log("Processing redirect in AuthHandler...");
         getRedirectResult(auth)
             .then((result) => {
                 if (result) {
-                    console.log("Redirect result:", result.user);
+                    console.log("Redirect result:", result.user.uid, result.user.displayName);
                     setUser(result.user);
                     toast.success("Successfully signed in!");
-                    navigate("/");
+                    navigate("/", { replace: true });
                 } else {
                     console.log("No redirect result available.");
-                    navigate("/");
+                    navigate("/", { replace: true });
                 }
+            })
+            .catch((error) => {
+                console.error("Error in auth handler:", error.message, error.code);
+                toast.error(`Failed to sign in: ${error.message}`);
+                navigate("/", { replace: true });
+            });
+    }, [navigate, setUser]);
+
+    return (
+        <div className="flex justify-center items-center h-screen">
+            <div className="text-gray-600 dark:text-gray-300">Processing login...</div>
+        </div>
+    );
+}:
             })
             .catch((error) => {
                 console.error("Error in auth handler:", error.message, error.code);
