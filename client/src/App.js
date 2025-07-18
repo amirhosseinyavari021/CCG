@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
+import { BrowserRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { Terminal, Copy, Check, ServerCrash, Wind, Apple, BrainCircuit, Bot, ChevronDown, Wand2, Search, LogIn, LogOut, User, History, Star, Sun, Moon, FileCode2, CopyPlus, Info, X, ShieldAlert, MessageSquare } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithRedirect, signOut, onAuthStateChanged, getRedirectResult } from 'firebase/auth';
 import { getFirestore, collection, addDoc, query, onSnapshot, orderBy, limit, deleteDoc, doc, where, getDocs } from 'firebase/firestore';
+import toast from 'react-hot-toast';
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
@@ -21,11 +23,13 @@ let auth;
 let db;
 if (firebaseConfig.apiKey) {
     try {
+        console.log("Initializing Firebase with config:", firebaseConfig);
         app = initializeApp(firebaseConfig);
         auth = getAuth(app);
         db = getFirestore(app);
     } catch (error) {
         console.error("Firebase initialization error:", error);
+        toast.error("Failed to initialize Firebase.");
     }
 }
 
@@ -34,35 +38,112 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+
     useEffect(() => {
         if (!auth) {
+            console.error("Auth is not initialized.");
+            toast.error("Authentication is not initialized.");
             setLoading(false);
             return;
         }
+
         const unsubscribe = onAuthStateChanged(auth, (user) => {
+            console.log("Auth state changed:", user ? user.uid : "No user");
             setUser(user);
             setLoading(false);
         });
 
-        getRedirectResult(auth).catch((error) => {
-            console.error("Error getting redirect result:", error);
-        });
+        getRedirectResult(auth)
+            .then((result) => {
+                if (result) {
+                    console.log("Redirect result:", result.user);
+                    setUser(result.user);
+                    toast.success("Successfully signed in!");
+                } else {
+                    console.log("No redirect result available.");
+                }
+            })
+            .catch((error) => {
+                console.error("Error getting redirect result:", error.message, error.code);
+                toast.error(`Failed to sign in: ${error.message}`);
+            });
 
         return () => unsubscribe();
     }, []);
+
     const loginWithGoogle = async () => {
-        if (!auth) return;
+        if (!auth) {
+            console.error("Auth is not initialized.");
+            toast.error("Authentication is not initialized.");
+            return;
+        }
         const provider = new GoogleAuthProvider();
-        try { await signInWithRedirect(auth, provider); } catch (error) { console.error("Google login error:", error); }
+        try {
+            console.log("Starting Google login with redirect...");
+            await signInWithRedirect(auth, provider);
+        } catch (error) {
+            console.error("Google login error:", error.message, error.code);
+            toast.error(`Failed to sign in: ${error.message}`);
+        }
     };
+
     const logout = async () => {
         if (!auth) return;
-        try { await signOut(auth); } catch (error) { console.error("Logout error:", error); }
+        try {
+            await signOut(auth);
+            toast.success("Successfully signed out!");
+        } catch (error) {
+            console.error("Logout error:", error);
+            toast.error(`Failed to sign out: ${error.message}`);
+        }
     };
+
     const value = { user, loading, loginWithGoogle, logout };
-    return <AuthContext.Provider value={value}>{!loading && children}</AuthContext.Provider>;
+    return (
+        <AuthContext.Provider value={value}>
+            {loading ? (
+                <div className="flex justify-center items-center h-screen">
+                    <div className="text-gray-600 dark:text-gray-300">Loading...</div>
+                </div>
+            ) : (
+                children
+            )}
+        </AuthContext.Provider>
+    );
 };
 export const useAuth = () => useContext(AuthContext);
+
+// --- Auth Handler Component ---
+const AuthHandler = () => {
+    const { setUser } = useAuth();
+    const navigate = useNavigate();
+
+    useEffect(() => {
+        getRedirectResult(auth)
+            .then((result) => {
+                if (result) {
+                    console.log("Redirect result:", result.user);
+                    setUser(result.user);
+                    toast.success("Successfully signed in!");
+                    navigate("/");
+                } else {
+                    console.log("No redirect result available.");
+                    navigate("/");
+                }
+            })
+            .catch((error) => {
+                console.error("Error in auth handler:", error.message, error.code);
+                toast.error(`Failed to sign in: ${error.message}`);
+                navigate("/");
+            });
+    }, [navigate, setUser]);
+
+    return (
+        <div className="flex justify-center items-center h-screen">
+            <div className="text-gray-600 dark:text-gray-300">Loading...</div>
+        </div>
+    );
+};
 
 // --- Translations ---
 const translations = {
@@ -135,7 +216,6 @@ const osDetails = {
 
 // --- API & DB Functions ---
 const callApiProxy = async (payload) => {
-    // This now calls our own server's proxy endpoint
     const response = await fetch('/api/proxy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -211,7 +291,6 @@ const fetchErrorAnalysis = async (errorMsg, os_type, os_version, cli, language) 
     return JSON.parse(jsonString);
 };
 
-
 const dbAction = async (userId, collectionName, action, data = {}) => {
     if (!userId || !db) return;
     const collectionRef = collection(db, "users", userId, collectionName);
@@ -221,7 +300,10 @@ const dbAction = async (userId, collectionName, action, data = {}) => {
         } else if (action === 'delete') {
             await deleteDoc(doc(db, "users", userId, collectionName, data.id));
         }
-    } catch (error) { console.error(`Error with ${collectionName}:`, error); }
+    } catch (error) {
+        console.error(`Error with ${collectionName}:`, error);
+        toast.error(`Failed to perform ${collectionName} action: ${error.message}`);
+    }
 };
 
 // --- Components ---
@@ -256,6 +338,7 @@ const Panel = ({ lang, onSelect, title, icon, collectionName, noItemsText }) => 
             setLoading(false);
         }, (error) => {
             console.error(`Error fetching ${collectionName}:`, error);
+            toast.error(`Failed to fetch ${collectionName}: ${error.message}`);
             setLoading(false);
         });
         return () => unsubscribe();
@@ -293,7 +376,7 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
         <header className="py-3 px-4 md:px-8 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm z-20">
             <div className={`container mx-auto flex items-center ${lang === 'fa' ? 'flex-row-reverse' : 'flex-row'}`}>
                 <div className="flex-1 flex items-center gap-4" dir={lang === 'fa' ? 'rtl' : 'ltr'}>
-                     <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                         <BrainCircuit className="w-8 h-8 text-cyan-500" />
                         <h1 className="text-2xl font-bold tracking-wider text-gray-800 dark:text-white">CMDGEN</h1>
                     </div>
@@ -305,16 +388,17 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
                     </div>
                 </div>
                 <div className="flex-none flex items-center gap-4">
-                     <button onClick={toggleTheme} className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                    <button onClick={toggleTheme} className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
                         {theme === 'dark' ? <Sun size={16}/> : <Moon size={16}/>}
-                     </button>
-                     <div className="flex items-center bg-gray-200 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-full p-1">
+                    </button>
+                    <div className="flex items-center bg-gray-200 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-full p-1">
                         <button onClick={() => setLang('en')} className={`px-3 py-1 text-sm rounded-full transition-colors ${lang === 'en' ? 'bg-cyan-500 text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-700'}`}>EN</button>
                         <button onClick={() => setLang('fa')} className={`px-3 py-1 text-sm rounded-full transition-colors ${lang === 'fa' ? 'bg-cyan-500 text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-700'}`}>FA</button>
                     </div>
                     {user ? (
                         <div className="flex items-center gap-3">
                             <img src={user.photoURL} alt={user.displayName} className="w-8 h-8 rounded-full" />
+                            <span className="text-sm text-gray-600 dark:text-gray-300">{user.displayName}</span>
                             <button onClick={logout} className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/40 text-red-400 dark:text-red-300 transition-colors"><LogOut size={16}/></button>
                         </div>
                     ) : (
@@ -390,38 +474,38 @@ const ScriptCard = ({ filename, script_lines = [], explanation, lang, onFavorite
     };
     return (
         <div className="mt-10 max-w-3xl mx-auto opacity-100" style={{ animation: `fadeInUp 0.5s ease-out forwards` }}>
-            <Card lang={lang}>
-                <div className="flex justify-between items-center mb-3">
-                    <div className="flex items-center gap-2 text-sm text-cyan-600 dark:text-cyan-400"><FileCode2 className="w-4 h-4" /><span>{filename}</span></div>
-                    <button onClick={onFavoriteToggle} className="p-1.5 text-gray-400 hover:text-amber-400 transition-colors">
-                        <Star size={16} className={isFavorite ? 'fill-amber-400 text-amber-400' : ''} />
-                    </button>
-                </div>
-                <CommandDisplay command={fullScript} onCopy={handleCopy} copied={copied} />
-                <div className="mt-4">
-                    <h4 className="font-bold text-gray-800 dark:text-gray-200">{translations[lang].scriptExplanation}</h4>
-                    <p className="mt-1 text-gray-600 dark:text-gray-300 text-sm leading-relaxed">{explanation}</p>
-                </div>
-            </Card>
-        </div>
+        <Card lang={lang}>
+            <div className="flex justify-between items-center mb-3">
+                <div className="flex items-center gap-2 text-sm text-cyan-600 dark:text-cyan-400"><FileCode2 className="w-4 h-4" /><span>{filename}</span></div>
+                <button onClick={onFavoriteToggle} className="p-1.5 text-gray-400 hover:text-amber-400 transition-colors">
+                    <Star size={16} className={isFavorite ? 'fill-amber-400 text-amber-400' : ''} />
+                </button>
+            </div>
+            <CommandDisplay command={fullScript} onCopy={handleCopy} copied={copied} />
+            <div className="mt-4">
+                <h4 className="font-bold text-gray-800 dark:text-gray-200">{translations[lang].scriptExplanation}</h4>
+                <p className="mt-1 text-gray-600 dark:text-gray-300 text-sm leading-relaxed">{explanation}</p>
+            </div>
+        </Card>
+    </div>
     );
 };
 
 const ErrorAnalysisCard = ({ analysis, lang }) => (
-     <div className="mt-10 max-w-3xl mx-auto opacity-100" style={{ animation: `fadeInUp 0.5s ease-out forwards` }}>
+    <div className="mt-10 max-w-3xl mx-auto opacity-100" style={{ animation: `fadeInUp 0.5s ease-out forwards` }}>
         <Card lang={lang}>
             <h3 className="text-lg font-bold text-cyan-600 dark:text-cyan-300 flex items-center gap-2 mb-4"><ShieldAlert size={20} /> {translations[lang].errorAnalysis}</h3>
             <div className="space-y-4">
                 <div>
-                    <h4 className="font-bold text-red-500 dark:text-red-400">علت احتمالی</h4>
+                    <h4 className="font-bold text-red-500 dark:text-red-400">{translations[lang].cause}</h4>
                     <p className="mt-1 text-gray-600 dark:text-gray-300 text-sm">{analysis.cause}</p>
                 </div>
-                 <div>
-                    <h4 className="font-bold text-amber-500 dark:text-amber-400">توضیح مشکل</h4>
+                <div>
+                    <h4 className="font-bold text-amber-500 dark:text-amber-400">{translations[lang].explanation}</h4>
                     <p className="mt-1 text-gray-600 dark:text-gray-300 text-sm">{analysis.explanation}</p>
                 </div>
                 <div>
-                    <h4 className="font-bold text-green-600 dark:text-green-400">راه‌حل پیشنهادی</h4>
+                    <h4 className="font-bold text-green-600 dark:text-green-400">{translations[lang].solution}</h4>
                     <div className="mt-2 space-y-2">
                         {analysis.solution.map((step, index) => {
                             if (step.startsWith('CMD:')) {
@@ -445,7 +529,6 @@ const ErrorAnalysisCard = ({ analysis, lang }) => (
         </Card>
     </div>
 );
-
 
 const AboutModal = ({ lang, onClose }) => {
     const t = translations[lang];
@@ -482,15 +565,16 @@ const FeedbackModal = ({ lang, onClose }) => {
         setStatus('sending');
         
         try {
-            // This now saves to Firestore instead of sending an email
             await dbAction(auth.currentUser?.uid, 'feedback', 'add', { text: feedback });
             setStatus('success');
+            toast.success(t.feedbackSuccess);
             setTimeout(() => {
                 onClose();
             }, 2000);
         } catch (error) {
             console.error("Error sending feedback:", error);
             setStatus('error');
+            toast.error(t.feedbackError);
         }
     };
 
@@ -522,7 +606,6 @@ const FeedbackModal = ({ lang, onClose }) => {
         </div>
     );
 };
-
 
 // Main App Component
 function AppContent() {
@@ -557,6 +640,9 @@ function AppContent() {
         const q = query(collection(db, "users", user.uid, "favorites"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             setFavorites(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }, (error) => {
+            console.error("Error fetching favorites:", error);
+            toast.error(`Failed to fetch favorites: ${error.message}`);
         });
         return () => unsubscribe();
     }, [user]);
@@ -575,7 +661,6 @@ function AppContent() {
     useEffect(() => {
         setOsVersion(osDetails[os].versions[0]);
         setCli(osDetails[os].clis[0]);
-        // Do NOT reset userInput here
         setResult(null);
     }, [os, lang, mode]);
 
@@ -602,15 +687,20 @@ function AppContent() {
 
         if (querySnapshot.empty) {
             await dbAction(user.uid, 'favorites', 'add', { ...itemData, identifier: itemIdentifier, type: itemType, userInput: userInput || itemIdentifier, mode: mode });
+            toast.success(t.favorites + " added!");
         } else {
             querySnapshot.forEach(doc => {
                 dbAction(user.uid, 'favorites', 'delete', { id: doc.id });
             });
+            toast.success(t.favorites + " removed!");
         }
     };
 
     const handlePrimaryAction = async () => {
-        if (!userInput.trim() || !os || !osVersion || !cli) return;
+        if (!userInput.trim() || !os || !osVersion || !cli) {
+            toast.error("Please fill in all required fields.");
+            return;
+        }
         setIsLoading(true);
         setError(null);
         setResult(null);
@@ -632,7 +722,6 @@ function AppContent() {
             setResult(responseData);
             await dbAction(user?.uid, 'history', 'add', { mode, os, osVersion, cli, userInput });
             
-            // Usage counter for feedback prompt
             const usageCount = parseInt(localStorage.getItem('cmdgenUsageCount') || '0') + 1;
             localStorage.setItem('cmdgenUsageCount', usageCount.toString());
             if (usageCount % 10 === 0 && !localStorage.getItem('cmdgenFeedbackDismissed')) {
@@ -642,6 +731,7 @@ function AppContent() {
         } catch (err) {
             setError(t.errorMessage);
             console.error(err);
+            toast.error(t.errorMessage);
         } finally {
             setIsLoading(false);
         }
@@ -653,7 +743,7 @@ function AppContent() {
         textArea.value = textToCopy;
         document.body.appendChild(textArea);
         textArea.select();
-        try { document.execCommand('copy'); } catch (err) { console.error('Copy failed', err); }
+        try { document.execCommand('copy'); toast.success(t.copied); } catch (err) { console.error('Copy failed', err); toast.error("Failed to copy commands."); }
         document.body.removeChild(textArea);
     };
 
@@ -675,7 +765,7 @@ function AppContent() {
             <div className="flex-1 flex flex-col h-screen overflow-y-auto">
                 <Header lang={lang} setLang={setLang} theme={theme} toggleTheme={toggleTheme} onHistoryToggle={() => handlePanelToggle('history')} onFavoritesToggle={() => handlePanelToggle('favorites')} onAboutToggle={() => setIsAboutModalOpen(true)} onFeedbackToggle={() => setIsFeedbackModalOpen(true)} />
                 <main className="flex-grow container mx-auto px-4 md:px-8 py-8 md:py-12">
-                     <div className="max-w-3xl mx-auto text-center">
+                    <div className="max-w-3xl mx-auto text-center">
                         <div className="inline-flex items-center bg-gray-200 dark:bg-gray-800 p-1 rounded-full mb-6">
                             <button onClick={() => setMode('generate')} className={`px-4 py-1.5 text-sm font-semibold rounded-full flex items-center gap-2 transition-colors ${mode === 'generate' ? 'bg-cyan-500 text-white' : 'text-gray-700 dark:text-gray-300'}`}> <Wand2 size={16} /> {t.modeGenerate} </button>
                             <button onClick={() => setMode('explain')} className={`px-4 py-1.5 text-sm font-semibold rounded-full flex items-center gap-2 transition-colors ${mode === 'explain' ? 'bg-cyan-500 text-white' : 'text-gray-700 dark:text-gray-300'}`}> <Search size={16} /> {t.modeExplain} </button>
@@ -761,8 +851,13 @@ function AppContent() {
 
 export default function App() {
     return (
-        <AuthProvider>
-            <AppContent />
-        </AuthProvider>
+        <BrowserRouter>
+            <AuthProvider>
+                <Routes>
+                    <Route path="/" element={<AppContent />} />
+                    <Route path="/__/auth/handler" element={<AuthHandler />} />
+                </Routes>
+            </AuthProvider>
+        </BrowserRouter>
     );
 }
