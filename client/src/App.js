@@ -2,16 +2,17 @@ import React, { useState, useEffect, useRef, createContext, useContext } from 'r
 import { BrowserRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { Terminal, Copy, Check, ServerCrash, Wind, Apple, BrainCircuit, Bot, ChevronDown, Wand2, Search, LogIn, LogOut, User, History, Star, Sun, Moon, FileCode2, CopyPlus, Info, X, ShieldAlert, MessageSquare } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithRedirect, signOut, onAuthStateChanged, getRedirectResult } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged, getRedirectResult } from 'firebase/auth';
 import { getFirestore, collection, addDoc, query, onSnapshot, orderBy, limit, deleteDoc, doc, where, getDocs } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 
 // --- Firebase Configuration ---
 const firebaseConfig = {
     apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
-    authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+    authDomain: "cmdgen.onrender.com", // صراحتاً به cmdgen.onrender.com تنظیم شده است
     projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+    storage Ascending order: 1
+storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
     messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
     appId: process.env.REACT_APP_FIREBASE_APP_ID,
     measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID
@@ -23,7 +24,10 @@ let auth;
 let db;
 if (firebaseConfig.apiKey) {
     try {
-        console.log("Initializing Firebase with config:", firebaseConfig);
+        console.log("Initializing Firebase with config:", {
+            ...firebaseConfig,
+            apiKey: '[REDACTED]' // لاگ کلید API مخفی شده است
+        });
         app = initializeApp(firebaseConfig);
         auth = getAuth(app);
         db = getFirestore(app);
@@ -48,8 +52,20 @@ export const AuthProvider = ({ children }) => {
         }
 
         const unsubscribe = onAuthStateChanged(auth, (user) => {
-            console.log("Auth state changed:", user ? { uid: user.uid, displayName: user.displayName, email: user.email } : "No user");
+            console.log("Auth state changed:", user ? {
+                uid: user.uid,
+                displayName: user.displayName,
+                email: user.email
+            } : "No user");
             setUser(user);
+            setLoading(false);
+        }, (error) => {
+            console.error("Auth state change error:", {
+                code: error.code,
+                message: error.message,
+                details: error
+            });
+            toast.error(`Auth error: ${error.message}`);
             setLoading(false);
         });
 
@@ -62,13 +78,31 @@ export const AuthProvider = ({ children }) => {
             toast.error("Authentication is not initialized.");
             return;
         }
+        if (document.body.classList.contains('logging-in')) {
+            console.log("Login already in progress, ignoring additional clicks.");
+            return;
+        }
+        document.body.classList.add('logging-in');
         const provider = new GoogleAuthProvider();
         try {
-            console.log("Starting Google login with redirect...");
-            await signInWithRedirect(auth, provider);
+            console.log("Starting Google login with popup...");
+            const result = await signInWithPopup(auth, provider); // تغییر به signInWithPopup برای دور زدن مشکلات ریدایرکت
+            console.log("Login successful:", {
+                uid: result.user.uid,
+                displayName: result.user.displayName,
+                email: result.user.email
+            });
+            setUser(result.user);
+            toast.success("Successfully signed in!");
         } catch (error) {
-            console.error("Google login error:", { code: error.code, message: error.message, details: error });
+            console.error("Google login error:", {
+                code: error.code,
+                message: error.message,
+                details: error
+            });
             toast.error(`Failed to sign in: ${error.code} - ${error.message}`);
+        } finally {
+            document.body.classList.remove('logging-in');
         }
     };
 
@@ -76,6 +110,7 @@ export const AuthProvider = ({ children }) => {
         if (!auth) return;
         try {
             await signOut(auth);
+            setUser(null); // صراحتاً user را null کنید
             toast.success("Successfully signed out!");
         } catch (error) {
             console.error("Logout error:", error);
@@ -88,7 +123,7 @@ export const AuthProvider = ({ children }) => {
         <AuthContext.Provider value={value}>
             {loading ? (
                 <div className="flex justify-center items-center h-screen">
-                    <div className="text-gray-600 dark:text-gray-300">Loading...</div>
+                    <div className="text-gray-600 dark:text-gray-300">Loading authentication...</div>
                 </div>
             ) : (
                 children
@@ -105,6 +140,12 @@ const AuthHandler = () => {
 
     useEffect(() => {
         console.log("Processing redirect in AuthHandler at:", new Date().toISOString());
+        if (!auth) {
+            console.error("Auth is not initialized in AuthHandler.");
+            toast.error("Authentication is not initialized.");
+            navigate("/", { replace: true });
+            return;
+        }
         getRedirectResult(auth)
             .then((result) => {
                 if (result) {
@@ -210,22 +251,27 @@ const osDetails = {
 
 // --- API & DB Functions ---
 const callApiProxy = async (payload) => {
-    const response = await fetch('/api/proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    });
+    try {
+        const response = await fetch('/api/proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
 
-    if (!response.ok) {
-        const errorBody = await response.text();
-        console.error("API Proxy Error:", response.status, errorBody);
-        throw new Error(`API request failed: ${response.status}. ${errorBody}`);
+        if (!response.ok) {
+            const errorBody = await response.text();
+            console.error("API Proxy Error:", response.status, errorBody);
+            throw new Error(`API request failed: ${response.status}. ${errorBody}`);
+        }
+        
+        const data = await response.json();
+        const content = data.choices[0]?.message?.content;
+        if (!content) throw new Error("Received an empty response from the API.");
+        return content;
+    } catch (error) {
+        console.error("API Proxy fetch error:", error);
+        throw error;
     }
-    
-    const data = await response.json();
-    const content = data.choices[0]?.message?.content;
-    if (!content) throw new Error("Received an empty response from the API.");
-    return content;
 };
 
 const baseSystemPrompt = `You are an expert command-line assistant, CMDGEN. Your explanations must be practical and user-focused. Explain *why* a user would do this and what the real-world outcome is.
@@ -253,7 +299,7 @@ const fetchExplanationForCommand = async (commandToExplain, os_type, os_version,
     1.  **Markdown Format:** Your entire response must be in Markdown.
     2.  **Structure:** The explanation MUST include these exact headings in the requested language: "Purpose / هدف", "Breakdown / اجزاء دستور", "Usage Examples / مثال‌های کاربردی", and "Pro Tip / نکته حرفه‌ای".
     3.  **OS-SPECIFIC EXAMPLES:** The examples in "Usage Examples" MUST be relevant and correct for the specified OS (${os_type}) and Shell (${cli}).`;
-    const userPrompt = `User's environment: OS=${os_type}, Version=${os_version}, Shell=${cli}. Please explain this command: \`${commandToExplain}\``;
+    const userPrompt = `User's environment: OS=${os_type}, Version=${os_version}, Shell=${cli}. Language for response: ${langMap[language]}. Please explain this command: \`${commandToExplain}\``;
     const payload = { model: 'llama3-8b-8192', messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }], temperature: 0.5 };
     return await callApiProxy(payload);
 };
@@ -392,8 +438,8 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
                     </div>
                     {user ? (
                         <div className="flex items-center gap-3">
-                            <img src={user.photoURL} alt={user.displayName} className="w-8 h-8 rounded-full" />
-                            <span className="text-sm text-gray-600 dark:text-gray-300">{user.displayName}</span>
+                            <img src={user.photoURL || 'https://via.placeholder.com/32'} alt={user.displayName || 'User'} className="w-8 h-8 rounded-full" />
+                            <span className="text-sm text-gray-600 dark:text-gray-300">{user.displayName || user.email || 'User'}</span>
                             <button onClick={logout} className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/40 text-red-400 dark:text-red-300 transition-colors"><LogOut size={16}/></button>
                         </div>
                     ) : (
@@ -469,20 +515,20 @@ const ScriptCard = ({ filename, script_lines = [], explanation, lang, onFavorite
     };
     return (
         <div className="mt-10 max-w-3xl mx-auto opacity-100" style={{ animation: `fadeInUp 0.5s ease-out forwards` }}>
-            <Card lang={lang}>
-                <div className="flex justify-between items-center mb-3">
-                    <div className="flex items-center gap-2 text-sm text-cyan-600 dark:text-cyan-400"><FileCode2 className="w-4 h-4" /><span>{filename}</span></div>
-                    <button onClick={onFavoriteToggle} className="p-1.5 text-gray-400 hover:text-amber-400 transition-colors">
-                        <Star size={16} className={isFavorite ? 'fill-amber-400 text-amber-400' : ''} />
-                    </button>
-                </div>
-                <CommandDisplay command={fullScript} onCopy={handleCopy} copied={copied} />
-                <div className="mt-4">
-                    <h4 className="font-bold text-gray-800 dark:text-gray-200">{translations[lang].scriptExplanation}</h4>
-                    <p className="mt-1 text-gray-600 dark:text-gray-300 text-sm leading-relaxed">{explanation}</p>
-                </div>
-            </Card>
-        </div>
+        <Card lang={lang}>
+            <div className="flex justify-between items-center mb-3">
+                <div className="flex items-center gap-2 text-sm text-cyan-600 dark:text-cyan-400"><FileCode2 className="w-4 h-4" /><span>{filename}</span></div>
+                <button onClick={onFavoriteToggle} className="p-1.5 text-gray-400 hover:text-amber-400 transition-colors">
+                    <Star size={16} className={isFavorite ? 'fill-amber-400 text-amber-400' : ''} />
+                </button>
+            </div>
+            <CommandDisplay command={fullScript} onCopy={handleCopy} copied={copied} />
+            <div className="mt-4">
+                <h4 className="font-bold text-gray-800 dark:text-gray-200">{translations[lang].scriptExplanation}</h4>
+                <p className="mt-1 text-gray-600 dark:text-gray-300 text-sm leading-relaxed">{explanation}</p>
+            </div>
+        </Card>
+    </div>
     );
 };
 
