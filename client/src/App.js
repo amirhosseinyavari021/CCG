@@ -126,6 +126,21 @@ const AuthHandler = () => {
     return null;
 };
 
+// --- Helper Functions ---
+const isValidEmail = (email) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+};
+
+const isStrongPassword = (password) => {
+    const minLength = 8;
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumbers = /\d/.test(password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    return password.length >= minLength && hasUpperCase && hasLowerCase && hasNumbers && hasSpecialChar;
+};
+
 // --- Translations ---
 const translations = {
     en: {
@@ -156,6 +171,8 @@ const translations = {
         aboutToolText: "CMDGEN is an intelligent assistant designed to bridge the gap between human language and the command line. Whether you're a seasoned developer or just starting, CMDGEN empowers you to accomplish tasks efficiently without needing to memorize complex syntax. It features powerful modes like **Generate**, **Explain**, **Script**, and **Error Analysis**. Powered by advanced AI and built with a modern tech stack including React and Firebase, CMDGEN is your smart, reliable partner for mastering the command line.",
         feedbackTitle: "Send Feedback", feedbackPlaceholder: "Your feedback helps us improve...", send: "Send", sending: "Sending...", feedbackSuccess: "Thank you for your feedback!", feedbackError: "Could not send feedback. Please try again later.",
         feedbackPrompt: "Enjoying CMDGEN? Help us improve by sending your feedback!", giveFeedback: "Give Feedback", dismiss: "Dismiss",
+        invalidEmail: "Please enter a valid email address.",
+        weakPassword: "Password must be at least 8 characters long and include uppercase, lowercase, numbers, and special characters.",
     },
     fa: {
         signUp: "ثبت‌نام", logout: "خروج", history: "تاریخچه", favorites: "مورد علاقه‌ها", about: "درباره", feedback: "بازخورد",
@@ -185,6 +202,8 @@ const translations = {
         aboutToolText: "CMDGEN یک دستیار هوشمند است که برای پر کردن شکاف بین زبان انسان و خط فرمان طراحی شده است. چه یک توسعه‌دهنده باتجربه باشید و چه در ابتدای راه، CMDGEN شما را قادر می‌سازد تا وظایف خود را به طور موثر و بدون نیاز به حفظ کردن دستورات پیچیده انجام دهید. این ابزار دارای حالت‌های قدرتمندی مانند **تولید**، **تحلیل**، **اسکریپت‌ساز** و **تحلیل خطا** است. CMDGEN با بهره‌گیری از هوش مصنوعی پیشرفته و ساخته شده بر پایه فناوری‌های مدرن مانند React و Firebase، شریک هوشمند و قابل اعتماد شما برای تسلط بر خط فرمان است.",
         feedbackTitle: "ارسال بازخورد", feedbackPlaceholder: "نظر شما به ما در بهبود این ابزار کمک می‌کند...", send: "ارسال", sending: "در حال ارسال...", feedbackSuccess: "از بازخورد شما سپاسگزاریم!", feedbackError: "ارسال بازخورد با مشکل مواجه شد. لطفاً بعداً تلاش کنید.",
         feedbackPrompt: "از کار با CMDGEN لذت می‌برید؟ با ارسال نظر خود به ما در بهبود آن کمک کنید!", giveFeedback: "ارسال بازخورد", dismiss: "بعداً",
+        invalidEmail: "لطفاً یک ایمیل معتبر وارد کنید.",
+        weakPassword: "رمز عبور باید حداقل ۸ کاراکتر باشد و شامل حروف بزرگ، حروف کوچک، اعداد و کاراکترهای خاص باشد.",
     }
 };
 
@@ -309,23 +328,19 @@ const CustomSelect = ({ label, value, onChange, options, placeholder, disabled, 
 const Panel = ({ lang, onSelect, title, icon, collectionName, noItemsText }) => {
     const { user } = useAuth();
     const [items, setItems] = useState([]);
-    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (!user || !db) {
             setItems([]);
-            setLoading(false);
             return;
         }
         const q = query(collection(db, "users", user.uid, collectionName), orderBy("createdAt", "desc"), limit(20));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setItems(data);
-            setLoading(false);
         }, (error) => {
             console.error(`Error fetching ${collectionName}:`, error);
             toast.error(`Failed to fetch ${collectionName}: ${error.message}`);
-            setLoading(false);
         });
         return () => unsubscribe();
     }, [user, collectionName]);
@@ -334,7 +349,6 @@ const Panel = ({ lang, onSelect, title, icon, collectionName, noItemsText }) => 
         <div className="w-full h-full bg-gray-100 dark:bg-gray-900 p-4 flex flex-col">
             <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">{icon} {title}</h3>
             {!user ? <div className="text-center text-gray-500 dark:text-gray-400 mt-8">{translations[lang].loginToSave}</div>
-                : loading ? <div className="text-center text-gray-500 dark:text-gray-400">Loading...</div>
                 : items.length === 0 ? <div className="text-center text-gray-500 dark:text-gray-400">{noItemsText}</div>
                 : (
                     <ul className="space-y-2 overflow-y-auto">
@@ -366,6 +380,14 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
 
     const handleSignUpSubmit = async (e) => {
         e.preventDefault();
+        if (!isValidEmail(email)) {
+            toast.error(t.invalidEmail);
+            return;
+        }
+        if (!isStrongPassword(password)) {
+            toast.error(t.weakPassword);
+            return;
+        }
         await signUpWithEmail(email, password);
         setIsSignUpOpen(false);
         setEmail('');
@@ -637,12 +659,12 @@ const FeedbackModal = ({ lang, onClose }) => {
 
 // Main App Component
 function AppContent() {
-    const [lang, setLang] = useState('en'); // پیش‌فرض به انگلیسی تغییر کرد
-    const [theme, setTheme] = useState('dark');
-    const [mode, setMode] = useState('generate');
-    const [os, setOs] = useState('linux');
-    const [osVersion, setOsVersion] = useState('');
-    const [cli, setCli] = useState('');
+    const [lang, setLang] = useState(() => localStorage.getItem('lang') || 'en');
+    const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
+    const [mode, setMode] = useState(() => localStorage.getItem('mode') || 'generate');
+    const [os, setOs] = useState(() => localStorage.getItem('os') || 'linux');
+    const [osVersion, setOsVersion] = useState(() => localStorage.getItem('osVersion') || osDetails[os].versions[0]);
+    const [cli, setCli] = useState(() => localStorage.getItem('cli') || osDetails[os].clis[0]);
     const [userInput, setUserInput] = useState('');
     const [result, setResult] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -657,17 +679,30 @@ function AppContent() {
     const t = translations[lang];
 
     useEffect(() => {
-        const savedTheme = localStorage.getItem('theme') || 'dark';
-        setTheme(savedTheme);
-        if (savedTheme === 'dark') document.documentElement.classList.add('dark');
+        if (theme === 'dark') document.documentElement.classList.add('dark');
         else document.documentElement.classList.remove('dark');
-    }, []);
+    }, [theme]);
 
     useEffect(() => {
-        if (!user) { setFavorites([]); return; }
+        document.body.dir = lang === 'fa' ? 'rtl' : 'ltr';
+        localStorage.setItem('lang', lang);
+        localStorage.setItem('theme', theme);
+        localStorage.setItem('mode', mode);
+        localStorage.setItem('os', os);
+        localStorage.setItem('osVersion', osVersion);
+        localStorage.setItem('cli', cli);
+    }, [lang, theme, mode, os, osVersion, cli]);
+
+    useEffect(() => {
+        if (!user) {
+            setFavorites([]);
+            return;
+        }
         const q = query(collection(db, "users", user.uid, "favorites"));
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            setFavorites(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setFavorites(data);
+            localStorage.setItem('favorites', JSON.stringify(data)); // ذخیره محلی
         }, (error) => {
             console.error("Error fetching favorites:", error);
             toast.error(`Failed to fetch favorites: ${error.message}`);
@@ -678,19 +713,13 @@ function AppContent() {
     const toggleTheme = () => {
         const newTheme = theme === 'light' ? 'dark' : 'light';
         setTheme(newTheme);
-        localStorage.setItem('theme', newTheme);
-        document.documentElement.classList.toggle('dark', newTheme === 'dark');
     };
-
-    useEffect(() => {
-        document.body.dir = lang === 'fa' ? 'rtl' : 'ltr';
-    }, [lang]);
 
     useEffect(() => {
         setOsVersion(osDetails[os].versions[0]);
         setCli(osDetails[os].clis[0]);
         setResult(null);
-    }, [os, lang, mode]);
+    }, [os]);
 
     const handlePanelToggle = (panel) => {
         setActivePanel(activePanel === panel ? null : panel);
@@ -701,7 +730,8 @@ function AppContent() {
         setOs(item.os);
         setOsVersion(item.osVersion);
         setCli(item.cli);
-        setUserInput(item.userInput);
+        setUserInput(item.userInput || '');
+        setResult(null); // ریست کردن result برای جلوگیری از صفحه سفید
         setActivePanel(null);
     };
 
