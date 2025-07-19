@@ -87,24 +87,24 @@ export const AuthProvider = ({ children }) => {
                 authDomain: auth.config.authDomain,
                 currentUrl: window.location.href
             });
+            // فقط یک پاپ‌آپ باز می‌کنیم و مطمئن می‌شیم به گوگل می‌ره
             const popup = window.open("", "_blank", "width=600,height=600");
-            if (popup) {
-                const result = await signInWithPopup(auth, provider);
-                console.log("Popup result:", {
-                    url: popup.location.href, // تلاش برای گرفتن URL پاپ‌آپ
-                    result: result ? "Success" : "Failed"
-                });
-                console.log("Login successful:", {
-                    uid: result.user.uid,
-                    displayName: result.user.displayName,
-                    email: result.user.email
-                });
-                setUser(result.user);
-                toast.success("Successfully signed in!");
-            } else {
-                console.error("Popup blocked by browser!");
-                toast.error("Popup was blocked. Allow popups and try again.");
+            if (!popup) {
+                throw new Error("Popup blocked by browser!");
             }
+            const result = await signInWithPopup(auth, provider);
+            console.log("Popup result:", {
+                url: popup.location.href,
+                result: result ? "Success" : "Failed"
+            });
+            console.log("Login successful:", {
+                uid: result.user.uid,
+                displayName: result.user.displayName,
+                email: result.user.email
+            });
+            setUser(result.user);
+            toast.success("Successfully signed in!");
+            popup.close(); // بستن پاپ‌آپ بعد از موفقیت
         } catch (error) {
             console.error("Google login error:", {
                 code: error.code,
@@ -116,8 +116,11 @@ export const AuthProvider = ({ children }) => {
             if (error.code === 'auth/popup-closed-by-user') {
                 toast.error("Popup was closed. Please try again and complete the login.");
             } else if (error.code === 'auth/unauthorized-domain') {
-                toast.error("Domain not authorized. Check Firebase settings.");
+                toast.error("Domain not authorized. Check Firebase settings and ensure cmdgen.onrender.com is added.");
+            } else if (error.code === 'auth/cancelled-popup-request') {
+                toast.error("Login request cancelled. Try again.");
             }
+            if (window.popup) window.popup.close(); // بستن پاپ‌آپ اگه خطا بده
         } finally {
             document.body.classList.remove('logging-in');
         }
