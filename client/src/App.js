@@ -29,7 +29,7 @@ try {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     db = getFirestore(app);
-    console.log("Auth initialized with domain:", auth ? auth.config.authDomain : "Auth failed to initialize");
+    console.log("Auth initialized with domain:", auth.config.authDomain);
 } catch (error) {
     console.error("Firebase initialization error:", error);
     toast.error("Failed to initialize Firebase.");
@@ -72,18 +72,17 @@ export const AuthProvider = ({ children }) => {
 
     const signUpWithEmail = async (email, password) => {
         if (!auth) {
-            console.error("Auth is not initialized for sign-up.");
+            console.error("Auth is not initialized.");
             toast.error("Authentication is not initialized.");
             return;
         }
         try {
-            console.log("Attempting sign-up with email:", email);
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             setUser(userCredential.user);
-            toast.success("ثبت‌نام موفق!");
+            toast.success("Successfully signed up!");
         } catch (error) {
             console.error("Sign-up error:", error);
-            toast.error(`به مشکل خورد: ${error.message}`);
+            toast.error(`Failed to sign up: ${error.message}`);
         }
     };
 
@@ -127,21 +126,6 @@ const AuthHandler = () => {
     return null;
 };
 
-// --- Helper Functions ---
-const isValidEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-};
-
-const isStrongPassword = (password) => {
-    const minLength = 8;
-    const hasUpperCase = /[A-Z]/.test(password);
-    const hasLowerCase = /[a-z]/.test(password);
-    const hasNumbers = /\d/.test(password);
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-    return password.length >= minLength && hasUpperCase && hasLowerCase && hasNumbers && hasSpecialChar;
-};
-
 // --- Translations ---
 const translations = {
     en: {
@@ -172,11 +156,6 @@ const translations = {
         aboutToolText: "CMDGEN is an intelligent assistant designed to bridge the gap between human language and the command line. Whether you're a seasoned developer or just starting, CMDGEN empowers you to accomplish tasks efficiently without needing to memorize complex syntax. It features powerful modes like **Generate**, **Explain**, **Script**, and **Error Analysis**. Powered by advanced AI and built with a modern tech stack including React and Firebase, CMDGEN is your smart, reliable partner for mastering the command line.",
         feedbackTitle: "Send Feedback", feedbackPlaceholder: "Your feedback helps us improve...", send: "Send", sending: "Sending...", feedbackSuccess: "Thank you for your feedback!", feedbackError: "Could not send feedback. Please try again later.",
         feedbackPrompt: "Enjoying CMDGEN? Help us improve by sending your feedback!", giveFeedback: "Give Feedback", dismiss: "Dismiss",
-        invalidEmail: "Please enter a valid email address.",
-        weakPassword: "Password must be at least 8 characters long and include uppercase, lowercase, numbers, and special characters.",
-        signupCancelled: "Sign-up cancelled.",
-        signupFailed: "Sign-up failed.",
-        signupSuccess: "Sign-up successful!",
     },
     fa: {
         signUp: "ثبت‌نام", logout: "خروج", history: "تاریخچه", favorites: "مورد علاقه‌ها", about: "درباره", feedback: "بازخورد",
@@ -206,11 +185,6 @@ const translations = {
         aboutToolText: "CMDGEN یک دستیار هوشمند است که برای پر کردن شکاف بین زبان انسان و خط فرمان طراحی شده است. چه یک توسعه‌دهنده باتجربه باشید و چه در ابتدای راه، CMDGEN شما را قادر می‌سازد تا وظایف خود را به طور موثر و بدون نیاز به حفظ کردن دستورات پیچیده انجام دهید. این ابزار دارای حالت‌های قدرتمندی مانند **تولید**، **تحلیل**، **اسکریپت‌ساز** و **تحلیل خطا** است. CMDGEN با بهره‌گیری از هوش مصنوعی پیشرفته و ساخته شده بر پایه فناوری‌های مدرن مانند React و Firebase، شریک هوشمند و قابل اعتماد شما برای تسلط بر خط فرمان است.",
         feedbackTitle: "ارسال بازخورد", feedbackPlaceholder: "نظر شما به ما در بهبود این ابزار کمک می‌کند...", send: "ارسال", sending: "در حال ارسال...", feedbackSuccess: "از بازخورد شما سپاسگزاریم!", feedbackError: "ارسال بازخورد با مشکل مواجه شد. لطفاً بعداً تلاش کنید.",
         feedbackPrompt: "از کار با CMDGEN لذت می‌برید؟ با ارسال نظر خود به ما در بهبود آن کمک کنید!", giveFeedback: "ارسال بازخورد", dismiss: "بعداً",
-        invalidEmail: "لطفاً یک ایمیل معتبر وارد کنید.",
-        weakPassword: "رمز عبور باید حداقل ۸ کاراکتر باشد و شامل حروف بزرگ، حروف کوچک، اعداد و کاراکترهای خاص باشد.",
-        signupCancelled: "ثبت‌نام لغو شد.",
-        signupFailed: "به مشکل خورد.",
-        signupSuccess: "ثبت‌نام موفق!",
     }
 };
 
@@ -335,19 +309,23 @@ const CustomSelect = ({ label, value, onChange, options, placeholder, disabled, 
 const Panel = ({ lang, onSelect, title, icon, collectionName, noItemsText }) => {
     const { user } = useAuth();
     const [items, setItems] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (!user || !db) {
             setItems([]);
+            setLoading(false);
             return;
         }
         const q = query(collection(db, "users", user.uid, collectionName), orderBy("createdAt", "desc"), limit(20));
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setItems(data);
+            setLoading(false);
         }, (error) => {
             console.error(`Error fetching ${collectionName}:`, error);
             toast.error(`Failed to fetch ${collectionName}: ${error.message}`);
+            setLoading(false);
         });
         return () => unsubscribe();
     }, [user, collectionName]);
@@ -356,6 +334,7 @@ const Panel = ({ lang, onSelect, title, icon, collectionName, noItemsText }) => 
         <div className="w-full h-full bg-gray-100 dark:bg-gray-900 p-4 flex flex-col">
             <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">{icon} {title}</h3>
             {!user ? <div className="text-center text-gray-500 dark:text-gray-400 mt-8">{translations[lang].loginToSave}</div>
+                : loading ? <div className="text-center text-gray-500 dark:text-gray-400">Loading...</div>
                 : items.length === 0 ? <div className="text-center text-gray-500 dark:text-gray-400">{noItemsText}</div>
                 : (
                     <ul className="space-y-2 overflow-y-auto">
@@ -384,44 +363,13 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
     const [isSignUpOpen, setIsSignUpOpen] = useState(false);
     const t = translations[lang];
     console.log("Header: Current user:", user ? { uid: user.uid, displayName: user.displayName, email: user.email } : "No user");
-    console.log("Sign-up button clicked, isSignUpOpen:", isSignUpOpen);
 
     const handleSignUpSubmit = async (e) => {
         e.preventDefault();
-        console.log("Sign-up form submitted with email:", email);
-        if (!auth) {
-            console.log("Auth is not initialized, cannot proceed with sign-up.");
-            toast.error("Authentication is not initialized.");
-            return;
-        }
-        if (!isValidEmail(email)) {
-            toast.error(t.invalidEmail);
-            return;
-        }
-        if (!isStrongPassword(password)) {
-            toast.error(t.weakPassword);
-            return;
-        }
-        try {
-            console.log("Attempting sign-up with email:", email);
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            setUser(userCredential.user);
-            toast.success(t.signupSuccess);
-        } catch (error) {
-            console.error("Sign-up error:", error);
-            toast.error(`به مشکل خورد: ${error.message}`);
-        }
+        await signUpWithEmail(email, password);
         setIsSignUpOpen(false);
         setEmail('');
         setPassword('');
-    };
-
-    const handleCancel = () => {
-        console.log("Sign-up cancelled");
-        setIsSignUpOpen(false);
-        setEmail('');
-        setPassword('');
-        toast.info(t.signupCancelled);
     };
 
     return (
@@ -455,7 +403,7 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
                         </div>
                     ) : (
                         <div className="relative group">
-                            <button onClick={() => { console.log("Sign-up button clicked"); setIsSignUpOpen(true); }} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-full text-sm font-semibold hover:bg-blue-700 transition-colors">
+                            <button onClick={() => setIsSignUpOpen(true)} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-full text-sm font-semibold hover:bg-blue-700 transition-colors">
                                 <LogIn size={16} /> {t.signUp}
                             </button>
                             {isSignUpOpen && (
@@ -465,20 +413,20 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
                                             type="email"
                                             value={email}
                                             onChange={(e) => setEmail(e.target.value)}
-                                            placeholder="example@example.com"
+                                            placeholder="Email"
                                             className="w-full bg-gray-200/50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500"
                                         />
                                         <input
                                             type="password"
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
-                                            placeholder="Pass123! (حداقل 8 کاراکتر با حروف بزرگ، کوچک، عدد و کاراکتر خاص)"
+                                            placeholder="Password"
                                             className="w-full bg-gray-200/50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500"
                                         />
                                         <button type="submit" className="w-full bg-cyan-600 text-white px-3 py-2 rounded-lg hover:bg-cyan-700">
                                             {t.signUp}
                                         </button>
-                                        <button type="button" onClick={handleCancel} className="w-full text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white mt-2">
+                                        <button type="button" onClick={() => setIsSignUpOpen(false)} className="w-full text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white mt-2">
                                             Cancel
                                         </button>
                                     </form>
@@ -638,7 +586,6 @@ const FeedbackModal = ({ lang, onClose }) => {
     const t = translations[lang];
     const [feedback, setFeedback] = useState('');
     const [status, setStatus] = useState('idle');
-    const feedbackEmail = process.env.REACT_APP_FEEDBACK_EMAIL || 'default@example.com';
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -646,12 +593,11 @@ const FeedbackModal = ({ lang, onClose }) => {
         setStatus('sending');
         
         try {
-            await dbAction(auth.currentUser?.uid, 'feedback', 'add', { text: feedback, email: feedbackEmail, createdAt: new Date() });
+            await dbAction(auth.currentUser?.uid, 'feedback', 'add', { text: feedback });
             setStatus('success');
             toast.success(t.feedbackSuccess);
             setTimeout(() => {
                 onClose();
-                setFeedback('');
             }, 2000);
         } catch (error) {
             console.error("Error sending feedback:", error);
@@ -691,12 +637,12 @@ const FeedbackModal = ({ lang, onClose }) => {
 
 // Main App Component
 function AppContent() {
-    const [lang, setLang] = useState(() => localStorage.getItem('lang') || 'en');
-    const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
-    const [mode, setMode] = useState(() => localStorage.getItem('mode') || 'generate');
-    const [os, setOs] = useState(() => localStorage.getItem('os') || 'linux');
-    const [osVersion, setOsVersion] = useState(() => localStorage.getItem('osVersion') || osDetails[os].versions[0]);
-    const [cli, setCli] = useState(() => localStorage.getItem('cli') || osDetails[os].clis[0]);
+    const [lang, setLang] = useState('en'); // پیش‌فرض به انگلیسی تغییر کرد
+    const [theme, setTheme] = useState('dark');
+    const [mode, setMode] = useState('generate');
+    const [os, setOs] = useState('linux');
+    const [osVersion, setOsVersion] = useState('');
+    const [cli, setCli] = useState('');
     const [userInput, setUserInput] = useState('');
     const [result, setResult] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -710,33 +656,41 @@ function AppContent() {
     const { user } = useAuth();
     const t = translations[lang];
 
+    useEffect(() => {
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        setTheme(savedTheme);
+        if (savedTheme === 'dark') document.documentElement.classList.add('dark');
+        else document.documentElement.classList.remove('dark');
+    }, []);
+
+    useEffect(() => {
+        if (!user) { setFavorites([]); return; }
+        const q = query(collection(db, "users", user.uid, "favorites"));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            setFavorites(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }, (error) => {
+            console.error("Error fetching favorites:", error);
+            toast.error(`Failed to fetch favorites: ${error.message}`);
+        });
+        return () => unsubscribe();
+    }, [user]);
+
     const toggleTheme = () => {
-        const newTheme = theme === 'dark' ? 'light' : 'dark';
+        const newTheme = theme === 'light' ? 'dark' : 'light';
         setTheme(newTheme);
-        document.documentElement.classList.toggle('dark', newTheme === 'dark');
         localStorage.setItem('theme', newTheme);
+        document.documentElement.classList.toggle('dark', newTheme === 'dark');
     };
 
     useEffect(() => {
-        if (theme === 'dark') document.documentElement.classList.add('dark');
-        else document.documentElement.classList.remove('dark');
-    }, [theme]);
-
-    useEffect(() => {
         document.body.dir = lang === 'fa' ? 'rtl' : 'ltr';
-        localStorage.setItem('lang', lang);
-        localStorage.setItem('theme', theme);
-        localStorage.setItem('mode', mode);
-        localStorage.setItem('os', os);
-        localStorage.setItem('osVersion', osVersion);
-        localStorage.setItem('cli', cli);
-    }, [lang, theme, mode, os, osVersion, cli]);
+    }, [lang]);
 
     useEffect(() => {
         setOsVersion(osDetails[os].versions[0]);
         setCli(osDetails[os].clis[0]);
         setResult(null);
-    }, [os]);
+    }, [os, lang, mode]);
 
     const handlePanelToggle = (panel) => {
         setActivePanel(activePanel === panel ? null : panel);
@@ -747,8 +701,7 @@ function AppContent() {
         setOs(item.os);
         setOsVersion(item.osVersion);
         setCli(item.cli);
-        setUserInput(item.userInput || '');
-        setResult(null);
+        setUserInput(item.userInput);
         setActivePanel(null);
     };
 
