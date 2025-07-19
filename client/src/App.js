@@ -619,7 +619,7 @@ const FeedbackModal = ({ lang, onClose }) => {
     const t = translations[lang];
     const [feedback, setFeedback] = useState('');
     const [status, setStatus] = useState('idle');
-    const feedbackEmail = process.env.REACT_APP_FEEDBACK_EMAIL || 'default@example.com'; // ایمیل محیطی
+    const feedbackEmail = process.env.REACT_APP_FEEDBACK_EMAIL
 
     const handleSubmit = async (e) => {
         e.preventDefault();
