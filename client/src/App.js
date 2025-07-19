@@ -156,10 +156,7 @@ const translations = {
         aboutToolText: "CMDGEN is an intelligent assistant designed to bridge the gap between human language and the command line. Whether you're a seasoned developer or just starting, CMDGEN empowers you to accomplish tasks efficiently without needing to memorize complex syntax. It features powerful modes like **Generate**, **Explain**, **Script**, and **Error Analysis**. Powered by advanced AI and built with a modern tech stack including React and Firebase, CMDGEN is your smart, reliable partner for mastering the command line.",
         feedbackTitle: "Send Feedback", feedbackPlaceholder: "Your feedback helps us improve...", send: "Send", sending: "Sending...", feedbackSuccess: "Thank you for your feedback!", feedbackError: "Could not send feedback. Please try again later.",
         feedbackPrompt: "Enjoying CMDGEN? Help us improve by sending your feedback!", giveFeedback: "Give Feedback", dismiss: "Dismiss",
-        signupWarning: "Please note: You must provide a valid email for feedback, password recovery, and other services. Your password must be at least 6-8 characters long, including uppercase letters, lowercase letters, numbers, and special characters (e.g., !@#$%) for security. Confirm to proceed.",
-        signupConfirm: "Confirm",
-        invalidEmail: "Please enter a valid email.",
-        weakPassword: "Password must be 6-8 characters with uppercase, lowercase, numbers, and special characters.",
+        signUpWarning: "Please provide a valid email for features like feedback and password recovery. Also, use a strong password (6-8 characters with uppercase, lowercase, numbers, and symbols) for your security. Confirm to proceed.",
     },
     fa: {
         signUp: "ثبت‌نام", logout: "خروج", history: "تاریخچه", favorites: "مورد علاقه‌ها", about: "درباره", feedback: "بازخورد",
@@ -189,10 +186,7 @@ const translations = {
         aboutToolText: "CMDGEN یک دستیار هوشمند است که برای پر کردن شکاف بین زبان انسان و خط فرمان طراحی شده است. چه یک توسعه‌دهنده باتجربه باشید و چه در ابتدای راه، CMDGEN شما را قادر می‌سازد تا وظایف خود را به طور موثر و بدون نیاز به حفظ کردن دستورات پیچیده انجام دهید. این ابزار دارای حالت‌های قدرتمندی مانند **تولید**، **تحلیل**، **اسکریپت‌ساز** و **تحلیل خطا** است. CMDGEN با بهره‌گیری از هوش مصنوعی پیشرفته و ساخته شده بر پایه فناوری‌های مدرن مانند React و Firebase، شریک هوشمند و قابل اعتماد شما برای تسلط بر خط فرمان است.",
         feedbackTitle: "ارسال بازخورد", feedbackPlaceholder: "نظر شما به ما در بهبود این ابزار کمک می‌کند...", send: "ارسال", sending: "در حال ارسال...", feedbackSuccess: "از بازخورد شما سپاسگزاریم!", feedbackError: "ارسال بازخورد با مشکل مواجه شد. لطفاً بعداً تلاش کنید.",
         feedbackPrompt: "از کار با CMDGEN لذت می‌برید؟ با ارسال نظر خود به ما در بهبود آن کمک کنید!", giveFeedback: "ارسال بازخورد", dismiss: "بعداً",
-        signupWarning: "لطفاً توجه کنید: باید یک ایمیل معتبر وارد کنید تا بتوانید بازخورد ارسال کنید، رمز عبور را بازیابی کنید و از خدمات دیگر استفاده کنید. رمز عبور شما باید حداقل ۶ تا ۸ کاراکتر باشد و شامل حروف بزرگ، حروف کوچک، اعداد و نمادها (مثل !@#$%) باشد تا امنیت شما حفظ شود. برای ادامه تأیید کنید.",
-        signupConfirm: "تأیید",
-        invalidEmail: "لطفاً یک ایمیل معتبر وارد کنید.",
-        weakPassword: "رمز عبور باید ۶ تا ۸ کاراکتر باشد و شامل حروف بزرگ، حروف کوچک، اعداد و نمادها باشد.",
+        signUpWarning: "لطفاً یک ایمیل معتبر وارد کنید تا از ویژگی‌هایی مثل بازخورد و بازیابی رمز عبور استفاده کنید. همچنین برای امنیت خود، از رمز عبوری قوی (۶ تا ۸ کاراکتر با حروف بزرگ، کوچک، اعداد و نمادها) استفاده کنید. برای ادامه تأیید کنید.",
     }
 };
 
@@ -201,22 +195,6 @@ const osDetails = {
     linux: { versions: ['Ubuntu 22.04', 'Debian 11', 'Fedora 38', 'Arch Linux', 'Generic Linux'], clis: ['Bash', 'Zsh', 'Fish'] },
     windows: { versions: ['Windows 11', 'Windows 10', 'Windows 7', 'Windows Server 2022'], clis: ['PowerShell', 'CMD'] },
     macos: { versions: ['Sonoma (14)', 'Ventura (13)', 'Monterey (12)'], clis: ['Zsh', 'Bash'] }
-};
-
-// --- Helper Functions ---
-const isValidEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-};
-
-const isStrongPassword = (password) => {
-    const minLength = 6;
-    const maxLength = 8;
-    const hasUpperCase = /[A-Z]/.test(password);
-    const hasLowerCase = /[a-z]/.test(password);
-    const hasNumbers = /\d/.test(password);
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-    return password.length >= minLength && password.length <= maxLength && hasUpperCase && hasLowerCase && hasNumbers && hasSpecialChar;
 };
 
 // --- API & DB Functions ---
@@ -393,34 +371,24 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
         setShowWarning(true);
     };
 
-    const handleWarningConfirm = () => {
+    const handleConfirmWarning = () => {
         setShowWarning(false);
         setIsSignUpOpen(true);
     };
 
+    const handleCancelWarning = () => {
+        setShowWarning(false);
+    };
+
     const handleSignUpSubmit = async (e) => {
         e.preventDefault();
-        if (!isValidEmail(email)) {
-            toast.error(t.invalidEmail);
-            return;
-        }
-        if (!isStrongPassword(password)) {
-            toast.error(t.weakPassword);
-            return;
-        }
         await signUpWithEmail(email, password);
         setIsSignUpOpen(false);
         setEmail('');
         setPassword('');
     };
 
-    const handleCancel = () => {
-        setIsSignUpOpen(false);
-        setEmail('');
-        setPassword('');
-    };
-
-    const logout = async () => {
+    const handleLogout = async () => {
         if (!auth) return;
         try {
             await signOut(auth);
@@ -459,7 +427,7 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
                         <div className="flex items-center gap-3">
                             <img src={user.photoURL || 'https://via.placeholder.com/32'} alt={user.displayName || 'User'} className="w-8 h-8 rounded-full" />
                             <span className="text-sm text-gray-600 dark:text-gray-300">{user.displayName || user.email || 'User'}</span>
-                            <button onClick={logout} className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/40 text-red-400 dark:text-red-300 transition-colors"><LogOut size={16}/></button>
+                            <button onClick={handleLogout} className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/40 text-red-400 dark:text-red-300 transition-colors"><LogOut size={16}/></button>
                         </div>
                     ) : (
                         <div className="relative group">
@@ -467,13 +435,11 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
                                 <LogIn size={16} /> {t.signUp}
                             </button>
                             {showWarning && (
-                                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                                    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg w-full max-w-md">
-                                        <p className="text-gray-800 dark:text-gray-200 mb-4">{t.signupWarning}</p>
-                                        <div className="flex justify-end gap-4">
-                                            <button onClick={() => setShowWarning(false)} className="px-4 py-2 bg-gray-300 dark:bg-gray-700 rounded-lg">Cancel</button>
-                                            <button onClick={handleWarningConfirm} className="px-4 py-2 bg-cyan-600 text-white rounded-lg">{t.signupConfirm}</button>
-                                        </div>
+                                <div className="absolute right-0 mt-2 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 p-4">
+                                    <p className="text-sm text-gray-700 dark:text-gray-300">{t.signUpWarning}</p>
+                                    <div className="mt-4 flex justify-end gap-2">
+                                        <button onClick={handleConfirmWarning} className="px-3 py-1 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">Confirm</button>
+                                        <button onClick={handleCancelWarning} className="px-3 py-1 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white">Cancel</button>
                                     </div>
                                 </div>
                             )}
@@ -497,7 +463,7 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
                                         <button type="submit" className="w-full bg-cyan-600 text-white px-3 py-2 rounded-lg hover:bg-cyan-700">
                                             {t.signUp}
                                         </button>
-                                        <button type="button" onClick={handleCancel} className="w-full text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white mt-2">
+                                        <button type="button" onClick={() => setIsSignUpOpen(false)} className="w-full text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white mt-2">
                                             Cancel
                                         </button>
                                     </form>
@@ -708,14 +674,14 @@ const FeedbackModal = ({ lang, onClose }) => {
 
 // Main App Component
 function AppContent() {
-    const [lang, setLang] = useState(() => localStorage.getItem('lang') || 'en');
-    const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'dark');
-    const [mode, setMode] = useState(() => localStorage.getItem('mode') || 'generate');
-    const [os, setOs] = useState(() => localStorage.getItem('os') || 'linux');
-    const [osVersion, setOsVersion] = useState(() => localStorage.getItem('osVersion') || osDetails[os].versions[0]);
-    const [cli, setCli] = useState(() => localStorage.getItem('cli') || osDetails[os].clis[0]);
+    const [lang, setLang] = useState('en'); // پیش‌فرض به انگلیسی تغییر کرد
+    const [theme, setTheme] = useState('dark');
+    const [mode, setMode] = useState('generate');
+    const [os, setOs] = useState('linux');
+    const [osVersion, setOsVersion] = useState(osDetails['linux'].versions[0]);
+    const [cli, setCli] = useState(osDetails['linux'].clis[0]);
     const [userInput, setUserInput] = useState('');
-    const [result, setResult] = useState(() => JSON.parse(localStorage.getItem('lastResult')) || null);
+    const [result, setResult] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [activePanel, setActivePanel] = useState(null);
@@ -728,20 +694,11 @@ function AppContent() {
     const t = translations[lang];
 
     useEffect(() => {
-        if (theme === 'dark') document.documentElement.classList.add('dark');
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        setTheme(savedTheme);
+        if (savedTheme === 'dark') document.documentElement.classList.add('dark');
         else document.documentElement.classList.remove('dark');
-        localStorage.setItem('theme', theme);
-    }, [theme]);
-
-    useEffect(() => {
-        document.body.dir = lang === 'fa' ? 'rtl' : 'ltr';
-        localStorage.setItem('lang', lang);
-        localStorage.setItem('theme', theme);
-        localStorage.setItem('mode', mode);
-        localStorage.setItem('os', os);
-        localStorage.setItem('osVersion', osVersion);
-        localStorage.setItem('cli', cli);
-    }, [lang, theme, mode, os, osVersion, cli]);
+    }, []);
 
     useEffect(() => {
         if (!user) { setFavorites([]); return; }
@@ -755,16 +712,22 @@ function AppContent() {
         return () => unsubscribe();
     }, [user]);
 
+    const toggleTheme = () => {
+        const newTheme = theme === 'light' ? 'dark' : 'light';
+        setTheme(newTheme);
+        localStorage.setItem('theme', newTheme);
+        document.documentElement.classList.toggle('dark', newTheme === 'dark');
+    };
+
+    useEffect(() => {
+        document.body.dir = lang === 'fa' ? 'rtl' : 'ltr';
+    }, [lang]);
+
     useEffect(() => {
         setOsVersion(osDetails[os].versions[0]);
         setCli(osDetails[os].clis[0]);
         setResult(null);
-    }, [os]);
-
-    const toggleTheme = () => {
-        const newTheme = theme === 'dark' ? 'light' : 'dark';
-        setTheme(newTheme);
-    };
+    }, [os, lang, mode]);
 
     const handlePanelToggle = (panel) => {
         setActivePanel(activePanel === panel ? null : panel);
@@ -776,7 +739,8 @@ function AppContent() {
         setOsVersion(item.osVersion);
         setCli(item.cli);
         setUserInput(item.userInput || '');
-        setResult(item.result || null);
+        setResult(null); // ریست کردن نتیجه برای رندر دوباره
+        handlePrimaryAction(); // اجرای خودکار برای لود کردن دستور
         setActivePanel(null);
     };
 
@@ -792,7 +756,7 @@ function AppContent() {
         const querySnapshot = await getDocs(favQuery);
 
         if (querySnapshot.empty) {
-            await dbAction(user.uid, 'favorites', 'add', { ...itemData, identifier: itemIdentifier, type: itemType, userInput: userInput || itemIdentifier, mode: mode, explanation: itemData.explanation, result: result });
+            await dbAction(user.uid, 'favorites', 'add', { ...itemData, identifier: itemIdentifier, type: itemType, userInput: userInput || itemIdentifier, mode: mode, explanation: itemData.explanation });
             toast.success(t.favorites + " added!");
         } else {
             querySnapshot.forEach(doc => {
@@ -809,6 +773,7 @@ function AppContent() {
         }
         setIsLoading(true);
         setError(null);
+        setResult(null);
         try {
             let responseData;
             if (mode === 'generate') {
@@ -825,14 +790,14 @@ function AppContent() {
                 responseData = { type: 'error', data: analysisData };
             }
             setResult(responseData);
-            localStorage.setItem('lastResult', JSON.stringify(responseData));
-            await dbAction(user?.uid, 'history', 'add', { mode, os, osVersion, cli, userInput, result: responseData });
+            await dbAction(user?.uid, 'history', 'add', { mode, os, osVersion, cli, userInput });
             
             const usageCount = parseInt(localStorage.getItem('cmdgenUsageCount') || '0') + 1;
             localStorage.setItem('cmdgenUsageCount', usageCount.toString());
             if (usageCount % 10 === 0 && !localStorage.getItem('cmdgenFeedbackDismissed')) {
                 setShowFeedbackPrompt(true);
             }
+
         } catch (err) {
             setError(t.errorMessage);
             console.error(err);
