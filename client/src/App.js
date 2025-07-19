@@ -386,6 +386,11 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
 
     const handleSignUpSubmit = async (e) => {
         e.preventDefault();
+        if (!auth) {
+            console.log("Auth is not initialized, cannot proceed with sign-up.");
+            toast.error("Authentication is not initialized.");
+            return;
+        }
         if (!isValidEmail(email)) {
             toast.error(t.invalidEmail);
             return;
@@ -394,8 +399,17 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
             toast.error(t.weakPassword);
             return;
         }
-        await signUpWithEmail(email, password);
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            setUser(userCredential.user);
+            toast.success(t.signupSuccess);
+        } catch (error) {
+            console.error("Sign-up error:", error);
+            toast.error(`به مشکل خورد: ${error.message}`);
+        }
         setIsSignUpOpen(false);
+        setEmail('');
+        setPassword('');
     };
 
     const handleCancel = () => {
