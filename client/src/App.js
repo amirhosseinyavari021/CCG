@@ -8,13 +8,13 @@ import toast from 'react-hot-toast';
 
 // کانفیگ Firebase با پیش‌فرض‌ها
 const firebaseConfig = {
-    apiKey: process.env.REACT_APP_FIREBASE_API_KEY || "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",
-    authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN || "cmdgen-4a263.firebaseapp.com", // پیش‌فرض Firebase
-    projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID || "cmdgen-4a263",
-    storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET || "cmdgen-4a263.appspot.com",
-    messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID || "73921214425",
-    appId: process.env.REACT_APP_FIREBASE_APP_ID || "1:73921214425:web:a42fd74a5e0a6d9b57cbc8",
-    measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID || "G-6VP7XBQKTN"
+    apiKey: process.env.REACT_APP_FIREBASE_API_KEY, 
+    authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN, 
+    projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID, 
+    storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET, 
+    messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID, 
+    appId: process.env.REACT_APP_FIREBASE_APP_ID, 
+    measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID 
 };
 
 // --- Initialize Firebase ---
