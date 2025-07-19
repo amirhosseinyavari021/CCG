@@ -79,10 +79,10 @@ export const AuthProvider = ({ children }) => {
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             setUser(userCredential.user);
-            toast.success("Successfully signed up!");
+            toast.success("ثبت‌نام موفق!");
         } catch (error) {
             console.error("Sign-up error:", error);
-            toast.error(`Failed to sign up: ${error.message}`);
+            toast.error(`به مشکل خورد: ${error.message}`);
         }
     };
 
@@ -173,6 +173,9 @@ const translations = {
         feedbackPrompt: "Enjoying CMDGEN? Help us improve by sending your feedback!", giveFeedback: "Give Feedback", dismiss: "Dismiss",
         invalidEmail: "Please enter a valid email address.",
         weakPassword: "Password must be at least 8 characters long and include uppercase, lowercase, numbers, and special characters.",
+        signupCancelled: "Sign-up cancelled.",
+        signupFailed: "Sign-up failed.",
+        signupSuccess: "Sign-up successful!",
     },
     fa: {
         signUp: "ثبت‌نام", logout: "خروج", history: "تاریخچه", favorites: "مورد علاقه‌ها", about: "درباره", feedback: "بازخورد",
@@ -204,6 +207,9 @@ const translations = {
         feedbackPrompt: "از کار با CMDGEN لذت می‌برید؟ با ارسال نظر خود به ما در بهبود آن کمک کنید!", giveFeedback: "ارسال بازخورد", dismiss: "بعداً",
         invalidEmail: "لطفاً یک ایمیل معتبر وارد کنید.",
         weakPassword: "رمز عبور باید حداقل ۸ کاراکتر باشد و شامل حروف بزرگ، حروف کوچک، اعداد و کاراکترهای خاص باشد.",
+        signupCancelled: "ثبت‌نام لغو شد.",
+        signupFailed: "به مشکل خورد.",
+        signupSuccess: "ثبت‌نام موفق!",
     }
 };
 
@@ -372,8 +378,8 @@ const Panel = ({ lang, onSelect, title, icon, collectionName, noItemsText }) => 
 
 const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavoritesToggle, onAboutToggle, onFeedbackToggle }) => {
     const { user, signUpWithEmail, logout } = useAuth();
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    const [email, setEmail] = useState('example@example.com'); // ایمیل نمونه
+    const [password, setPassword] = useState('Pass123!'); // رمز نمونه
     const [isSignUpOpen, setIsSignUpOpen] = useState(false);
     const t = translations[lang];
     console.log("Header: Current user:", user ? { uid: user.uid, displayName: user.displayName, email: user.email } : "No user");
@@ -389,9 +395,14 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
             return;
         }
         await signUpWithEmail(email, password);
+        setIsSignUpOpen(false); // فقط در صورت موفقیت بسته می‌شه
+    };
+
+    const handleCancel = () => {
         setIsSignUpOpen(false);
-        setEmail('');
-        setPassword('');
+        setEmail('example@example.com');
+        setPassword('Pass123!');
+        toast.info(t.signupCancelled);
     };
 
     return (
@@ -435,20 +446,20 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
                                             type="email"
                                             value={email}
                                             onChange={(e) => setEmail(e.target.value)}
-                                            placeholder="Email"
+                                            placeholder="example@example.com"
                                             className="w-full bg-gray-200/50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500"
                                         />
                                         <input
                                             type="password"
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
-                                            placeholder="Password"
+                                            placeholder="Pass123!"
                                             className="w-full bg-gray-200/50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500"
                                         />
                                         <button type="submit" className="w-full bg-cyan-600 text-white px-3 py-2 rounded-lg hover:bg-cyan-700">
                                             {t.signUp}
                                         </button>
-                                        <button type="button" onClick={() => setIsSignUpOpen(false)} className="w-full text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white mt-2">
+                                        <button type="button" onClick={handleCancel} className="w-full text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white mt-2">
                                             Cancel
                                         </button>
                                     </form>
@@ -608,6 +619,7 @@ const FeedbackModal = ({ lang, onClose }) => {
     const t = translations[lang];
     const [feedback, setFeedback] = useState('');
     const [status, setStatus] = useState('idle');
+    const feedbackEmail = process.env.REACT_APP_FEEDBACK_EMAIL || 'default@example.com'; // ایمیل محیطی
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -615,11 +627,12 @@ const FeedbackModal = ({ lang, onClose }) => {
         setStatus('sending');
         
         try {
-            await dbAction(auth.currentUser?.uid, 'feedback', 'add', { text: feedback });
+            await dbAction(auth.currentUser?.uid, 'feedback', 'add', { text: feedback, email: feedbackEmail, createdAt: new Date() });
             setStatus('success');
             toast.success(t.feedbackSuccess);
             setTimeout(() => {
                 onClose();
+                setFeedback('');
             }, 2000);
         } catch (error) {
             console.error("Error sending feedback:", error);
@@ -702,7 +715,7 @@ function AppContent() {
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setFavorites(data);
-            localStorage.setItem('favorites', JSON.stringify(data)); // ذخیره محلی
+            localStorage.setItem('favorites', JSON.stringify(data));
         }, (error) => {
             console.error("Error fetching favorites:", error);
             toast.error(`Failed to fetch favorites: ${error.message}`);
@@ -731,7 +744,7 @@ function AppContent() {
         setOsVersion(item.osVersion);
         setCli(item.cli);
         setUserInput(item.userInput || '');
-        setResult(null); // ریست کردن result برای جلوگیری از صفحه سفید
+        setResult(null);
         setActivePanel(null);
     };
 
