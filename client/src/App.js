@@ -378,8 +378,8 @@ const Panel = ({ lang, onSelect, title, icon, collectionName, noItemsText }) => 
 
 const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavoritesToggle, onAboutToggle, onFeedbackToggle }) => {
     const { user, signUpWithEmail, logout } = useAuth();
-    const [email, setEmail] = useState('example@example.com'); // ایمیل نمونه
-    const [password, setPassword] = useState('Pass123!'); // رمز نمونه
+    const [email, setEmail] = useState(''); // مقدار اولیه خالی
+    const [password, setPassword] = useState(''); // مقدار اولیه خالی
     const [isSignUpOpen, setIsSignUpOpen] = useState(false);
     const t = translations[lang];
     console.log("Header: Current user:", user ? { uid: user.uid, displayName: user.displayName, email: user.email } : "No user");
@@ -400,8 +400,8 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
 
     const handleCancel = () => {
         setIsSignUpOpen(false);
-        setEmail('example@example.com');
-        setPassword('Pass123!');
+        setEmail('');
+        setPassword('');
         toast.info(t.signupCancelled);
     };
 
@@ -453,7 +453,7 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
                                             type="password"
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
-                                            placeholder="Pass123!"
+                                            placeholder="Pass123! (حداقل 8 کاراکتر با حروف بزرگ، کوچک، عدد و کاراکتر خاص)"
                                             className="w-full bg-gray-200/50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500"
                                         />
                                         <button type="submit" className="w-full bg-cyan-600 text-white px-3 py-2 rounded-lg hover:bg-cyan-700">
@@ -705,28 +705,6 @@ function AppContent() {
         localStorage.setItem('osVersion', osVersion);
         localStorage.setItem('cli', cli);
     }, [lang, theme, mode, os, osVersion, cli]);
-
-    useEffect(() => {
-        if (!user) {
-            setFavorites([]);
-            return;
-        }
-        const q = query(collection(db, "users", user.uid, "favorites"));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setFavorites(data);
-            localStorage.setItem('favorites', JSON.stringify(data));
-        }, (error) => {
-            console.error("Error fetching favorites:", error);
-            toast.error(`Failed to fetch favorites: ${error.message}`);
-        });
-        return () => unsubscribe();
-    }, [user]);
-
-    const toggleTheme = () => {
-        const newTheme = theme === 'light' ? 'dark' : 'light';
-        setTheme(newTheme);
-    };
 
     useEffect(() => {
         setOsVersion(osDetails[os].versions[0]);
