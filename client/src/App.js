@@ -29,7 +29,7 @@ try {
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     db = getFirestore(app);
-    console.log("Auth initialized with domain:", auth.config.authDomain);
+    console.log("Auth initialized with domain:", auth ? auth.config.authDomain : "Auth failed to initialize");
 } catch (error) {
     console.error("Firebase initialization error:", error);
     toast.error("Failed to initialize Firebase.");
@@ -72,11 +72,12 @@ export const AuthProvider = ({ children }) => {
 
     const signUpWithEmail = async (email, password) => {
         if (!auth) {
-            console.error("Auth is not initialized.");
+            console.error("Auth is not initialized for sign-up.");
             toast.error("Authentication is not initialized.");
             return;
         }
         try {
+            console.log("Attempting sign-up with email:", email);
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             setUser(userCredential.user);
             toast.success("ثبت‌نام موفق!");
@@ -383,9 +384,11 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
     const [isSignUpOpen, setIsSignUpOpen] = useState(false);
     const t = translations[lang];
     console.log("Header: Current user:", user ? { uid: user.uid, displayName: user.displayName, email: user.email } : "No user");
+    console.log("Sign-up button clicked, isSignUpOpen:", isSignUpOpen);
 
     const handleSignUpSubmit = async (e) => {
         e.preventDefault();
+        console.log("Sign-up form submitted with email:", email);
         if (!auth) {
             console.log("Auth is not initialized, cannot proceed with sign-up.");
             toast.error("Authentication is not initialized.");
@@ -400,6 +403,7 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
             return;
         }
         try {
+            console.log("Attempting sign-up with email:", email);
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             setUser(userCredential.user);
             toast.success(t.signupSuccess);
@@ -413,6 +417,7 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
     };
 
     const handleCancel = () => {
+        console.log("Sign-up cancelled");
         setIsSignUpOpen(false);
         setEmail('');
         setPassword('');
@@ -450,7 +455,7 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
                         </div>
                     ) : (
                         <div className="relative group">
-                            <button onClick={() => setIsSignUpOpen(true)} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-full text-sm font-semibold hover:bg-blue-700 transition-colors">
+                            <button onClick={() => { console.log("Sign-up button clicked"); setIsSignUpOpen(true); }} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-full text-sm font-semibold hover:bg-blue-700 transition-colors">
                                 <LogIn size={16} /> {t.signUp}
                             </button>
                             {isSignUpOpen && (
