@@ -2,19 +2,19 @@ import React, { useState, useEffect, useRef, createContext, useContext } from 'r
 import { BrowserRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { Terminal, Copy, Check, ServerCrash, Wind, Apple, BrainCircuit, Bot, ChevronDown, Wand2, Search, LogIn, LogOut, User, History, Star, Sun, Moon, FileCode2, CopyPlus, Info, X, ShieldAlert, MessageSquare } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged, getRedirectResult } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, collection, addDoc, query, onSnapshot, orderBy, limit, deleteDoc, doc, where, getDocs } from 'firebase/firestore';
-import toast from 'react-hot-toast';   
+import toast from 'react-hot-toast';
 
 // کانفیگ Firebase با پیش‌فرض‌ها
 const firebaseConfig = {
-    apiKey: process.env.REACT_APP_FIREBASE_API_KEY, 
-    authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN, 
-    projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID, 
-    storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET, 
-    messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID, 
-    appId: process.env.REACT_APP_FIREBASE_APP_ID, 
-    measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID 
+    apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+    authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+    storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.REACT_APP_FIREBASE_APP_ID,
+    measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID
 };
 
 // --- Initialize Firebase ---
@@ -24,7 +24,7 @@ let db;
 try {
     console.log("Initializing Firebase with config:", {
         ...firebaseConfig,
-        apiKey: '[REDACTED]' // لاگ کلید API مخفی شده است
+        apiKey: '[REDACTED]'
     });
     app = initializeApp(firebaseConfig);
     auth = getAuth(app);
@@ -70,60 +70,19 @@ export const AuthProvider = ({ children }) => {
         return () => unsubscribe();
     }, []);
 
-    const loginWithGoogle = async () => {
+    const signUpWithEmail = async (email, password) => {
         if (!auth) {
-            console.error("Auth is not initialized. Config check:", auth ? "Initialized" : "Not initialized");
+            console.error("Auth is not initialized.");
             toast.error("Authentication is not initialized.");
             return;
         }
-        if (document.body.classList.contains('logging-in')) {
-            console.log("Login already in progress, ignoring additional clicks.");
-            return;
-        }
-        document.body.classList.add('logging-in');
-        const provider = new GoogleAuthProvider();
-        let popup = null;
         try {
-            console.log("Attempting to open popup for Google login...", {
-                authDomain: auth.config.authDomain,
-                currentUrl: window.location.href
-            });
-            popup = window.open("", "_blank", "width=600,height=600");
-            if (!popup) {
-                throw new Error("Popup blocked by browser! Please allow popups for this site and try again.");
-            }
-            console.log("Popup opened successfully, initiating signInWithPopup...");
-            const result = await signInWithPopup(auth, provider);
-            console.log("Popup result:", {
-                url: popup ? popup.location.href : "Popup closed",
-                user: result.user ? {
-                    uid: result.user.uid,
-                    displayName: result.user.displayName,
-                    email: result.user.email
-                } : "No user"
-            });
-            setUser(result.user);
-            toast.success("Successfully signed in!");
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            setUser(userCredential.user);
+            toast.success("Successfully signed up!");
         } catch (error) {
-            console.log("Popup error state:", {
-                url: popup ? popup.location.href : "Popup unavailable",
-                error: {
-                    code: error.code,
-                    message: error.message,
-                    details: error
-                }
-            });
-            toast.error(`Failed to sign in: ${error.message}`);
-            if (error.code === 'auth/popup-closed-by-user') {
-                toast.error("Popup was closed. Please allow popups and try again.");
-            } else if (error.code === 'auth/unauthorized-domain') {
-                toast.error("Domain not authorized. Check Firebase settings.");
-            } else if (error.code === 'auth/popup-blocked') {
-                toast.error("Popup blocked. Please enable popups for this site and retry.");
-            }
-        } finally {
-            if (popup && !popup.closed) popup.close();
-            document.body.classList.remove('logging-in');
+            console.error("Sign-up error:", error);
+            toast.error(`Failed to sign up: ${error.message}`);
         }
     };
 
@@ -139,7 +98,7 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const value = { user, loading, loginWithGoogle, logout };
+    const value = { user, loading, signUpWithEmail, logout };
     return (
         <AuthContext.Provider value={value}>
             {loading ? (
@@ -153,6 +112,7 @@ export const AuthProvider = ({ children }) => {
     );
 };
 export const useAuth = () => useContext(AuthContext);
+
 // --- Auth Handler Component ---
 const AuthHandler = () => {
     const { setUser } = useAuth();
@@ -160,51 +120,17 @@ const AuthHandler = () => {
 
     useEffect(() => {
         console.log("Processing redirect in AuthHandler at:", new Date().toISOString());
-        if (!auth) {
-            console.error("Auth is not initialized in AuthHandler.");
-            toast.error("Authentication is not initialized.");
-            navigate("/", { replace: true });
-            return;
-        }
-        getRedirectResult(auth)
-            .then((result) => {
-                if (result) {
-                    console.log("Redirect result:", {
-                        uid: result.user.uid,
-                        displayName: result.user.displayName,
-                        email: result.user.email
-                    });
-                    setUser(result.user);
-                    toast.success("Successfully signed in!");
-                    navigate("/", { replace: true });
-                } else {
-                    console.log("No redirect result available. Possible reasons: User cancelled login or already processed.");
-                    navigate("/", { replace: true });
-                }
-            })
-            .catch((error) => {
-                console.error("Error in auth handler:", {
-                    code: error.code,
-                    message: error.message,
-                    details: error
-                });
-                toast.error(`Failed to sign in: ${error.code} - ${error.message}`);
-                navigate("/", { replace: true });
-            });
+        navigate("/", { replace: true });
     }, [navigate, setUser]);
 
-    return (
-        <div className="flex justify-center items-center h-screen">
-            <div className="text-gray-600 dark:text-gray-300">Processing login...</div>
-        </div>
-    );
+    return null;
 };
 
 // --- Translations ---
 const translations = {
     en: {
-        login: "Login with Google", logout: "Logout", history: "History", favorites: "Favorites", about: "About", feedback: "Feedback",
-        loginToSave: "Login to save.", noHistory: "No history yet.", noFavorites: "No favorites yet.",
+        signUp: "Sign Up", logout: "Logout", history: "History", favorites: "Favorites", about: "About", feedback: "Feedback",
+        loginToSave: "Sign up to save.", noHistory: "No history yet.", noFavorites: "No favorites yet.",
         modeGenerate: "Generate", modeExplain: "Explain", modeScript: "Script", modeError: "Analyze Error",
         generateSubheader: "Ask a question to generate commands.",
         explainSubheader: "Enter a command to get a detailed explanation.",
@@ -232,8 +158,8 @@ const translations = {
         feedbackPrompt: "Enjoying CMDGEN? Help us improve by sending your feedback!", giveFeedback: "Give Feedback", dismiss: "Dismiss",
     },
     fa: {
-        login: "ورود با گوگل", logout: "خروج", history: "تاریخچه", favorites: "مورد علاقه‌ها", about: "درباره", feedback: "بازخورد",
-        loginToSave: "برای ذخیره وارد شوید.", noHistory: "تاریخچه‌ای وجود ندارد.", noFavorites: "موردی یافت نشد.",
+        signUp: "ثبت‌نام", logout: "خروج", history: "تاریخچه", favorites: "مورد علاقه‌ها", about: "درباره", feedback: "بازخورد",
+        loginToSave: "برای ذخیره ثبت‌نام کنید.", noHistory: "تاریخچه‌ای وجود ندارد.", noFavorites: "موردی یافت نشد.",
         modeGenerate: "تولید دستور", modeExplain: "تحلیل دستور", modeScript: "اسکریپت‌ساز", modeError: "تحلیل خطا",
         generateSubheader: "سوال خود را برای تولید دستورات وارد کنید.",
         explainSubheader: "یک دستور را برای دریافت تحلیل کامل وارد کنید.",
@@ -418,6 +344,8 @@ const Panel = ({ lang, onSelect, title, icon, collectionName, noItemsText }) => 
                                     <p className="text-sm text-cyan-600 dark:text-cyan-400 font-semibold truncate">
                                         {item.mode === 'generate' ? 'Q:' : item.mode === 'script' ? 'Task:' : 'Cmd:'} {item.userInput}
                                     </p>
+                                    {item.command && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{item.command}</p>}
+                                    {item.explanation && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">{item.explanation.substring(0, 50)}...</p>}
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{item.os} / {item.cli}</p>
                                 </button>
                             </li>
@@ -429,9 +357,20 @@ const Panel = ({ lang, onSelect, title, icon, collectionName, noItemsText }) => 
 };
 
 const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavoritesToggle, onAboutToggle, onFeedbackToggle }) => {
-    const { user, loginWithGoogle, logout } = useAuth();
+    const { user, signUpWithEmail, logout } = useAuth();
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [isSignUpOpen, setIsSignUpOpen] = useState(false);
     const t = translations[lang];
     console.log("Header: Current user:", user ? { uid: user.uid, displayName: user.displayName, email: user.email } : "No user");
+
+    const handleSignUpSubmit = async (e) => {
+        e.preventDefault();
+        await signUpWithEmail(email, password);
+        setIsSignUpOpen(false);
+        setEmail('');
+        setPassword('');
+    };
 
     return (
         <header className="py-3 px-4 md:px-8 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm z-20">
@@ -463,9 +402,37 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
                             <button onClick={logout} className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/40 text-red-400 dark:text-red-300 transition-colors"><LogOut size={16}/></button>
                         </div>
                     ) : (
-                        <button onClick={loginWithGoogle} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-full text-sm font-semibold hover:bg-blue-700 transition-colors">
-                            <LogIn size={16}/> {t.login}
-                        </button>
+                        <div className="relative group">
+                            <button onClick={() => setIsSignUpOpen(true)} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-full text-sm font-semibold hover:bg-blue-700 transition-colors">
+                                <LogIn size={16} /> {t.signUp}
+                            </button>
+                            {isSignUpOpen && (
+                                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
+                                    <form onSubmit={handleSignUpSubmit} className="p-4 space-y-3">
+                                        <input
+                                            type="email"
+                                            value={email}
+                                            onChange={(e) => setEmail(e.target.value)}
+                                            placeholder="Email"
+                                            className="w-full bg-gray-200/50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500"
+                                        />
+                                        <input
+                                            type="password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            placeholder="Password"
+                                            className="w-full bg-gray-200/50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500"
+                                        />
+                                        <button type="submit" className="w-full bg-cyan-600 text-white px-3 py-2 rounded-lg hover:bg-cyan-700">
+                                            {t.signUp}
+                                        </button>
+                                        <button type="button" onClick={() => setIsSignUpOpen(false)} className="w-full text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white mt-2">
+                                            Cancel
+                                        </button>
+                                    </form>
+                                </div>
+                            )}
+                        </div>
                     )}
                 </div>
             </div>
@@ -618,7 +585,7 @@ const AboutModal = ({ lang, onClose }) => {
 const FeedbackModal = ({ lang, onClose }) => {
     const t = translations[lang];
     const [feedback, setFeedback] = useState('');
-    const [status, setStatus] = useState('idle'); // idle, sending, success, error
+    const [status, setStatus] = useState('idle');
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -670,7 +637,7 @@ const FeedbackModal = ({ lang, onClose }) => {
 
 // Main App Component
 function AppContent() {
-    const [lang, setLang] = useState('fa');
+    const [lang, setLang] = useState('en'); // پیش‌فرض به انگلیسی تغییر کرد
     const [theme, setTheme] = useState('dark');
     const [mode, setMode] = useState('generate');
     const [os, setOs] = useState('linux');
@@ -739,15 +706,18 @@ function AppContent() {
     };
 
     const handleFavoriteToggle = async (itemData, itemType) => {
-        if (!user) return;
-        const itemIdentifier = itemData.command || (itemData.script_lines && itemData.script_lines.join('\n'));
+        if (!user) {
+            toast.error(t.loginToSave);
+            return;
+        }
+        const itemIdentifier = itemData.command || (itemData.script_lines && itemData.script_lines.join('\n')) || itemData.userInput;
         if (!itemIdentifier) return;
         
         const favQuery = query(collection(db, "users", user.uid, "favorites"), where("identifier", "==", itemIdentifier));
         const querySnapshot = await getDocs(favQuery);
 
         if (querySnapshot.empty) {
-            await dbAction(user.uid, 'favorites', 'add', { ...itemData, identifier: itemIdentifier, type: itemType, userInput: userInput || itemIdentifier, mode: mode });
+            await dbAction(user.uid, 'favorites', 'add', { ...itemData, identifier: itemIdentifier, type: itemType, userInput: userInput || itemIdentifier, mode: mode, explanation: itemData.explanation });
             toast.success(t.favorites + " added!");
         } else {
             querySnapshot.forEach(doc => {
