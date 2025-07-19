@@ -378,8 +378,8 @@ const Panel = ({ lang, onSelect, title, icon, collectionName, noItemsText }) => 
 
 const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavoritesToggle, onAboutToggle, onFeedbackToggle }) => {
     const { user, signUpWithEmail, logout } = useAuth();
-    const [email, setEmail] = useState(''); // مقدار اولیه خالی
-    const [password, setPassword] = useState(''); // مقدار اولیه خالی
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
     const [isSignUpOpen, setIsSignUpOpen] = useState(false);
     const t = translations[lang];
     console.log("Header: Current user:", user ? { uid: user.uid, displayName: user.displayName, email: user.email } : "No user");
@@ -395,7 +395,7 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
             return;
         }
         await signUpWithEmail(email, password);
-        setIsSignUpOpen(false); // فقط در صورت موفقیت بسته می‌شه
+        setIsSignUpOpen(false);
     };
 
     const handleCancel = () => {
@@ -619,7 +619,7 @@ const FeedbackModal = ({ lang, onClose }) => {
     const t = translations[lang];
     const [feedback, setFeedback] = useState('');
     const [status, setStatus] = useState('idle');
-    const feedbackEmail = process.env.REACT_APP_FEEDBACK_EMAIL
+    const feedbackEmail = process.env.REACT_APP_FEEDBACK_EMAIL || 'default@example.com';
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -690,6 +690,13 @@ function AppContent() {
 
     const { user } = useAuth();
     const t = translations[lang];
+
+    const toggleTheme = () => {
+        const newTheme = theme === 'dark' ? 'light' : 'dark';
+        setTheme(newTheme);
+        document.documentElement.classList.toggle('dark', newTheme === 'dark');
+        localStorage.setItem('theme', newTheme);
+    };
 
     useEffect(() => {
         if (theme === 'dark') document.documentElement.classList.add('dark');
