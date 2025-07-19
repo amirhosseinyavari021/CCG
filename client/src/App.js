@@ -4,12 +4,11 @@ import { Terminal, Copy, Check, ServerCrash, Wind, Apple, BrainCircuit, Bot, Che
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged, getRedirectResult } from 'firebase/auth';
 import { getFirestore, collection, addDoc, query, onSnapshot, orderBy, limit, deleteDoc, doc, where, getDocs } from 'firebase/firestore';
-import toast from 'react-hot-toast';
+import toast from 'react-hot-toast';   
 
-// --- Firebase Configuration ---
 const firebaseConfig = {
     apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
-    authDomain: "cmdgen.onrender.com",
+    authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN, 
     projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
     storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
     messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
