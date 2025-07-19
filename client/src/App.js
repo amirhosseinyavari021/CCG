@@ -6,33 +6,33 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signO
 import { getFirestore, collection, addDoc, query, onSnapshot, orderBy, limit, deleteDoc, doc, where, getDocs } from 'firebase/firestore';
 import toast from 'react-hot-toast';   
 
+// کانفیگ Firebase با پیش‌فرض‌ها
 const firebaseConfig = {
-    apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
-    authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN, 
-    projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.REACT_APP_FIREBASE_APP_ID,
-    measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID
+    apiKey: process.env.REACT_APP_FIREBASE_API_KEY || "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",
+    authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN || "cmdgen-4a263.firebaseapp.com", // پیش‌فرض Firebase
+    projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID || "cmdgen-4a263",
+    storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET || "cmdgen-4a263.appspot.com",
+    messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID || "73921214425",
+    appId: process.env.REACT_APP_FIREBASE_APP_ID || "1:73921214425:web:a42fd74a5e0a6d9b57cbc8",
+    measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID || "G-6VP7XBQKTN"
 };
 
 // --- Initialize Firebase ---
 let app;
 let auth;
 let db;
-if (firebaseConfig.apiKey) {
-    try {
-        console.log("Initializing Firebase with config:", {
-            ...firebaseConfig,
-            apiKey: '[REDACTED]' // لاگ کلید API مخفی شده است
-        });
-        app = initializeApp(firebaseConfig);
-        auth = getAuth(app);
-        db = getFirestore(app);
-    } catch (error) {
-        console.error("Firebase initialization error:", error);
-        toast.error("Failed to initialize Firebase.");
-    }
+try {
+    console.log("Initializing Firebase with config:", {
+        ...firebaseConfig,
+        apiKey: '[REDACTED]' // لاگ کلید API مخفی شده است
+    });
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+    console.log("Auth initialized with domain:", auth.config.authDomain);
+} catch (error) {
+    console.error("Firebase initialization error:", error);
+    toast.error("Failed to initialize Firebase.");
 }
 
 // --- Authentication Context ---
@@ -83,22 +83,41 @@ export const AuthProvider = ({ children }) => {
         document.body.classList.add('logging-in');
         const provider = new GoogleAuthProvider();
         try {
-            console.log("Starting Google login with popup...");
-            const result = await signInWithPopup(auth, provider); // تغییر به signInWithPopup برای دور زدن مشکلات ریدایرکت
-            console.log("Login successful:", {
-                uid: result.user.uid,
-                displayName: result.user.displayName,
-                email: result.user.email
+            console.log("Starting Google login with popup...", {
+                authDomain: auth.config.authDomain,
+                currentUrl: window.location.href
             });
-            setUser(result.user);
-            toast.success("Successfully signed in!");
+            const popup = window.open("", "_blank", "width=600,height=600");
+            if (popup) {
+                const result = await signInWithPopup(auth, provider);
+                console.log("Popup result:", {
+                    url: popup.location.href, // تلاش برای گرفتن URL پاپ‌آپ
+                    result: result ? "Success" : "Failed"
+                });
+                console.log("Login successful:", {
+                    uid: result.user.uid,
+                    displayName: result.user.displayName,
+                    email: result.user.email
+                });
+                setUser(result.user);
+                toast.success("Successfully signed in!");
+            } else {
+                console.error("Popup blocked by browser!");
+                toast.error("Popup was blocked. Allow popups and try again.");
+            }
         } catch (error) {
             console.error("Google login error:", {
                 code: error.code,
                 message: error.message,
-                details: error
+                details: error,
+                authDomain: auth.config.authDomain
             });
             toast.error(`Failed to sign in: ${error.code} - ${error.message}`);
+            if (error.code === 'auth/popup-closed-by-user') {
+                toast.error("Popup was closed. Please try again and complete the login.");
+            } else if (error.code === 'auth/unauthorized-domain') {
+                toast.error("Domain not authorized. Check Firebase settings.");
+            }
         } finally {
             document.body.classList.remove('logging-in');
         }
@@ -108,7 +127,7 @@ export const AuthProvider = ({ children }) => {
         if (!auth) return;
         try {
             await signOut(auth);
-            setUser(null); // صراحتاً user را null کنید
+            setUser(null);
             toast.success("Successfully signed out!");
         } catch (error) {
             console.error("Logout error:", error);
