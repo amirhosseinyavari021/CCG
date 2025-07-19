@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         if (!auth) {
-            console.error("Auth is not initialized.");
+            console.error("Auth is not initialized. Config:", firebaseConfig);
             toast.error("Authentication is not initialized.");
             setLoading(false);
             return;
@@ -72,7 +72,7 @@ export const AuthProvider = ({ children }) => {
 
     const loginWithGoogle = async () => {
         if (!auth) {
-            console.error("Auth is not initialized.");
+            console.error("Auth is not initialized. Config check:", auth ? "Initialized" : "Not initialized");
             toast.error("Authentication is not initialized.");
             return;
         }
@@ -82,46 +82,47 @@ export const AuthProvider = ({ children }) => {
         }
         document.body.classList.add('logging-in');
         const provider = new GoogleAuthProvider();
+        let popup = null;
         try {
-            console.log("Starting Google login with popup...", {
+            console.log("Attempting to open popup for Google login...", {
                 authDomain: auth.config.authDomain,
                 currentUrl: window.location.href
             });
-            // فقط یک پاپ‌آپ باز می‌کنیم و مطمئن می‌شیم به گوگل می‌ره
-            const popup = window.open("", "_blank", "width=600,height=600");
+            popup = window.open("", "_blank", "width=600,height=600");
             if (!popup) {
-                throw new Error("Popup blocked by browser!");
+                throw new Error("Popup blocked by browser! Please allow popups for this site and try again.");
             }
+            console.log("Popup opened successfully, initiating signInWithPopup...");
             const result = await signInWithPopup(auth, provider);
             console.log("Popup result:", {
-                url: popup.location.href,
-                result: result ? "Success" : "Failed"
-            });
-            console.log("Login successful:", {
-                uid: result.user.uid,
-                displayName: result.user.displayName,
-                email: result.user.email
+                url: popup ? popup.location.href : "Popup closed",
+                user: result.user ? {
+                    uid: result.user.uid,
+                    displayName: result.user.displayName,
+                    email: result.user.email
+                } : "No user"
             });
             setUser(result.user);
             toast.success("Successfully signed in!");
-            popup.close(); // بستن پاپ‌آپ بعد از موفقیت
         } catch (error) {
-            console.error("Google login error:", {
-                code: error.code,
-                message: error.message,
-                details: error,
-                authDomain: auth.config.authDomain
+            console.log("Popup error state:", {
+                url: popup ? popup.location.href : "Popup unavailable",
+                error: {
+                    code: error.code,
+                    message: error.message,
+                    details: error
+                }
             });
-            toast.error(`Failed to sign in: ${error.code} - ${error.message}`);
+            toast.error(`Failed to sign in: ${error.message}`);
             if (error.code === 'auth/popup-closed-by-user') {
-                toast.error("Popup was closed. Please try again and complete the login.");
+                toast.error("Popup was closed. Please allow popups and try again.");
             } else if (error.code === 'auth/unauthorized-domain') {
-                toast.error("Domain not authorized. Check Firebase settings and ensure cmdgen.onrender.com is added.");
-            } else if (error.code === 'auth/cancelled-popup-request') {
-                toast.error("Login request cancelled. Try again.");
+                toast.error("Domain not authorized. Check Firebase settings.");
+            } else if (error.code === 'auth/popup-blocked') {
+                toast.error("Popup blocked. Please enable popups for this site and retry.");
             }
-            if (window.popup) window.popup.close(); // بستن پاپ‌آپ اگه خطا بده
         } finally {
+            if (popup && !popup.closed) popup.close();
             document.body.classList.remove('logging-in');
         }
     };
@@ -152,7 +153,6 @@ export const AuthProvider = ({ children }) => {
     );
 };
 export const useAuth = () => useContext(AuthContext);
-
 // --- Auth Handler Component ---
 const AuthHandler = () => {
     const { setUser } = useAuth();
