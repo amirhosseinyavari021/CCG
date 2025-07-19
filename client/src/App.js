@@ -359,7 +359,7 @@ const Panel = ({ lang, onSelect, title, icon, collectionName, noItemsText }) => 
 };
 
 const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavoritesToggle, onAboutToggle, onFeedbackToggle }) => {
-    const { user, signUpWithEmail } = useAuth();
+    const { user, signUpWithEmail, logout } = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isSignUpOpen, setIsSignUpOpen] = useState(false);
@@ -386,18 +386,6 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
         setIsSignUpOpen(false);
         setEmail('');
         setPassword('');
-    };
-
-    const handleLogout = async () => {
-        if (!auth) return;
-        try {
-            await signOut(auth);
-            setUser(null);
-            toast.success("Successfully signed out!");
-        } catch (error) {
-            console.error("Logout error:", error);
-            toast.error(`Failed to sign out: ${error.message}`);
-        }
     };
 
     return (
@@ -427,7 +415,7 @@ const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavorite
                         <div className="flex items-center gap-3">
                             <img src={user.photoURL || 'https://via.placeholder.com/32'} alt={user.displayName || 'User'} className="w-8 h-8 rounded-full" />
                             <span className="text-sm text-gray-600 dark:text-gray-300">{user.displayName || user.email || 'User'}</span>
-                            <button onClick={handleLogout} className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/40 text-red-400 dark:text-red-300 transition-colors"><LogOut size={16}/></button>
+                            <button onClick={logout} className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/40 text-red-400 dark:text-red-300 transition-colors"><LogOut size={16}/></button>
                         </div>
                     ) : (
                         <div className="relative group">
@@ -740,8 +728,9 @@ function AppContent() {
         setCli(item.cli);
         setUserInput(item.userInput || '');
         setResult(null); // ریست کردن نتیجه برای رندر دوباره
-        handlePrimaryAction(); // اجرای خودکار برای لود کردن دستور
         setActivePanel(null);
+        // لود کردن خودکار دستور با استفاده از اطلاعات ذخیره‌شده
+        handlePrimaryAction();
     };
 
     const handleFavoriteToggle = async (itemData, itemType) => {
