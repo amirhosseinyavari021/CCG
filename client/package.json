@@ -2,7 +2,7 @@
   "name": "client",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://cmdgen.onrender.com",
+  "homepage": "cmdgen-4a263.firebaseapp.com",
   "dependencies": {
     "@tailwindcss/typography": "^0.5.13",
     "firebase": "^9.17.2",
