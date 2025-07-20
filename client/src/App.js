@@ -112,7 +112,7 @@ export const AuthProvider = ({ children }) => {
 };
 export const useAuth = () => useContext(AuthContext);
 
-// --- Auth Handler Component ---
+// --- Authentication Handler ---
 const AuthHandler = () => {
   const { setUser } = useAuth();
   const navigate = useNavigate();
@@ -174,7 +174,7 @@ const translations = {
     os: "سیستم‌عامل", osVersion: "نسخه سیستم‌عامل", cli: "رابط خط فرمان (CLI)",
     selectVersion: "انتخاب نسخه", selectCli: "انتخاب رابط",
     generate: "تولید دستورات", explain: "تحلیل کن", generateScript: "تولید اسکریپت", analyzeError: "تحلیل خطا",
-    generating: "در حال تولید...", explaining: " стрельба تحلیل...", generatingScript: "در حال ساخت اسکریپت...", analyzing: "در حال تحلیل...",
+    generating: "در حال تولید...", explaining: "در حال تحلیل...", generatingScript: "در حال ساخت اسکریپت...", analyzing: "در حال تحلیل...",
     copied: "کپی شد!", copyAll: "کپی همه به عنوان اسکریپت", downloadScript: "دانلود اسکریپت", shareCommand: "اشتراک‌گذاری دستور", searchPlaceholder: "جستجو در تاریخچه یا موارد موردعلاقه...",
     footerLine1: "تمامی حقوق مادی و معنوی این اثر محفوظ است.",
     footerLine2: "ساخته شده توسط امیرحسین یاوری",
@@ -579,23 +579,23 @@ const ScriptCard = ({ filename, script_lines = [], explanation, lang, onFavorite
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <Card lang={lang}>
-        <div className="flex justify-between items-center mb-3">
-          <div className="flex items-center gap-2 text-sm text-cyan-600 dark:text-cyan-400"><FileCode2 className="w-4 h-4" /><span>{filename}</span></div>
-          <div className="flex items-center gap-2">
-            <button onClick={downloadScript} className="text-sm text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300"><Download size={16} /> {translations[lang].downloadScript}</button>
-            <button onClick={onShare} className="text-sm text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300">{translations[lang].shareCommand}</button>
-            <button onClick={onFavoriteToggle} className="p-1.5 text-gray-400 hover:text-amber-400 transition-colors">
-              <Star size={16} className={isFavorite ? 'fill-amber-400 text-amber-400' : ''} />
-            </button>
-          </div>
+    <Card lang={lang}>
+      <div className="flex justify-between items-center mb-3">
+        <div className="flex items-center gap-2 text-sm text-cyan-600 dark:text-cyan-400"><FileCode2 className="w-4 h-4" /><span>{filename}</span></div>
+        <div className="flex items-center gap-2">
+          <button onClick={downloadScript} className="text-sm text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300"><Download size={16} /> {translations[lang].downloadScript}</button>
+          <button onClick={onShare} className="text-sm text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300">{translations[lang].shareCommand}</button>
+          <button onClick={onFavoriteToggle} className="p-1.5 text-gray-400 hover:text-amber-400 transition-colors">
+            <Star size={16} className={isFavorite ? 'fill-amber-400 text-amber-400' : ''} />
+          </button>
         </div>
-        <CommandDisplay command={fullScript} onCopy={handleCopy} copied={copied} />
-        <div className="mt-4">
-          <h4 className="font-bold text-gray-800 dark:text-gray-200">{translations[lang].scriptExplanation}</h4>
-          <p className="mt-1 text-gray-600 dark:text-gray-300 text-sm leading-relaxed">{explanation}</p>
-        </div>
-      </Card>
+      </div>
+      <CommandDisplay command={fullScript} onCopy={handleCopy} copied={copied} />
+      <div className="mt-4">
+        <h4 className="font-bold text-gray-800 dark:text-gray-200">{translations[lang].scriptExplanation}</h4>
+        <p className="mt-1 text-gray-600 dark:text-gray-300 text-sm leading-relaxed">{explanation}</p>
+      </div>
+    </Card>
     </motion.div>
   );
 };
@@ -979,36 +979,4 @@ function AppContent() {
 
           {error && (
             <motion.div
-              className="mt-8 max-w-3xl mx-auto bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-500/50 rounded-xl p-5 text-center text-red-700 dark:text-red-300"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <div className="flex items-center justify-center gap-2"><ServerCrash className="w-6 h-6"/><h3 className="font-bold text-lg">{t.errorTitle}</h3></div><p className="mt-2 text-sm">{error}</p>
-            </motion.div>
-          )}
-          
-          {result && result.type === 'commands' && (
-            <motion.div
-              className="mt-10 max-w-3xl mx-auto space-y-4"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <div className="flex justify-end">
-                <button onClick={copyAllCommands} className="flex items-center gap-2 text-sm font-semibold bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
-                  <CopyPlus size={16} /> {t.copyAll}
-                </button>
-              </div>
-              {result.data.map((cmd, index) => {
-                const isFavorite = favorites.some(fav => fav.identifier === cmd.command);
-                return <GeneratedCommandCard key={index} {...cmd} lang={lang} onFavoriteToggle={() => handleFavoriteToggle(cmd, 'command')} isFavorite={isFavorite} onShare={() => handleShare(cmd)} />
-              })}
-            </motion.div>
-          )}
-          
-          {result && result.type === 'explanation' && <ExplanationCard explanation={result.data} lang={lang} />}
-
-          {result && result.type === 'script' && (() => {
-            const isFavorite = favorites.some(fav => fav.identifier === result.data.script_lines.join('\n'));
-            return <ScriptCard {...result.data} lang={lang} onFavoriteToggle={() => handleFavoriteToggle(result.data, 'script')} isFavorite={isFavorite} onShare={()
+              className="mt-8 max-w-3xl mx-auto bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-500/50 rounded-xl p-
