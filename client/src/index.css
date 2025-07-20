@@ -30,7 +30,32 @@ html {
   text-align: right;
 }
 
-/* بهینه‌سازی برای موبایل */
+/* استایل سایدبار برای PC (بالای 640px) */
+@media (min-width: 641px) {
+  aside {
+    width: 72px;
+    background: white;
+    @apply dark:bg-gray-900;
+    border-right: 1px solid #e5e7eb;
+    @apply dark:border-gray-700;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    overflow-y: auto;
+    transition: width 0.3s ease;
+  }
+
+  aside.w-72 {
+    width: 72px;
+  }
+
+  aside:hover,
+  aside.active {
+    width: 288px;
+  }
+}
+
+/* بهینه‌سازی برای موبایل (زیر 640px) */
 @media (max-width: 640px) {
   body {
     font-size: 14px;
