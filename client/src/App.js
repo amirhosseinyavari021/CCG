@@ -1,3 +1,6 @@
+بله حتما. این کد کامل شماست که در آن مشکل هوک `useState` در کامپوننت `ErrorAnalysisCard` برطرف شده است. یک کامپوننت جدید به نام `SolutionCommandStep` برای مدیریت صحیح state ایجاد شده است.
+
+```jsx
 import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { BrowserRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -600,6 +603,30 @@ const ScriptCard = ({ filename, script_lines = [], explanation, lang, onFavorite
   );
 };
 
+// --- START: CODE CORRECTION ---
+
+// This new component manages its own "copied" state, following the Rules of Hooks.
+const SolutionCommandStep = ({ command }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    const textArea = document.createElement("textarea");
+    textArea.value = command;
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Copy failed', err);
+    }
+    document.body.removeChild(textArea);
+  };
+
+  return <CommandDisplay command={command} onCopy={handleCopy} copied={copied} />;
+};
+
 const ErrorAnalysisCard = ({ analysis, lang }) => (
   <motion.div
     className="mt-10 max-w-3xl mx-auto"
@@ -611,29 +638,21 @@ const ErrorAnalysisCard = ({ analysis, lang }) => (
       <h3 className="text-lg font-bold text-cyan-600 dark:text-cyan-300 flex items-center gap-2 mb-4"><ShieldAlert size={20} /> {translations[lang].errorAnalysis}</h3>
       <div className="space-y-4">
         <div>
-          <h4 className="font-bold text-red-500 dark:text-red-400">{translations[lang].cause}</h4>
+          <h4 className="font-bold text-red-500 dark:text-red-400">{translations[lang].cause || 'Cause'}</h4>
           <p className="mt-1 text-gray-600 dark:text-gray-300 text-sm">{analysis.cause}</p>
         </div>
         <div>
-          <h4 className="font-bold text-amber-500 dark:text-amber-400">{translations[lang].explanation}</h4>
+          <h4 className="font-bold text-amber-500 dark:text-amber-400">{translations[lang].explanation || 'Explanation'}</h4>
           <p className="mt-1 text-gray-600 dark:text-gray-300 text-sm">{analysis.explanation}</p>
         </div>
         <div>
-          <h4 className="font-bold text-green-600 dark:text-green-400">{translations[lang].solution}</h4>
+          <h4 className="font-bold text-green-600 dark:text-green-400">{translations[lang].solution || 'Solution'}</h4>
           <div className="mt-2 space-y-2">
             {analysis.solution.map((step, index) => {
               if (step.startsWith('CMD:')) {
                 const command = step.substring(4).trim();
-                const [copied, setCopied] = useState(false);
-                const handleCopy = () => {
-                  const textArea = document.createElement("textarea");
-                  textArea.value = command;
-                  document.body.appendChild(textArea);
-                  textArea.select();
-                  try { document.execCommand('copy'); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch (err) { console.error('Copy failed', err); }
-                  document.body.removeChild(textArea);
-                };
-                return <CommandDisplay key={index} command={command} onCopy={handleCopy} copied={copied} />;
+                // Use the new, corrected component
+                return <SolutionCommandStep key={index} command={command} />;
               }
               return <p key={index} className="text-gray-600 dark:text-gray-300 text-sm">{index + 1}. {step}</p>;
             })}
@@ -643,6 +662,9 @@ const ErrorAnalysisCard = ({ analysis, lang }) => (
     </Card>
   </motion.div>
 );
+
+// --- END: CODE CORRECTION ---
+
 
 const AboutModal = ({ lang, onClose }) => {
   const t = translations[lang];
@@ -977,14 +999,80 @@ function AppContent() {
             </button>
           </motion.div>
 
-         {error && (
-  <motion.div
-    className="mt-8 max-w-3xl mx-auto bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-500/50 rounded-xl p-6"
-  >
-    <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
-      <ServerCrash size={20} />
-      <h3 className="text-lg font-bold">{translations[lang].errorTitle}</h3>
-    </div>
-    <p className="mt-2 text-gray-600 dark:text-gray-300">{error}</p>
-  </motion.div>
-)}
+          {error && (
+            <motion.div
+              className="mt-8 max-w-3xl mx-auto bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-500/50 rounded-xl p-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                <ServerCrash size={20} />
+                <h3 className="text-lg font-bold">{translations[lang].errorTitle}</h3>
+              </div>
+              <p className="mt-2 text-gray-600 dark:text-gray-300">{error}</p>
+            </motion.div>
+          )}
+
+          {result && !isLoading && (
+            <div className="mt-10">
+              {result.type === 'commands' && (
+                <>
+                  <div className="space-y-6">
+                    {result.data.map((cmd, i) => (
+                       <GeneratedCommandCard
+                         key={i}
+                         command={cmd.command}
+                         explanation={cmd.explanation}
+                         warning={cmd.warning}
+                         lang={lang}
+                         onFavoriteToggle={() => handleFavoriteToggle(cmd, 'command')}
+                         isFavorite={favorites.some(fav => fav.identifier === cmd.command)}
+                         onShare={() => handleShare(cmd)}
+                       />
+                    ))}
+                  </div>
+                  {result.data.length > 1 && (
+                    <div className="text-center mt-6">
+                      <button onClick={copyAllCommands} className="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg flex items-center gap-2 mx-auto hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                        <CopyPlus size={16} /> {t.copyAll}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+              {result.type === 'explanation' && <ExplanationCard explanation={result.data} lang={lang} />}
+              {result.type === 'script' && (
+                <ScriptCard
+                  filename={result.data.filename}
+                  script_lines={result.data.script_lines}
+                  explanation={result.data.explanation}
+                  lang={lang}
+                  onFavoriteToggle={() => handleFavoriteToggle(result.data, 'script')}
+                  isFavorite={favorites.some(fav => fav.identifier === result.data.script_lines.join('\n'))}
+                  onShare={() => handleShare(result.data)}
+                />
+              )}
+              {result.type === 'error' && <ErrorAnalysisCard analysis={result.data} lang={lang} />}
+            </div>
+          )}
+        </main>
+      </div>
+    </motion.div>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/auth-callback" element={<AuthHandler />} />
+          <Route path="*" element={<AppContent />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}
+
+export default App;
+```
