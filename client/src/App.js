@@ -174,7 +174,7 @@ const osDetails = {
   macos: { versions: ['Sonoma (14)', 'Ventura (13)', 'Monterey (12)'], clis: ['Zsh', 'Bash'] }
 };
 
-// API & DB Functions
+// API & DB Functions (unchanged)
 const callApiProxy = async (payload) => {
   try {
     const response = await fetch('/api/proxy', {
@@ -245,7 +245,7 @@ const dbAction = async (userId, collectionName, action, data = {}) => {
   }
 };
 
-// Components
+// Components (unchanged except where noted)
 const CustomSelect = ({ label, value, onChange, options, placeholder, disabled, lang, error }) => (
   <motion.div className="flex flex-col gap-2" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
     <label className={`text-sm font-medium text-gray-700 dark:text-gray-300 ${disabled ? 'opacity-50' : ''}`}>{label} <span className="text-red-500">*</span></label>
@@ -854,11 +854,11 @@ function AppContent() {
         onAboutToggle={() => setIsAboutModalOpen(true)}
         onFeedbackToggle={() => setIsFeedbackModalOpen(true)}
       />
-      <aside className={`hidden md:block bg-white/80 dark:bg-gray-900/80 transition-all duration-300 ${activePanel ? 'w-72' : 'w-0'} ${lang === 'fa' ? 'border-l' : 'border-r'} border-gray-200 dark:border-gray-800 overflow-hidden`}>
+      <aside className={`hidden md:block ${activePanel ? 'w-72' : 'w-72 hover:w-72 active:w-72'} bg-white dark:bg-gray-900 transition-all duration-300 ${lang === 'fa' ? 'border-l' : 'border-r'} border-gray-200 dark:border-gray-700 overflow-y-auto fixed top-0 bottom-0`}>
         {activePanel === 'history' && <Panel lang={lang} onSelect={handleHistorySelect} title={t.history} icon={<History size={20}/>} collectionName="history" noItemsText={t.noHistory} />}
         {activePanel === 'favorites' && <Panel lang={lang} onSelect={handleHistorySelect} title={t.favorites} icon={<Star size={20}/>} collectionName="favorites" noItemsText={t.noFavorites} />}
       </aside>
-      <div className="flex-1 flex flex-col h-screen overflow-y-auto">
+      <div className={`flex-1 flex flex-col h-screen overflow-y-auto ${lang === 'fa' ? 'ml-0 md:mr-72' : 'ml-0 md:ml-72'}`}>
         <Header
           lang={lang}
           setLang={setLang}
