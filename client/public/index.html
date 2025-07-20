@@ -22,48 +22,26 @@
 </head>
 <body>
     <div id="root"></div>
-    <script>
+    <script type="module">
+        import { dbAction, fetchItems, checkFavorite } from './firebaseUtils.js';
+
         const { createRoot } = ReactDOM;
-        const { BrowserRouter, Route, Routes, useNavigate } = ReactRouterDOM;
+        const { BrowserRouter, Route, Routes, useNavigate, useParams } = ReactRouterDOM;
         const { useState, useEffect, useRef, createContext, useContext } = React;
         const toast = window.toast;
 
         // Icons (simulated for this example)
-        const icons = { Terminal: 'T', Copy: 'C', Check: '✓', ServerCrash: '!', Wind: 'W', Apple: 'A', BrainCircuit: 'B', Bot: 'B', ChevronDown: '↓', Wand2: 'W', Search: 'S', LogIn: 'L', LogOut: 'O', User: 'U', History: 'H', Star: '★', Sun: '☀', Moon: '☾', FileCode2: 'F', CopyPlus: '+', Info: 'i', X: 'X', ShieldAlert: '!' };
+        const icons = { Terminal: 'T', Copy: 'C', Check: '✓', ServerCrash: '!', Wind: 'W', Apple: 'A', BrainCircuit: 'B', Bot: 'B', ChevronDown: '↓', Wand2: 'W', Search: 'S', LogIn: 'L', LogOut: 'O', User: 'U', History: 'H', Star: '★', Sun: '☀', Moon: '☾', FileCode2: 'F', CopyPlus: '+', Info: 'i', X: 'X', ShieldAlert: '!', MessageSquare: 'M' };
 
-        // Firebase Config (replace with your actual config)
-        const firebaseConfig = {
-            apiKey: "your-api-key",
-            authDomain: "your-auth-domain",
-            projectId: "your-project-id",
-            storageBucket: "your-storage-bucket",
-            messagingSenderId: "your-messaging-sender-id",
-            appId: "your-app-id",
-            measurementId: "your-measurement-id"
-        };
-
-        let app, auth, db;
-        try {
-            app = firebase.initializeApp(firebaseConfig);
-            auth = firebase.getAuth(app);
-            db = firebase.getFirestore(app);
-        } catch (error) {
-            console.error("Firebase initialization error:", error);
-            toast.error("Failed to initialize Firebase.");
-        }
+        // Firebase Config (already initialized in firebaseUtils.js)
 
         const AuthContext = createContext();
         const AuthProvider = ({ children }) => {
             const [user, setUser] = useState(null);
             const [loading, setLoading] = useState(true);
+            const [lang, setLang] = useState('en');
 
             useEffect(() => {
-                if (!auth) {
-                    console.error("Auth is not initialized.");
-                    toast.error("Authentication is not initialized.");
-                    setLoading(false);
-                    return;
-                }
                 const unsubscribe = firebase.onAuthStateChanged(auth, (user) => {
                     console.log("Auth state changed:", user ? { uid: user.uid, email: user.email } : "No user");
                     setUser(user);
@@ -77,11 +55,6 @@
             }, []);
 
             const signUpWithEmail = async (email, password) => {
-                if (!auth) {
-                    console.error("Auth is not initialized.");
-                    toast.error("Authentication is not initialized.");
-                    return;
-                }
                 try {
                     const userCredential = await firebase.createUserWithEmailAndPassword(auth, email, password);
                     setUser(userCredential.user);
@@ -92,8 +65,18 @@
                 }
             };
 
+            const signInWithEmailAndPassword = async (email, password) => {
+                try {
+                    const userCredential = await firebase.signInWithEmailAndPassword(auth, email, password);
+                    setUser(userCredential.user);
+                    toast.success("Successfully logged in!");
+                } catch (error) {
+                    console.error("Login error:", error);
+                    toast.error(`Failed to log in: ${error.message}`);
+                }
+            };
+
             const logout = async () => {
-                if (!auth) return;
                 try {
                     await firebase.signOut(auth);
                     setUser(null);
@@ -104,7 +87,7 @@
                 }
             };
 
-            const value = { user, loading, signUpWithEmail, logout };
+            const value = { user, loading, signUpWithEmail, signInWithEmailAndPassword, logout, lang, setLang };
             return (
                 <AuthContext.Provider value={value}>
                     {loading ? (
@@ -132,42 +115,18 @@
         };
 
         const translations = {
-            en: { signUp: "Sign Up", logout: "Logout", history: "History", favorites: "Favorites", about: "About", feedback: "Feedback",
-                  loginToSave: "Sign up to save.", noHistory: "No history yet.", noFavorites: "No favorites yet.",
+            en: { signUp: "Sign Up", login: "Login", logout: "Logout", history: "History", favorites: "Favorites", about: "About", feedback: "Feedback",
+                  loginToSave: "Sign up to save.", noHistory: "No history yet.", noFavorites: "No favorites yet.", searchFavorites: "Search favorites...",
                   modeGenerate: "Generate", modeExplain: "Explain", modeScript: "Script", modeError: "Analyze Error",
-                  generateSubheader: "Ask a question to generate commands.", explainSubheader: "Enter a command to get a detailed explanation.",
-                  scriptSubheader: "Describe a multi-step task to generate a script.", errorSubheader: "Paste an error message to understand and solve it.",
-                  questionLabel: "Your Question", taskLabel: "Describe your task", errorLabel: "Paste your error message here",
-                  questionPlaceholder: "e.g., how to find all files larger than 100MB", taskPlaceholder: "e.g., find all .log files in my home directory, zip them, and move the zip to /tmp",
-                  errorPlaceholder: "e.g., bash: command not found: git", commandLabel: "Command to Explain", commandPlaceholder: "e.g., grep -r 'error' /var/log",
-                  os: "Operating System", osVersion: "OS Version", cli: "CLI / Shell", selectVersion: "Select Version", selectCli: "Select Shell",
-                  generate: "Generate Commands", explain: "Explain Command", generateScript: "Generate Script", analyzeError: "Analyze Error",
-                  generating: "Generating...", explaining: "Explaining...", generatingScript: "Generating Script...", analyzing: "Analyzing...",
-                  copied: "Copied!", copyAll: "Copy All as Script", footerLine1: "All material and intellectual property rights are reserved.",
-                  footerLine2: "Created by Amirhossein Yavari", errorTitle: "An Error Occurred", errorMessage: "Could not fetch a response. Please check your connection and API key, then try again.",
-                  detailedExplanation: "Command Explanation", scriptExplanation: "Script Explanation", errorAnalysis: "Error Analysis",
-                  aboutMeTitle: "About Me", aboutToolTitle: "About CMDGEN", aboutMeText: "I'm Amirhossein Yavari, born in 2008, and I'm currently learning about the world of Information Technology (IT). I'm passionate about building tools that can help others, and CMDGen is one of my first projects on this journey. My goal is to continue creating useful tools that make technology easier for everyone.",
-                  aboutToolText: "CMDGEN is an intelligent assistant designed to bridge the gap between human language and the command line. Whether you're a seasoned developer or just starting, CMDGEN empowers you to accomplish tasks efficiently without needing to memorize complex syntax. It features powerful modes like **Generate**, **Explain**, **Script**, and **Error Analysis**. Powered by advanced AI and built with a modern tech stack including React and Firebase, CMDGEN is your smart, reliable partner for mastering the command line.",
-                  feedbackTitle: "Send Feedback", feedbackPlaceholder: "Your feedback helps us improve...", send: "Send", sending: "Sending...", feedbackSuccess: "Thank you for your feedback!", feedbackError: "Could not send feedback. Please try again later.",
-                  feedbackPrompt: "Enjoying CMDGEN? Help us improve by sending your feedback!", giveFeedback: "Give Feedback", dismiss: "Dismiss" },
-            fa: { signUp: "ثبت‌نام", logout: "خروج", history: "تاریخچه", favorites: "مورد علاقه‌ها", about: "درباره", feedback: "بازخورد",
-                  loginToSave: "برای ذخیره ثبت‌نام کنید.", noHistory: "تاریخچه‌ای وجود ندارد.", noFavorites: "موردی یافت نشد.",
+                  favoriteDetail: "Favorite Detail", command: "Command", explanation: "Explanation",
+                  // ... سایر ترجمه‌ها
+            },
+            fa: { signUp: "ثبت‌نام", login: "ورود", logout: "خروج", history: "تاریخچه", favorites: "مورد علاقه‌ها", about: "درباره", feedback: "بازخورد",
+                  loginToSave: "برای ذخیره ثبت‌نام کنید.", noHistory: "تاریخچه‌ای وجود ندارد.", noFavorites: "موردی یافت نشد.", searchFavorites: "جستجوی مورد علاقه‌ها...",
                   modeGenerate: "تولید دستور", modeExplain: "تحلیل دستور", modeScript: "اسکریپت‌ساز", modeError: "تحلیل خطا",
-                  generateSubheader: "سوال خود را برای تولید دستورات وارد کنید.", explainSubheader: "یک دستور را برای دریافت تحلیل کامل وارد کنید.",
-                  scriptSubheader: "یک وظیفه چندمرحله‌ای را برای تولید اسکریپت توصیف کنید.", errorSubheader: "متن کامل خطا را برای درک و حل آن وارد کنید.",
-                  questionLabel: "سوال شما", taskLabel: "وظیفه خود را توصیف کنید", errorLabel: "پیغام خطای خود را اینجا وارد کنید",
-                  questionPlaceholder: "مثلاً: چطور فایل‌های بزرگتر از ۱۰۰ مگابایت را پیدا کنم", taskPlaceholder: "مثلاً: تمام فایل‌های log در پوشه home را پیدا کن، آنها را فشرده و به پوشه tmp منتقل کن",
-                  errorPlaceholder: "مثلاً: bash: command not found: git", commandLabel: "دستور جهت تحلیل", commandPlaceholder: "مثلاً: grep -r 'error' /var/log",
-                  os: "سیستم‌عامل", osVersion: "نسخه سیستم‌عامل", cli: "رابط خط فرمان (CLI)", selectVersion: "انتخاب نسخه", selectCli: "انتخاب رابط",
-                  generate: "تولید دستورات", explain: "تحلیل کن", generateScript: "تولید اسکریپت", analyzeError: "تحلیل خطا",
-                  generating: "در حال تولید...", explaining: "در حال تحلیل...", generatingScript: "در حال ساخت اسکریپت...", analyzing: "در حال تحلیل...",
-                  copied: "کپی شد!", copyAll: "کپی همه به عنوان اسکریپت", footerLine1: "تمامی حقوق مادی و معنوی این اثر محفوظ است.",
-                  footerLine2: "ساخته شده توسط امیرحسین یاوری", errorTitle: "خطا در دریافت اطلاعات", errorMessage: "پاسخی دریافت نشد. لطفاً اتصال اینترنت و کلید API خود را بررسی کرده و دوباره تلاش کنید.",
-                  detailedExplanation: "تحلیل دستور", scriptExplanation: "توضیحات اسکریپت", errorAnalysis: "تحلیل خطا",
-                  aboutMeTitle: "درباره من", aboutToolTitle: "درباره CMDGEN", aboutMeText: "من امیرحسین یاوری هستم، متولد ۱۳۸۷ و در حال یادگیری در دنیای فناوری اطلاعات (IT) هستم. به ساخت ابزارهایی که به دیگران کمک می‌کند علاقه‌مندم و CMDGen یکی از اولین پروژه‌های من در این مسیر است. هدفم این است که به ساخت ابزارهای مفید که تکنولوژی را برای همه آسان‌تر می‌کنند، ادامه دهم.",
-                  aboutToolText: "CMDGEN یک دستیار هوشمند است که برای پر کردن شکاف بین زبان انسان و خط فرمان طراحی شده است. چه یک توسعه‌دهنده باتجربه باشید و چه در ابتدای راه، CMDGEN شما را قادر می‌سازد تا وظایف خود را به طور موثر و بدون نیاز به حفظ کردن دستورات پیچیده انجام دهید. این ابزار دارای حالت‌های قدرتمندی مانند **تولید**، **تحلیل**، **اسکریپت‌ساز** و **تحلیل خطا** است. CMDGEN با بهره‌گیری از هوش مصنوعی پیشرفته و ساخته شده بر پایه فناوری‌های مدرن مانند React و Firebase، شریک هوشمند و قابل اعتماد شما برای تسلط بر خط فرمان است.",
-                  feedbackTitle: "ارسال بازخورد", feedbackPlaceholder: "نظر شما به ما در بهبود این ابزار کمک می‌کند...", send: "ارسال", sending: "در حال ارسال...", feedbackSuccess: "از بازخورد شما سپاسگزاریم!", feedbackError: "ارسال بازخورد با مشکل مواجه شد. لطفاً بعداً تلاش کنید.",
-                  feedbackPrompt: "از کار با CMDGEN لذت می‌برید؟ با ارسال نظر خود به ما در بهبود آن کمک کنید!", giveFeedback: "ارسال بازخورد", dismiss: "بعداً" }
+                  favoriteDetail: "جزئیات مورد علاقه", command: "دستور", explanation: "توضیحات",
+                  // ... سایر ترجمه‌ها
+            }
         };
 
         const osDetails = {
@@ -231,19 +190,16 @@
             return JSON.parse(jsonString);
         };
 
-        const dbAction = async (userId, collectionName, action, data = {}) => {
-            if (!userId || !db) return;
-            const collectionRef = firebase.collection(db, "users", userId, collectionName);
-            try {
-                if (action === 'add') {
-                    await firebase.addDoc(collectionRef, { ...data, createdAt: new Date() });
-                } else if (action === 'delete') {
-                    await firebase.deleteDoc(firebase.doc(db, "users", userId, collectionName, data.id));
-                }
-            } catch (error) {
-                console.error(`Error with ${collectionName}:`, error);
-                toast.error(`Failed to perform ${collectionName} action: ${error.message}`);
+        const dbActionLocal = async (collectionName, action, data = {}) => {
+            let localData = JSON.parse(localStorage.getItem(collectionName) || '[]');
+            if (action === 'add') {
+                localData.push({ ...data, createdAt: new Date() });
+                localStorage.setItem(collectionName, JSON.stringify(localData));
+            } else if (action === 'delete' && data.id) {
+                localData = localData.filter(item => item.id !== data.id);
+                localStorage.setItem(collectionName, JSON.stringify(localData));
             }
+            return localData;
         };
 
         const CustomSelect = ({ label, value, onChange, options, placeholder, disabled, lang }) => (
@@ -264,20 +220,15 @@
             const [items, setItems] = useState([]);
 
             useEffect(() => {
-                if (!user || !db) {
-                    setItems([]);
-                    return;
-                }
-                const q = firebase.query(firebase.collection(db, "users", user.uid, collectionName), firebase.orderBy("createdAt", "desc"), firebase.limit(20));
-                const unsubscribe = firebase.onSnapshot(q, (snapshot) => {
-                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    setItems(data);
-                }, (error) => {
-                    console.error(`Error fetching ${collectionName}:`, error);
-                    toast.error(`Failed to fetch ${collectionName}: ${error.message}`);
-                    setItems([]); // Reset list on error
-                });
-                return () => unsubscribe();
+                const fetchData = async () => {
+                    if (!user) {
+                        setItems(JSON.parse(localStorage.getItem(collectionName) || '[]'));
+                    } else {
+                        const fetchedItems = await fetchItems(user.uid, collectionName);
+                        setItems(fetchedItems);
+                    }
+                };
+                fetchData();
             }, [user, collectionName]);
 
             return (
@@ -305,19 +256,88 @@
             );
         };
 
+        const FavoritesList = ({ lang, favorites, onSelect }) => {
+            const [searchTerm, setSearchTerm] = useState('');
+            const t = translations[lang];
+
+            const filteredFavorites = favorites.filter(item =>
+                (item.userInput?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                 item.command?.toLowerCase().includes(searchTerm.toLowerCase()))
+            );
+
+            return (
+                <div className="w-full h-full bg-gray-100 dark:bg-gray-900 p-4 flex flex-col">
+                    <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                        <span>{icons.Star}</span> {t.favorites}
+                    </h3>
+                    <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder={t.searchFavorites}
+                        className="w-full bg-gray-200/50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-700 rounded-lg px-4 py-2 mb-4 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500"
+                    />
+                    <div className="overflow-y-auto flex-1 space-y-2">
+                        {filteredFavorites.length > 0 ? (
+                            filteredFavorites.map(item => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => onSelect(item)}
+                                    className="w-full text-left p-2 rounded-lg bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
+                                >
+                                    <p className="text-sm text-cyan-600 dark:text-cyan-400 font-semibold truncate">
+                                        {item.mode === 'generate' ? 'Q:' : item.mode === 'script' ? 'Task:' : 'Cmd:'} {item.userInput}
+                                    </p>
+                                    {item.command && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{item.command}</p>}
+                                    {item.explanation && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate">{item.explanation.substring(0, 50)}...</p>}
+                                </button>
+                            ))
+                        ) : (
+                            <p className="text-center text-gray-500 dark:text-gray-400">{t.noFavorites}</p>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
         const Header = ({ lang, setLang, theme, toggleTheme, onHistoryToggle, onFavoritesToggle, onAboutToggle, onFeedbackToggle }) => {
-            const { user, signUpWithEmail, logout } = useAuth();
+            const { user, signUpWithEmail, signInWithEmailAndPassword, logout } = useAuth();
             const [email, setEmail] = useState('');
             const [password, setPassword] = useState('');
             const [isSignUpOpen, setIsSignUpOpen] = useState(false);
+            const [isLoginOpen, setIsLoginOpen] = useState(false);
             const t = translations[lang];
 
             const handleSignUpSubmit = async (e) => {
                 e.preventDefault();
-                await signUpWithEmail(email, password);
-                setIsSignUpOpen(false);
-                setEmail('');
-                setPassword('');
+                if (password.length < 6) {
+                    toast.error(`${t.signUp} failed: Password must be at least 6 characters.`);
+                    return;
+                }
+                try {
+                    await signUpWithEmail(email, password);
+                    setIsSignUpOpen(false);
+                    setEmail('');
+                    setPassword('');
+                    toast.success("Successfully signed up!");
+                } catch (error) {
+                    console.error("Sign-up error:", error);
+                    toast.error(`Failed to sign up: ${error.message}`);
+                }
+            };
+
+            const handleLoginSubmit = async (e) => {
+                e.preventDefault();
+                try {
+                    await signInWithEmailAndPassword(email, password);
+                    setIsLoginOpen(false);
+                    setEmail('');
+                    setPassword('');
+                    toast.success("Successfully logged in!");
+                } catch (error) {
+                    console.error("Login error:", error);
+                    toast.error(`Failed to log in: ${error.message}`);
+                }
             };
 
             return (
@@ -350,20 +370,33 @@
                                     <button onClick={logout} className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/40 text-red-400 dark:text-red-300 transition-colors"><span>{icons.LogOut}</span></button>
                                 </div>
                             ) : (
-                                <div className="relative group">
-                                    <button onClick={() => setIsSignUpOpen(true)} className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-full text-sm font-semibold hover:bg-blue-700 transition-colors">
+                                <div className="flex gap-2">
+                                    <button onClick={() => setIsSignUpOpen(true)} className="bg-blue-600 text-white px-3 py-1.5 rounded-full text-sm font-semibold hover:bg-blue-700">
                                         <span>{icons.LogIn}</span> {t.signUp}
                                     </button>
-                                    {isSignUpOpen && (
-                                        <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
-                                            <form onSubmit={handleSignUpSubmit} className="p-4 space-y-3">
-                                                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className="w-full bg-gray-200/50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500" />
-                                                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className="w-full bg-gray-200/50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500" />
-                                                <button type="submit" className="w-full bg-cyan-600 text-white px-3 py-2 rounded-lg hover:bg-cyan-700">{t.signUp}</button>
-                                                <button type="button" onClick={() => setIsSignUpOpen(false)} className="w-full text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white mt-2">Cancel</button>
-                                            </form>
-                                        </div>
-                                    )}
+                                    <button onClick={() => setIsLoginOpen(true)} className="bg-green-600 text-white px-3 py-1.5 rounded-full text-sm font-semibold hover:bg-green-700">
+                                        <span>{icons.User}</span> {t.login}
+                                    </button>
+                                </div>
+                            )}
+                            {isSignUpOpen && (
+                                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
+                                    <form onSubmit={handleSignUpSubmit} className="p-4 space-y-3">
+                                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className="w-full bg-gray-200/50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500" />
+                                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className="w-full bg-gray-200/50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500" />
+                                        <button type="submit" className="w-full bg-cyan-600 text-white px-3 py-2 rounded-lg hover:bg-cyan-700">{t.signUp}</button>
+                                        <button type="button" onClick={() => setIsSignUpOpen(false)} className="w-full text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white mt-2">Cancel</button>
+                                    </form>
+                                </div>
+                            )}
+                            {isLoginOpen && (
+                                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
+                                    <form onSubmit={handleLoginSubmit} className="p-4 space-y-3">
+                                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className="w-full bg-gray-200/50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500" />
+                                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className="w-full bg-gray-200/50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500" />
+                                        <button type="submit" className="w-full bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700">{t.login}</button>
+                                        <button type="button" onClick={() => setIsLoginOpen(false)} className="w-full text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white mt-2">Cancel</button>
+                                    </form>
                                 </div>
                             )}
                         </div>
@@ -518,6 +551,18 @@
             );
         };
 
+        const FavoriteDetail = ({ favorite }) => {
+            const { lang } = useAuth();
+            const t = translations[lang];
+            return (
+                <div className="max-w-3xl mx-auto p-6">
+                    <h2 className="text-2xl font-bold">{t.favoriteDetail}</h2>
+                    <p><strong>{t.command}:</strong> {favorite.command}</p>
+                    <p><strong>{t.explanation}:</strong> {favorite.explanation}</p>
+                </div>
+            );
+        };
+
         function AppContent() {
             const [lang, setLang] = useState('en');
             const [theme, setTheme] = useState('dark');
@@ -534,8 +579,8 @@
             const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
             const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
             const [favorites, setFavorites] = useState([]);
-
-            const { user } = useAuth();
+            const { user, setLang: setAuthLang } = useAuth();
+            const navigate = useNavigate();
             const t = translations[lang];
 
             useEffect(() => {
@@ -545,16 +590,25 @@
             }, []);
 
             useEffect(() => {
-                if (!user) { setFavorites([]); return; }
-                const q = firebase.query(firebase.collection(db, "users", user.uid, "favorites"));
-                const unsubscribe = firebase.onSnapshot(q, (snapshot) => {
-                    setFavorites(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-                }, (error) => {
-                    console.error("Error fetching favorites:", error);
-                    toast.error(`Failed to fetch favorites: ${error.message}`);
-                });
-                return () => unsubscribe();
-            }, [user]);
+                setAuthLang(lang);
+                if (user) {
+                    const fetchFavorites = async () => {
+                        const fetchedFavorites = await fetchItems(user.uid, 'favorites');
+                        setFavorites(fetchedFavorites);
+                        // همگام‌سازی با localStorage
+                        const localFavorites = JSON.parse(localStorage.getItem('localFavorites') || '[]');
+                        localFavorites.forEach(async fav => {
+                            if (!fetchedFavorites.some(f => f.identifier === fav.identifier)) {
+                                await dbAction(user.uid, 'favorites', 'add', fav);
+                            }
+                        });
+                        localStorage.removeItem('localFavorites');
+                    };
+                    fetchFavorites();
+                } else {
+                    setFavorites(JSON.parse(localStorage.getItem('localFavorites') || '[]'));
+                }
+            }, [user, lang]);
 
             useEffect(() => {
                 setOsVersion(osDetails[os].versions[0] || '');
@@ -583,29 +637,33 @@
                 setOsVersion(item.osVersion);
                 setCli(item.cli);
                 setUserInput(item.userInput || '');
-                setResult(null); // Reset result before reload
-                handlePrimaryAction(); // Auto-load commands
-                setActivePanel(null);
+                setResult(null);
+                navigate(`/favorite/${item.id}`);
             };
 
             const handleFavoriteToggle = async (itemData, itemType) => {
-                if (!user) {
-                    toast.error(t.loginToSave);
-                    return;
-                }
                 const itemIdentifier = itemData.command || (itemData.script_lines && itemData.script_lines.join('\n')) || itemData.userInput;
                 if (!itemIdentifier) return;
-                
-                const favQuery = firebase.query(firebase.collection(db, "users", user.uid, "favorites"), firebase.where("identifier", "==", itemIdentifier));
-                const querySnapshot = await firebase.getDocs(favQuery);
 
-                if (querySnapshot.empty) {
+                if (!user) {
+                    let localFavorites = await dbActionLocal('localFavorites', 'add', { ...itemData, identifier: itemIdentifier, type: itemType });
+                    setFavorites(localFavorites);
+                    toast.success(t.favorites + " saved locally!");
+                    return;
+                }
+
+                const isFavorite = await checkFavorite(user.uid, itemIdentifier);
+                if (!isFavorite) {
                     await dbAction(user.uid, 'favorites', 'add', { ...itemData, identifier: itemIdentifier, type: itemType, userInput: userInput || itemIdentifier, mode: mode, explanation: itemData.explanation });
                     toast.success(t.favorites + " added!");
                 } else {
-                    querySnapshot.forEach(doc => dbAction(user.uid, 'favorites', 'delete', { id: doc.id }));
+                    const q = query(collection(db, "users", user.uid, "favorites"), where("identifier", "==", itemIdentifier));
+                    const snapshot = await getDocs(q);
+                    snapshot.forEach(doc => dbAction(user.uid, 'favorites', 'delete', { id: doc.id }));
                     toast.success(t.favorites + " removed!");
                 }
+                const updatedFavorites = await fetchItems(user.uid, 'favorites');
+                setFavorites(updatedFavorites);
             };
 
             const handlePrimaryAction = async () => {
@@ -632,7 +690,11 @@
                         responseData = { type: 'error', data: analysisData };
                     }
                     setResult(responseData);
-                    await dbAction(user?.uid, 'history', 'add', { mode, os, osVersion, cli, userInput });
+                    if (user) {
+                        await dbAction(user.uid, 'history', 'add', { mode, os, osVersion, cli, userInput });
+                    } else {
+                        await dbActionLocal('localHistory', 'add', { mode, os, osVersion, cli, userInput });
+                    }
                     const usageCount = parseInt(localStorage.getItem('cmdgenUsageCount') || '0') + 1;
                     localStorage.setItem('cmdgenUsageCount', usageCount.toString());
                     if (usageCount % 10 === 0 && !localStorage.getItem('cmdgenFeedbackDismissed')) {
@@ -666,7 +728,7 @@
                     {isFeedbackModalOpen && <FeedbackModal lang={lang} onClose={() => setIsFeedbackModalOpen(false)} />}
                     <aside className={`bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm transition-all duration-300 ease-in-out ${activePanel ? 'w-72' : 'w-0'} ${lang === 'fa' ? 'border-l' : 'border-r'} border-gray-200 dark:border-gray-800 overflow-hidden`}>
                         {activePanel === 'history' && <Panel lang={lang} onSelect={handleHistorySelect} title={t.history} icon={<span>{icons.History}</span>} collectionName="history" noItemsText={t.noHistory} />}
-                        {activePanel === 'favorites' && <Panel lang={lang} onSelect={handleHistorySelect} title={t.favorites} icon={<span>{icons.Star}</span>} collectionName="favorites" noItemsText={t.noFavorites} />}
+                        {activePanel === 'favorites' && <FavoritesList lang={lang} favorites={favorites} onSelect={handleHistorySelect} />}
                     </aside>
                     <div className="flex-1 flex flex-col h-screen overflow-y-auto">
                         <Header lang={lang} setLang={setLang} theme={theme} toggleTheme={toggleTheme} onHistoryToggle={() => handlePanelToggle('history')} onFavoritesToggle={() => handlePanelToggle('favorites')} onAboutToggle={() => setIsAboutModalOpen(true)} onFeedbackToggle={() => setIsFeedbackModalOpen(true)} />
@@ -760,6 +822,7 @@
                     <AuthProvider>
                         <Routes>
                             <Route path="/" element={<AppContent />} />
+                            <Route path="/favorite/:id" element={<FavoriteDetail favorite={favorites.find(f => f.id === useParams().id)} />} />
                             <Route path="/__/auth/handler" element={<AuthHandler />} />
                         </Routes>
                     </AuthProvider>
