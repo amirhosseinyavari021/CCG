@@ -1,6 +1,4 @@
-بله حتما. این کد کامل شماست که در آن مشکل هوک `useState` در کامپوننت `ErrorAnalysisCard` برطرف شده است. یک کامپوننت جدید به نام `SolutionCommandStep` برای مدیریت صحیح state ایجاد شده است.
 
-```jsx
 import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { BrowserRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
