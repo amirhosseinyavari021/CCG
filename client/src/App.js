@@ -977,6 +977,14 @@ function AppContent() {
             </button>
           </motion.div>
 
-          {error && (
-            <motion.div
-              className="mt-8 max-w-3xl mx-auto bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-500/50 rounded-xl p-
+         {error && (
+  <motion.div
+    className="mt-8 max-w-3xl mx-auto bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-500/50 rounded-xl p-6"
+  >
+    <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
+      <ServerCrash size={20} />
+      <h3 className="text-lg font-bold">{translations[lang].errorTitle}</h3>
+    </div>
+    <p className="mt-2 text-gray-600 dark:text-gray-300">{error}</p>
+  </motion.div>
+)}
