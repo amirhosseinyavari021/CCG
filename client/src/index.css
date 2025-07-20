@@ -1,3 +1,110 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  font-family: 'Inter', sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* RTL برای فارسی */
+[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+[dir="rtl"] .flex-row {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .text-left {
+  text-align: right;
+}
+
+/* بهینه‌سازی برای موبایل */
+@media (max-width: 640px) {
+  body {
+    font-size: 14px;
+  }
+
+  h1, .text-2xl {
+    font-size: 1.5rem;
+  }
+
+  h2, .text-3xl {
+    font-size: 1.25rem;
+  }
+
+  button {
+    padding: 0.75rem 1rem;
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  input, textarea, select {
+    padding: 0.75rem;
+    font-size: 0.875rem;
+  }
+
+  .mobile-drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 80%;
+    max-width: 300px;
+    height: 100%;
+    background: white;
+    dark:background: gray-900;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+    z-index: 1000;
+  }
+
+  .mobile-drawer.open {
+    transform: translateX(0);
+  }
+
+  header {
+    padding: 0.5rem 1rem;
+  }
+
+  .container {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+  }
+
+  .card {
+    padding: 1rem;
+  }
+
+  .grid-cols-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* فونت فارسی */
+[lang="fa"] {
+  font-family: 'Vazirmatn', sans-serif;
+}
+
+/* کارت‌ها */
+.card {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* جلوگیری از سرریز کدها */
+pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
