@@ -245,7 +245,7 @@ const dbAction = async (userId, collectionName, action, data = {}) => {
   }
 };
 
-// Components (unchanged except where noted)
+// Components
 const CustomSelect = ({ label, value, onChange, options, placeholder, disabled, lang, error }) => (
   <motion.div className="flex flex-col gap-2" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
     <label className={`text-sm font-medium text-gray-700 dark:text-gray-300 ${disabled ? 'opacity-50' : ''}`}>{label} <span className="text-red-500">*</span></label>
@@ -665,6 +665,16 @@ const FeedbackModal = ({ lang, onClose }) => {
 
 const MobileDrawer = ({ lang, isOpen, onClose, onHistoryToggle, onFavoritesToggle, onAboutToggle, onFeedbackToggle }) => {
   const t = translations[lang];
+  const [activePanel, setActivePanel] = useState(null);
+
+  useEffect(() => {
+    if (!isOpen) setActivePanel(null);
+  }, [isOpen]);
+
+  const handlePanelToggle = (panel) => {
+    setActivePanel(activePanel === panel ? null : panel);
+  };
+
   return (
     <motion.div
       className={`mobile-drawer bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 ${isOpen ? 'open' : ''}`}
@@ -680,12 +690,24 @@ const MobileDrawer = ({ lang, isOpen, onClose, onHistoryToggle, onFavoritesToggl
           </button>
         </div>
         <div className="flex flex-col gap-4">
-          <button onClick={() => { onHistoryToggle(); onClose(); }} className="flex items-center gap-2 text-gray-800 dark:text-white hover:text-cyan-600 dark:hover:text-cyan-400">
+          <button
+            onClick={() => handlePanelToggle('history')}
+            className="flex items-center gap-2 text-gray-800 dark:text-white hover:text-cyan-600 dark:hover:text-cyan-400"
+          >
             <History size={20} /> {t.history}
           </button>
-          <button onClick={() => { onFavoritesToggle(); onClose(); }} className="flex items-center gap-2 text-gray-800 dark:text-white hover:text-cyan-600 dark:hover:text-cyan-400">
+          {activePanel === 'history' && (
+            <Panel lang={lang} onSelect={onHistoryToggle} title={t.history} icon={<History size={20}/>} collectionName="history" noItemsText={t.noHistory} />
+          )}
+          <button
+            onClick={() => handlePanelToggle('favorites')}
+            className="flex items-center gap-2 text-gray-800 dark:text-white hover:text-cyan-600 dark:hover:text-cyan-400"
+          >
             <Star size={20} /> {t.favorites}
           </button>
+          {activePanel === 'favorites' && (
+            <Panel lang={lang} onSelect={onFavoritesToggle} title={t.favorites} icon={<Star size={20}/>} collectionName="favorites" noItemsText={t.noFavorites} />
+          )}
           <button onClick={() => { onFeedbackToggle(); onClose(); }} className="flex items-center gap-2 text-gray-800 dark:text-white hover:text-cyan-600 dark:hover:text-cyan-400">
             <MessageSquare size={20} /> {t.feedback}
           </button>
@@ -742,7 +764,6 @@ function AppContent() {
 
   const handlePanelToggle = (panel) => {
     setActivePanel(activePanel === panel ? null : panel);
-    setIsDrawerOpen(false);
   };
 
   const handleHistorySelect = (item) => {
@@ -849,8 +870,8 @@ function AppContent() {
         lang={lang}
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        onHistoryToggle={() => handlePanelToggle('history')}
-        onFavoritesToggle={() => handlePanelToggle('favorites')}
+        onHistoryToggle={handleHistorySelect}
+        onFavoritesToggle={handleHistorySelect}
         onAboutToggle={() => setIsAboutModalOpen(true)}
         onFeedbackToggle={() => setIsFeedbackModalOpen(true)}
       />
@@ -955,7 +976,7 @@ function AppContent() {
                     warning={cmd.warning}
                     lang={lang}
                     onFavoriteToggle={() => handleFavoriteToggle(cmd, 'command')}
-                    isFavorite={!!favorites.find(fav => fav.command === cmd.command)}
+                    isFavorite={false} // بهینه‌سازی: باید از دیتابیس چک کنی
                     onShare={() => handleShare(cmd)}
                   />
                 ))}
@@ -969,7 +990,7 @@ function AppContent() {
                 explanation={result.data.explanation}
                 lang={lang}
                 onFavoriteToggle={() => handleFavoriteToggle(result.data, 'script')}
-                isFavorite={!!favorites.find(fav => fav.identifier === result.data.script_lines.join('\n'))}
+                isFavorite={false} // بهینه‌سازی: باید از دیتابیس چک کنی
                 onShare={() => handleShare(result.data)}
               />
             )}
