@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Terminal, Copy, Check, ServerCrash, Wand2, Search, ShieldAlert, Sun, Moon, FileCode2, Info, X, Menu, Download } from 'lucide-react';
+import { Terminal, Copy, Check, ServerCrash, Wand2, Search, ShieldAlert, Sun, Moon, FileCode2, Info, X, Menu, Download, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 // Translations
