@@ -1,6 +1,6 @@
 const express = require('express');
 const path = require('path');
-const rateLimit = 'express-rate-limit';
+const rateLimit = require('express-rate-limit');
 const axios = require('axios');
 
 const app = express();
@@ -35,18 +35,18 @@ app.post('/api/proxy', async (req, res) => {
         payload.generationConfig = { response_mime_type: 'application/json' };
     }
 
-    const apiModel = 'gemini-1.5-flash';
-    // For JSON, we use generateContent. For text, we stream.
+    // ============== تغییر فقط در این خط =================
+    const apiModel = 'gemini-1.5-pro'; // <-- از flash به pro تغییر کرد
+    // =====================================================
+
     const endpoint = isJsonResponse ? 'generateContent' : 'streamGenerateContent';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:${endpoint}?key=${apiKey}`;
 
     if (isJsonResponse) {
-        // Handle JSON response in one go
         const response = await axios.post(url, payload);
         const content = response.data.candidates[0].content.parts[0].text;
-        res.json({ content }); // Send the complete JSON string
+        res.json({ content });
     } else {
-        // Handle streaming for plain text (e.g., 'explain' mode)
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
@@ -54,25 +54,15 @@ app.post('/api/proxy', async (req, res) => {
         const googleResponse = await axios.post(url, payload, { responseType: 'stream' });
 
         googleResponse.data.on('data', (chunk) => {
-            // Extract text from the stream chunk and send it directly
             const textMatch = chunk.toString().match(/"text":\s*"(.*?)"/);
             if (textMatch && textMatch[1]) {
-                // Decode JSON string character escapes (like \n, \")
                 const decodedText = JSON.parse(`"${textMatch[1]}"`);
                 res.write(decodedText);
             }
         });
 
-        googleResponse.data.on('end', () => {
-            res.end();
-        });
-        
-        googleResponse.data.on('error', (err) => {
-            if (!res.headersSent) {
-                res.status(500).send('Stream error');
-            }
-            res.end();
-        });
+        googleResponse.data.on('end', () => res.end());
+        googleResponse.data.on('error', () => res.end());
     }
 
   } catch (error) {
@@ -82,7 +72,6 @@ app.post('/api/proxy', async (req, res) => {
     }
   }
 });
-
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'client/build')));
