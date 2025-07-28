@@ -1,7 +1,7 @@
 const express = require('express');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
-const axios = require('axios'); // برای درخواست به API گوگل
+const axios = require('axios'); // اطمینان حاصل کنید که axios نصب شده: npm install axios
 
 const app = express();
 
@@ -21,34 +21,60 @@ app.use(express.json());
 // endpoint برای پروکسی API
 app.post('/api/proxy', async (req, res) => {
   try {
-    const { messages } = req.body; // ساختار پیام‌ها از App.js
-    if (!messages || !messages[1]?.content) {
+    // دریافت کل پیام‌ها، مدل و فرمت پاسخ از کلاینت
+    const { messages, response_format } = req.body;
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ error: 'Invalid request payload' });
     }
 
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
+      console.error('API Key is not configured on the server.');
       return res.status(500).json({ error: 'API Key not configured' });
     }
 
-    const response = await axios.post(
-      'https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=' + apiKey,
-      {
-        contents: [{ parts: [{ text: messages[1].content }] }]
-      },
-      {
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
+    // جدا کردن پیام سیستم از پیام کاربر
+    const systemInstruction = messages.find(m => m.role === 'system')?.content || '';
+    const userMessage = messages.find(m => m.role === 'user')?.content || '';
 
-    const content = response.data.candidates[0].content.parts[0].text;
-    res.json({ choices: [{ message: { content } }] }); // سازگار با ساختار مورد انتظار App.js
-  } catch (error) {
-    console.error('Proxy error:', error.response?.data || error.message);
-    if (error.response?.status === 429) {
-      return res.status(429).json({ error: 'Rate limit exceeded' });
+    if (!userMessage) {
+        return res.status(400).json({ error: 'User message is missing' });
     }
-    res.status(500).json({ error: 'Internal server error' });
+    
+    // ساختار صحیح درخواست برای API Gemini
+    const payload = {
+      contents: [{ parts: [{ text: userMessage }] }],
+      generationConfig: {
+        // تنظیم mime type برای خروجی JSON یا متن عادی
+        response_mime_type: response_format?.type === 'json_object' ? 'application/json' : 'text/plain',
+      },
+      // ارسال دستورالعمل‌های سیستمی
+      system_instruction: {
+        parts: [{ text: systemInstruction }]
+      }
+    };
+    
+    // استفاده از یک مدل قدرتمند سازگار با Gemini API
+    const apiModel = 'gemini-1.5-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:generateContent?key=${apiKey}`;
+
+    const response = await axios.post(url, payload, {
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    // استخراج محتوای پاسخ
+    const content = response.data.candidates[0].content.parts[0].text;
+    
+    // بازگرداندن پاسخ در فرمتی که کلاینت انتظار دارد
+    res.json({ choices: [{ message: { content } }] });
+
+  } catch (error) {
+    // لاگ کردن خطای دقیق‌تر برای دیباگینگ
+    console.error('Proxy error:', error.response?.data?.error || error.message);
+    if (error.response?.status === 429) {
+      return res.status(429).json({ error: 'Rate limit exceeded. Please try again later.' });
+    }
+    res.status(500).json({ error: 'An error occurred on the server.' });
   }
 });
 
