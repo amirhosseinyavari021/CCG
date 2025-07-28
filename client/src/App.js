@@ -331,7 +331,12 @@ function AppContent() {
         throw new Error("Network response was not ok.");
     }
     
-    setResult({ type: responseType, data: responseType === 'explanation' ? '' : {} });
+    // Initialize the result structure based on the response type
+    if (responseType === 'explanation') {
+      setResult({ type: 'explanation', data: '' });
+    } else {
+      setResult({ type: responseType, data: {} });
+    }
     
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -340,36 +345,32 @@ function AppContent() {
 
     while (true) {
         const { value, done } = await reader.read();
-        if (done) break;
-
-        accumulatedText += decoder.decode(value, { stream: true });
-        
-        // Regular expression to find all text parts in the stream chunks
-        const textParts = accumulatedText.match(/"text":\s*"(.*?)"/g);
-        let combinedText = '';
-        if(textParts) {
-            combinedText = textParts.map(part => {
-                try {
-                    return JSON.parse(`{${part}}`).text;
-                } catch {
-                    return '';
+        if (done) {
+            // End of stream. Try to parse the complete accumulated text one last time.
+            try {
+                if (responseType !== 'explanation') {
+                    const parsedJson = JSON.parse(accumulatedText);
+                    finalResult = { type: responseType, data: parsedJson };
+                    setResult(finalResult);
                 }
-            }).join('');
+            } catch (e) {
+                console.error("Final JSON parsing failed:", e);
+                toast.error(t.errorServer);
+            }
+            break; // Exit the loop
         }
 
+        const chunk = decoder.decode(value, { stream: true });
+        accumulatedText += chunk;
+
+        // For explanation (plain text), update the UI on every chunk
         if (responseType === 'explanation') {
-            finalResult = { type: 'explanation', data: combinedText };
-            setResult(finalResult);
+            setResult({ type: 'explanation', data: accumulatedText });
+            finalResult = { type: 'explanation', data: accumulatedText };
         } else {
-            try {
-                // Try to parse the combined text as JSON
-                const parsedJson = JSON.parse(combinedText);
-                finalResult = { type: responseType, data: parsedJson };
-                setResult(finalResult);
-            } catch (e) {
-                // If parsing fails, it means the JSON is not complete yet.
-                // We show a placeholder or do nothing and wait for more chunks.
-            }
+            // For JSON, we show a loading state and parse only at the end
+            // Optional: you could try to parse here to update UI faster if possible
+            // but it's safer to wait until the end.
         }
     }
 
