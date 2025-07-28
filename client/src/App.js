@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Terminal, Copy, Check, ServerCrash, Wand2, Search, ShieldAlert, Sun, Moon, FileCode2, Info, X, Menu, Download, ChevronDown, Bot } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+// Translations
 const translations = {
   en: {
     about: "About", modeGenerate: "Generate", modeExplain: "Explain", modeScript: "Script", modeError: "Analyze Error",
@@ -20,7 +21,7 @@ const translations = {
     errorServer: "Something went wrong on our end. Please try again later.",
     errorInput: "Invalid input. Please provide a valid question or command.",
     fieldRequired: "This field is required",
-    detailedExplanation: "Command Explanation", scriptExplanation: "Script Details", errorAnalysis: "Error Analysis", cause: "Cause", solution: "Solution",
+    detailedExplanation: "Command Explanation", scriptExplanation: "Script Details", errorAnalysis: "Error Analysis", cause: "Cause", solution: "Solution", explanation: "Explanation",
     aboutMeTitle: "About Me", aboutToolTitle: "About CMDGEN", aboutMeText: "I'm Amirhossein Yavari, born in 2008, passionate about IT and building tools like CMDGEN.",
     aboutToolText: "CMDGEN is a smart assistant for command-line tasks, built with React.", footerLine1: "All rights reserved.",
     footerLine2: "Created by Amirhossein Yavari",
@@ -40,7 +41,7 @@ const translations = {
     errorServer: "مشکلی از سمت ما پیش آمده. لطفاً بعداً دوباره امتحان کنید.",
     errorInput: "ورودی نامعتبر است. لطفاً سوال یا دستور معتبری وارد کنید.",
     fieldRequired: "این فیلد الزامی است",
-    detailedExplanation: "توضیحات دستور", scriptExplanation: "جزئیات اسکریپت", errorAnalysis: "تحلیل خطا", cause: "علت", solution: "راه‌حل",
+    detailedExplanation: "توضیحات دستور", scriptExplanation: "جزئیات اسکریپت", errorAnalysis: "تحلیل خطا", cause: "علت", solution: "راه‌حل", explanation: "توضیحات",
     aboutMeTitle: "درباره من", aboutToolTitle: "درباره CMDGEN", aboutMeText: "من امیرحسین یاوری هستم، متولد ۱۳۸۷، علاقه‌مند به IT و ساخت ابزارهایی مثل CMDGEN.",
     aboutToolText: "CMDGEN یک دستیار هوشمند برای خط فرمان است که با React ساخته شده.", footerLine1: "تمامی حقوق محفوظ است.",
     footerLine2: "ساخته شده توسط امیرحسین یاوری",
@@ -76,7 +77,7 @@ const getCache = (key) => {
 const baseSystemPrompt = `You are CMDGEN, an expert command-line assistant. Provide practical, user-focused explanations. Use "فلگ" for command-line options in Persian.`;
 const modelName = 'gemini-1.5-flash';
 
-// ... (کامپوننت‌ها بدون تغییر باقی می‌مانند)
+// Components
 const CustomSelect = ({ label, value, onChange, options, placeholder, lang, error }) => (
   <motion.div className="flex flex-col gap-2" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{label} <span className="text-red-500">*</span></label>
@@ -329,46 +330,52 @@ function AppContent() {
     if (!response.ok || !response.body) {
         throw new Error("Network response was not ok.");
     }
-
-    // آماده‌سازی برای نمایش نتیجه
+    
     setResult({ type: responseType, data: responseType === 'explanation' ? '' : {} });
     
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    let accumulatedJson = '';
+    let accumulatedText = '';
+    let finalResult = null;
 
     while (true) {
         const { value, done } = await reader.read();
         if (done) break;
 
-        accumulatedJson += decoder.decode(value, { stream: true });
-
-        // تلاش برای پارس کردن اطلاعات از استریم
-        try {
-            // پاسخ‌های استریم گوگل معمولا با "data: " شروع می‌شوند و در یک آرایه قرار دارند
-            const jsonObjects = accumulatedJson.match(/{[\s\S]*?}/g);
-            if(jsonObjects){
-                let currentText = '';
-                jsonObjects.forEach(jsonStr => {
-                    const parsed = JSON.parse(jsonStr);
-                    currentText += parsed.candidates[0].content.parts[0].text;
-                });
-
-                if (responseType === 'explanation') {
-                    setResult({ type: 'explanation', data: currentText });
-                } else {
-                    // برای انواع دیگر، تلاش می‌کنیم JSON نهایی را بسازیم
-                    setResult({ type: responseType, data: JSON.parse(currentText) });
+        accumulatedText += decoder.decode(value, { stream: true });
+        
+        // Regular expression to find all text parts in the stream chunks
+        const textParts = accumulatedText.match(/"text":\s*"(.*?)"/g);
+        let combinedText = '';
+        if(textParts) {
+            combinedText = textParts.map(part => {
+                try {
+                    return JSON.parse(`{${part}}`).text;
+                } catch {
+                    return '';
                 }
+            }).join('');
+        }
+
+        if (responseType === 'explanation') {
+            finalResult = { type: 'explanation', data: combinedText };
+            setResult(finalResult);
+        } else {
+            try {
+                // Try to parse the combined text as JSON
+                const parsedJson = JSON.parse(combinedText);
+                finalResult = { type: responseType, data: parsedJson };
+                setResult(finalResult);
+            } catch (e) {
+                // If parsing fails, it means the JSON is not complete yet.
+                // We show a placeholder or do nothing and wait for more chunks.
             }
-        } catch (e) {
-            // اگر JSON هنوز کامل نیست، ادامه می‌دهیم
-            continue;
         }
     }
 
-    // ذخیره نتیجه نهایی در کش
-    setCache(getCacheKey(mode, os, userInput), result.data);
+    if (finalResult) {
+        setCache(getCacheKey(mode, os, userInput), finalResult.data);
+    }
   };
 
   const handlePrimaryAction = async () => {
@@ -393,11 +400,11 @@ function AppContent() {
 
     if (mode === 'generate') {
       responseType = 'commands';
-      const systemPrompt = `${baseSystemPrompt} Provide 3 practical commands in JSON format (array named "commands") for the user's environment: OS=${os_type}, Version=${os_version}, Shell=${cli}. Language: ${langMap[language]}. Each command must have "command", "explanation", and an optional "warning".`;
+      const systemPrompt = `${baseSystemPrompt} Provide 3 practical commands in JSON format (array named "commands") for the user's environment: OS=${os}, Version=${osVersion}, Shell=${cli}. Language: ${langMap[lang]}. Each command must have "command", "explanation", and an optional "warning".`;
       payload = { model: modelName, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: `Question: "${userInput}"` }], response_format: { type: "json_object" } };
     } else if (mode === 'explain') {
       responseType = 'explanation';
-      const systemPrompt = `${baseSystemPrompt} Provide a clear Markdown explanation for the command in ${langMap[language]}. Include: "Purpose / هدف", "Breakdown / اجزاء دستور", "Usage Examples / مثال‌های کاربردی", "Pro Tip / نکته حرفه‌ای".`;
+      const systemPrompt = `${baseSystemPrompt} Provide a clear Markdown explanation for the command in ${langMap[lang]}. Include: "Purpose / هدف", "Breakdown / اجزاء دستور", "Usage Examples / مثال‌های کاربردی", "Pro Tip / نکته حرفه‌ای".`;
       payload = { model: modelName, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: `Command: \`${userInput}\`. Environment: OS=${os}, Version=${osVersion}, Shell=${cli}.` }] };
     } else if (mode === 'script') {
         responseType = 'script';
@@ -420,8 +427,8 @@ function AppContent() {
   };
 
   const copyAllCommands = () => {
-    if (result?.type === 'commands' && result.data.length > 0) {
-        const textToCopy = result.data.map(cmd => cmd.command).join('\n');
+    if (result?.type === 'commands' && result.data.commands && result.data.commands.length > 0) {
+        const textToCopy = result.data.commands.map(cmd => cmd.command).join('\n');
         navigator.clipboard.writeText(textToCopy);
         toast.success(t.copied);
     }
@@ -440,7 +447,26 @@ function AppContent() {
         <MobileDrawer lang={lang} isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} onAboutClick={() => setIsAboutModalOpen(true)} onLangChange={handleLangChange} />
 
         <header className="bg-white dark:bg-gray-900 shadow-sm sticky top-0 z-40">
-            {/* Header content ... */}
+            <div className="container mx-auto px-4 py-2 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                    <button onClick={() => setIsDrawerOpen(true)} className="md:hidden p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded">
+                        <Menu size={20} />
+                    </button>
+                    <h1 className="text-xl font-bold text-cyan-600 dark:text-cyan-400">CMDGEN</h1>
+                    <button onClick={() => setIsAboutModalOpen(true)} className="hidden md:inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">
+                        <Info size={16} /> {t.about}
+                    </button>
+                </div>
+                <div className="flex items-center gap-3">
+                    <button onClick={toggleTheme} className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded">
+                        {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                    </button>
+                    <div className="hidden md:flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5">
+                        <button onClick={() => setLang('en')} className={`px-2.5 py-1 rounded-full text-xs ${lang === 'en' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>EN</button>
+                        <button onClick={() => setLang('fa')} className={`px-2.5 py-1 rounded-full text-xs ${lang === 'fa' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>FA</button>
+                    </div>
+                </div>
+            </div>
         </header>
 
         <main className="container mx-auto px-4 py-6 flex-grow">
@@ -473,13 +499,13 @@ function AppContent() {
                     </button>
                 </Card>
 
-                {result?.type === 'commands' && result.data.length > 0 && (
+                {result?.type === 'commands' && result.data.commands && (
                     <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="mt-6 space-y-4">
                         <div className="flex justify-between items-center px-1">
                             <h3 className="text-lg font-bold text-gray-900 dark:text-white">Generated Commands</h3>
                             <button onClick={copyAllCommands} className="flex items-center gap-1.5 text-sm text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 transition-colors"><Copy size={14} /> {t.copyAll}</button>
                         </div>
-                        {result.data.map((cmd, index) => <GeneratedCommandCard key={index} command={cmd.command} explanation={cmd.explanation} warning={cmd.warning} lang={lang} />)}
+                        {result.data.commands.map((cmd, index) => <GeneratedCommandCard key={index} command={cmd.command} explanation={cmd.explanation} warning={cmd.warning} lang={lang} />)}
                     </motion.div>
                 )}
                 
@@ -490,7 +516,8 @@ function AppContent() {
         </main>
 
         <footer className="bg-white dark:bg-gray-900 py-3 text-center text-gray-500 dark:text-gray-400 text-xs border-t border-gray-200 dark:border-gray-800">
-            {/* Footer content ... */}
+             <p>{t.footerLine1}</p>
+             <p className="mt-1">{t.footerLine2}</p>
         </footer>
     </motion.div>
   );
