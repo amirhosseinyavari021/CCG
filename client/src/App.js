@@ -320,65 +320,6 @@ function AppContent() {
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
   };
 
-  const processStream = async (payload, responseType) => {
-    const response = await fetch('/api/proxy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-    });
-
-    if (!response.ok || !response.body) {
-        throw new Error("Network response was not ok.");
-    }
-    
-    // Initialize the result structure based on the response type
-    if (responseType === 'explanation') {
-      setResult({ type: 'explanation', data: '' });
-    } else {
-      setResult({ type: responseType, data: {} });
-    }
-    
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let accumulatedText = '';
-    let finalResult = null;
-
-    while (true) {
-        const { value, done } = await reader.read();
-        if (done) {
-            // End of stream. Try to parse the complete accumulated text one last time.
-            try {
-                if (responseType !== 'explanation') {
-                    const parsedJson = JSON.parse(accumulatedText);
-                    finalResult = { type: responseType, data: parsedJson };
-                    setResult(finalResult);
-                }
-            } catch (e) {
-                console.error("Final JSON parsing failed:", e);
-                toast.error(t.errorServer);
-            }
-            break; // Exit the loop
-        }
-
-        const chunk = decoder.decode(value, { stream: true });
-        accumulatedText += chunk;
-
-        // For explanation (plain text), update the UI on every chunk
-        if (responseType === 'explanation') {
-            setResult({ type: 'explanation', data: accumulatedText });
-            finalResult = { type: 'explanation', data: accumulatedText };
-        } else {
-            // For JSON, we show a loading state and parse only at the end
-            // Optional: you could try to parse here to update UI faster if possible
-            // but it's safer to wait until the end.
-        }
-    }
-
-    if (finalResult) {
-        setCache(getCacheKey(mode, os, userInput), finalResult.data);
-    }
-  };
-
   const handlePrimaryAction = async () => {
     const newErrors = {};
     if (!userInput.trim()) newErrors.userInput = t.fieldRequired;
@@ -398,9 +339,11 @@ function AppContent() {
     const langMap = { 'fa': 'Persian', 'en': 'English' };
     let payload;
     let responseType;
+    let isJson = false;
 
     if (mode === 'generate') {
       responseType = 'commands';
+      isJson = true;
       const systemPrompt = `${baseSystemPrompt} Provide 3 practical commands in JSON format (array named "commands") for the user's environment: OS=${os}, Version=${osVersion}, Shell=${cli}. Language: ${langMap[lang]}. Each command must have "command", "explanation", and an optional "warning".`;
       payload = { model: modelName, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: `Question: "${userInput}"` }], response_format: { type: "json_object" } };
     } else if (mode === 'explain') {
@@ -409,19 +352,51 @@ function AppContent() {
       payload = { model: modelName, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: `Command: \`${userInput}\`. Environment: OS=${os}, Version=${osVersion}, Shell=${cli}.` }] };
     } else if (mode === 'script') {
         responseType = 'script';
+        isJson = true;
         const scriptExtension = (os === 'windows' && cli === 'PowerShell') ? 'ps1' : (os === 'windows' && cli === 'CMD') ? 'bat' : 'sh';
         const systemPrompt = `${baseSystemPrompt} Generate a JSON object with a script for the task. Include: "filename" (e.g., "task.${scriptExtension}"), "script_lines" (array of code lines), "explanation". Language: ${langMap[lang]}.`;
         payload = { model: modelName, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: `Task: "${userInput}". Environment: OS=${os}, Version=${osVersion}, Shell=${cli}.` }], response_format: { type: "json_object" } };
     } else { // error
         responseType = 'error';
+        isJson = true;
         const systemPrompt = `${baseSystemPrompt} Analyze the error in JSON format. Include: "cause", "explanation", "solution" (array of steps, prefix commands with 'CMD:'). Language: ${langMap[lang]}.`;
         payload = { model: modelName, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: `Error: "${userInput}". Environment: OS=${os}, Version=${osVersion}, Shell=${cli}.` }], response_format: { type: "json_object" } };
     }
 
     try {
-        await processStream(payload, responseType);
+        const response = await fetch('/api/proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            throw new Error(t.errorServer);
+        }
+
+        if (isJson) {
+            const data = await response.json();
+            const finalResult = { type: responseType, data: JSON.parse(data.content) };
+            setResult(finalResult);
+            setCache(getCacheKey(mode, os, userInput), finalResult.data);
+        } else { // Streaming for plain text
+            if (!response.body) throw new Error("Response body is missing.");
+            setResult({ type: responseType, data: '' });
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let accumulatedText = '';
+            
+            while (true) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                accumulatedText += decoder.decode(value, { stream: true });
+                setResult({ type: responseType, data: accumulatedText });
+            }
+            setCache(getCacheKey(mode, os, userInput), accumulatedText);
+        }
+
     } catch (err) {
-        toast.error(err.message === 'network' ? t.errorNetwork : err.message || t.errorServer);
+        toast.error(err.message || t.errorNetwork);
     } finally {
         setIsLoading(false);
     }
