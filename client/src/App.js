@@ -383,7 +383,6 @@ function AppContent() {
         const decoder = new TextDecoder();
         let fullContent = '';
         
-        // Initialize result with a streaming-friendly structure
         setResult({ type: responseType, data: isJson ? {} : '' });
 
         while (true) {
@@ -402,8 +401,7 @@ function AppContent() {
                         if (delta) {
                             fullContent += delta;
                             if (!isJson) {
-                                // For plain text, update UI progressively
-                                setResult({ type: responseType, data: fullContent });
+                                setResult(prev => ({ ...prev, data: fullContent }));
                             }
                         }
                     } catch (e) {
@@ -414,9 +412,10 @@ function AppContent() {
         }
         
         const finalParsedData = isJson ? JSON.parse(fullContent) : fullContent;
+        const finalResult = { type: responseType, data: finalParsedData };
 
-        setResult({ type: responseType, data: finalParsedData });
-        setCache(getCacheKey(mode, os, userInput), finalParsedData);
+        setResult(finalResult);
+        setCache(getCacheKey(mode, os, userInput), finalResult.data);
 
     } catch (err) {
         toast.error(err.message || t.errorNetwork);
@@ -479,11 +478,11 @@ function AppContent() {
                         </button>
                     ))}
                 </div>
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 text-center">{t[`mode${mode.charAt(0).toUpperCase() + m.slice(1)}`]}</h2>
+                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 text-center">{t[`mode${mode.charAt(0).toUpperCase() + mode.slice(1)}`]}</h2>
                 <p className="text-gray-600 dark:text-gray-400 mb-8 text-center text-md">{t[`${mode}Subheader`]}</p>
 
                 <Card lang={lang}>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <CustomSelect label={t.os} value={os} onChange={setOs} options={Object.keys(osDetails)} placeholder={t.os} lang={lang} error={formErrors.os} />
                         <CustomSelect label={t.osVersion} value={osVersion} onChange={setOsVersion} options={osDetails[os]?.versions || []} placeholder={t.selectVersion} lang={lang} error={formErrors.osVersion} />
                         <CustomSelect label={t.cli} value={cli} onChange={setCli} options={osDetails[os]?.clis || []} placeholder={t.selectCli} lang={lang} error={formErrors.cli} />
