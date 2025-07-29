@@ -1,6 +1,5 @@
 const express = require('express');
 const path = require('path');
-const rateLimit = require('express-rate-limit');
 const axios = require('axios');
 
 const app = express();
@@ -12,66 +11,53 @@ app.use(express.json());
 
 app.post('/api/proxy', async (req, res) => {
   try {
-    const { messages, response_format } = req.body;
-    const apiKey = process.env.API_KEY;
+    // 1. Get your API Key from environment variables
+    const apiKey = process.env.API_KEY; 
 
     if (!apiKey) {
+      console.error('API Key is missing!');
       return res.status(500).json({ error: 'API Key not configured' });
     }
-    if (!messages || messages.length === 0) {
-      return res.status(400).json({ error: 'Invalid request payload' });
-    }
+    
+    // 2. Get the original messages from the client
+    const { messages, response_format } = req.body;
+    
+    // 3. Define the OpenRouter URL and the model name
+    const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
+    const modelName = 'meta-llama/llama-3.1-8b-instruct'; // Your chosen model
 
-    const systemInstruction = messages.find(m => m.role === 'system')?.content || '';
-    const userMessage = messages.find(m => m.role === 'user')?.content || '';
-
+    // 4. Create the payload for OpenRouter
     const payload = {
-      contents: [{ parts: [{ text: userMessage }] }],
-      system_instruction: { parts: [{ text: systemInstruction }] }
+      model: modelName,
+      messages: messages, // Send the original messages array
     };
+    
+    // OpenRouter uses streaming by default if you add "stream: true"
+    // For simplicity, we'll handle JSON and Text responses without client-side streaming for now.
+    const response = await axios.post(
+      openRouterUrl,
+      payload,
+      {
+        headers: {
+          // 5. Add the Authorization header
+          'Authorization': `Bearer ${apiKey}` 
+        }
+      }
+    );
 
-    const isJsonResponse = response_format?.type === 'json_object';
-    if (isJsonResponse) {
-        payload.generationConfig = { response_mime_type: 'application/json' };
-    }
-
-    // ============== تغییر فقط در این خط =================
-    const apiModel = 'gemini-1.5-pro'; // <-- از flash به pro تغییر کرد
-    // =====================================================
-
-    const endpoint = isJsonResponse ? 'generateContent' : 'streamGenerateContent';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${apiModel}:${endpoint}?key=${apiKey}`;
-
-    if (isJsonResponse) {
-        const response = await axios.post(url, payload);
-        const content = response.data.candidates[0].content.parts[0].text;
-        res.json({ content });
-    } else {
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-        
-        const googleResponse = await axios.post(url, payload, { responseType: 'stream' });
-
-        googleResponse.data.on('data', (chunk) => {
-            const textMatch = chunk.toString().match(/"text":\s*"(.*?)"/);
-            if (textMatch && textMatch[1]) {
-                const decodedText = JSON.parse(`"${textMatch[1]}"`);
-                res.write(decodedText);
-            }
-        });
-
-        googleResponse.data.on('end', () => res.end());
-        googleResponse.data.on('error', () => res.end());
-    }
+    // 6. Extract the content and send it back to the client
+    const content = response.data.choices[0].message.content;
+    res.json({ content: content });
 
   } catch (error) {
+    // Log the detailed error from the API
     console.error('Proxy Error:', error.response ? error.response.data : error.message);
     if (!res.headersSent) {
       res.status(500).json({ error: 'An error occurred on the server.' });
     }
   }
 });
+
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'client/build')));
