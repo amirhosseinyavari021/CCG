@@ -75,7 +75,22 @@ const getCache = (key) => {
 };
 
 const baseSystemPrompt = `You are CMDGEN, an expert command-line assistant. Provide practical, user-focused explanations. Use "فلگ" for command-line options in Persian.`;
-const modelName = 'meta-llama/llama-3.1-8b-instruct'; // This is just for reference, the server decides the model.
+
+// Standalone Component for a single step in the error analysis solution
+const SolutionStep = ({ step, t }) => {
+    if (step.startsWith('CMD:')) {
+        const command = step.substring(4).trim();
+        const [copied, setCopied] = useState(false);
+        const handleCopy = () => {
+            navigator.clipboard.writeText(command);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+            toast.success(t.copied);
+        };
+        return <CommandDisplay command={command} onCopy={handleCopy} copied={copied} />;
+    }
+    return <p className="text-gray-600 dark:text-gray-300 text-sm">{step}</p>;
+};
 
 // Components
 const CustomSelect = ({ label, value, onChange, options, placeholder, lang, error }) => (
@@ -180,21 +195,6 @@ const ScriptCard = ({ filename, script_lines = [], explanation, lang }) => {
 };
 const ErrorAnalysisCard = ({ analysis, lang }) => {
     const t = translations[lang];
-    const SolutionStep = ({ step, index }) => {
-        if (step.startsWith('CMD:')) {
-            const command = step.substring(4).trim();
-            const [copied, setCopied] = useState(false);
-            const handleCopy = () => {
-                navigator.clipboard.writeText(command);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-                toast.success(t.copied);
-            };
-            return <CommandDisplay command={command} onCopy={handleCopy} copied={copied} />;
-        }
-        return <p className="text-gray-600 dark:text-gray-300 text-sm">{index + 1}. {step}</p>;
-    };
-
     return (
         <motion.div className="mt-6 max-w-2xl mx-auto" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}>
             <Card lang={lang}>
@@ -211,7 +211,7 @@ const ErrorAnalysisCard = ({ analysis, lang }) => {
                     {analysis.solution && <div>
                         <h4 className="font-semibold text-green-600 dark:text-green-400 mb-2">{t.solution}</h4>
                         <div className="space-y-2">
-                            {analysis.solution.map((step, index) => <SolutionStep key={index} step={step} index={index} />)}
+                            {analysis.solution.map((step, index) => <SolutionStep key={index} step={step} t={t} />)}
                         </div>
                     </div>}
                 </div>
@@ -383,42 +383,49 @@ function AppContent() {
         const decoder = new TextDecoder();
         let accumulatedData = '';
         
-        // Initialize result with the correct structure
-        setResult({ type: responseType, data: isJson ? {} : '' });
-
         while (true) {
             const { value, done } = await reader.read();
             if (done) break;
-
             accumulatedData += decoder.decode(value, { stream: true });
-
-            // In "explain" mode, we can update the UI progressively
-            if (!isJson) {
-                setResult({ type: responseType, data: accumulatedData });
+        }
+        
+        let finalData;
+        
+        // At the end of the stream, process the complete data
+        const dataLines = accumulatedData.split('\n').filter(line => line.startsWith('data: '));
+        if (dataLines.length === 0) {
+            // It might not be a stream, just a simple JSON response.
+            finalData = JSON.parse(accumulatedData).content;
+        } else {
+            const lastDataLine = dataLines[dataLines.length - 1];
+            const jsonString = lastDataLine.substring(5); // Remove "data: "
+            if(jsonString.trim() === "[DONE]") {
+                // If the last message is [DONE], we need to assemble the full message from previous chunks
+                let fullContent = '';
+                for(const line of dataLines) {
+                    const jsonPart = line.substring(5);
+                    if(jsonPart.trim() !== "[DONE]") {
+                        try {
+                            const parsed = JSON.parse(jsonPart);
+                            if(parsed.choices[0].delta.content) {
+                                fullContent += parsed.choices[0].delta.content;
+                            }
+                        } catch(e) {
+                            // Ignore parsing errors for intermediate chunks
+                        }
+                    }
+                }
+                finalData = fullContent;
+            } else {
+                 finalData = JSON.parse(jsonString).choices[0].message.content;
             }
         }
         
-        // At the end of the stream, process the complete data
-        let finalData;
-        if (isJson) {
-            // The accumulated data from the stream contains multiple JSON objects.
-            // We need to find the main "data" part and parse it.
-            const dataMatch = accumulatedData.match(/data: (\{.*\})/);
-            if (dataMatch && dataMatch[1]) {
-                const innerJson = JSON.parse(dataMatch[1]);
-                finalData = JSON.parse(innerJson.choices[0].message.content);
-            } else {
-                 // Fallback for non-standard stream format if needed
-                const lastValidJson = accumulatedData.substring(accumulatedData.lastIndexOf('data:') + 5).trim();
-                const parsedLastJson = JSON.parse(lastValidJson);
-                finalData = JSON.parse(parsedLastJson.choices[0].message.content);
-            }
-        } else {
-            finalData = accumulatedData;
-        }
+        // Final parsing of the content if it's supposed to be JSON
+        const finalParsedData = isJson ? JSON.parse(finalData) : finalData;
 
-        setResult({ type: responseType, data: finalData });
-        setCache(getCacheKey(mode, os, userInput), finalData);
+        setResult({ type: responseType, data: finalParsedData });
+        setCache(getCacheKey(mode, os, userInput), finalParsedData);
 
     } catch (err) {
         toast.error(err.message || t.errorNetwork);
@@ -440,7 +447,7 @@ function AppContent() {
     explain: { label: t.commandLabel, placeholder: t.commandPlaceholder, button: t.explain, loading: t.explaining },
     script: { label: t.taskLabel, placeholder: t.taskPlaceholder, button: t.generateScript, loading: t.generatingScript },
     error: { label: t.errorLabel, placeholder: t.errorPlaceholder, button: t.analyzeError, loading: t.analyzing },
-  }[mode];
+  };
 
   return (
     <motion.div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200" style={{ fontFamily: lang === 'fa' ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
@@ -481,7 +488,7 @@ function AppContent() {
                         </button>
                     ))}
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 text-center">{t[`mode${mode.charAt(0).toUpperCase() + m.slice(1)}`]}</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 text-center">{t[`mode${mode.charAt(0).toUpperCase() + mode.slice(1)}`]}</h2>
                 <p className="text-gray-600 dark:text-gray-400 mb-6 text-center text-sm">{t[`${mode}Subheader`]}</p>
 
                 <Card lang={lang}>
