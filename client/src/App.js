@@ -371,24 +371,54 @@ function AppContent() {
         });
 
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || t.errorServer);
+            const errorData = await response.json().catch(() => ({ error: { message: t.errorServer } }));
+            throw new Error(errorData.error.message || t.errorServer);
         }
 
-        const data = await response.json();
-        let finalResultData;
+        if (!response.body) {
+            throw new Error("Response body is missing.");
+        }
 
-        // The server now sends the content in a { content: "..." } wrapper.
-        // We need to parse this content.
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let accumulatedData = '';
+        
+        // Initialize result with the correct structure
+        setResult({ type: responseType, data: isJson ? {} : '' });
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            accumulatedData += decoder.decode(value, { stream: true });
+
+            // In "explain" mode, we can update the UI progressively
+            if (!isJson) {
+                setResult({ type: responseType, data: accumulatedData });
+            }
+        }
+        
+        // At the end of the stream, process the complete data
+        let finalData;
         if (isJson) {
-            finalResultData = JSON.parse(data.content);
+            // The accumulated data from the stream contains multiple JSON objects.
+            // We need to find the main "data" part and parse it.
+            const dataMatch = accumulatedData.match(/data: (\{.*\})/);
+            if (dataMatch && dataMatch[1]) {
+                const innerJson = JSON.parse(dataMatch[1]);
+                finalData = JSON.parse(innerJson.choices[0].message.content);
+            } else {
+                 // Fallback for non-standard stream format if needed
+                const lastValidJson = accumulatedData.substring(accumulatedData.lastIndexOf('data:') + 5).trim();
+                const parsedLastJson = JSON.parse(lastValidJson);
+                finalData = JSON.parse(parsedLastJson.choices[0].message.content);
+            }
         } else {
-            finalResultData = data.content;
+            finalData = accumulatedData;
         }
 
-        const finalResult = { type: responseType, data: finalResultData };
-        setResult(finalResult);
-        setCache(getCacheKey(mode, os, userInput), finalResult.data);
+        setResult({ type: responseType, data: finalData });
+        setCache(getCacheKey(mode, os, userInput), finalData);
 
     } catch (err) {
         toast.error(err.message || t.errorNetwork);
@@ -451,7 +481,7 @@ function AppContent() {
                         </button>
                     ))}
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 text-center">{t[`mode${mode.charAt(0).toUpperCase() + mode.slice(1)}`]}</h2>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 text-center">{t[`mode${mode.charAt(0).toUpperCase() + m.slice(1)}`]}</h2>
                 <p className="text-gray-600 dark:text-gray-400 mb-6 text-center text-sm">{t[`${mode}Subheader`]}</p>
 
                 <Card lang={lang}>
