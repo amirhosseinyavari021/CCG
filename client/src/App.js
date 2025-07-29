@@ -381,27 +381,34 @@ function AppContent() {
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-        let accumulatedData = '';
+        let fullContent = '';
         
+        // Initialize result with a streaming-friendly structure
+        setResult({ type: responseType, data: isJson ? {} : '' });
+
         while (true) {
             const { value, done } = await reader.read();
             if (done) break;
-            accumulatedData += decoder.decode(value, { stream: true });
-        }
-        
-        let fullContent = '';
-        const dataLines = accumulatedData.split('\n').filter(line => line.startsWith('data: '));
 
-        for(const line of dataLines) {
-            const jsonPart = line.substring(5).trim();
-            if(jsonPart && jsonPart !== "[DONE]") {
-                try {
-                    const parsed = JSON.parse(jsonPart);
-                    if(parsed.choices[0].delta.content) {
-                        fullContent += parsed.choices[0].delta.content;
+            const chunk = decoder.decode(value, { stream: true });
+            const dataLines = chunk.split('\n').filter(line => line.startsWith('data: '));
+
+            for (const line of dataLines) {
+                const jsonPart = line.substring(5).trim();
+                if (jsonPart && jsonPart !== "[DONE]") {
+                    try {
+                        const parsed = JSON.parse(jsonPart);
+                        const delta = parsed.choices[0].delta.content;
+                        if (delta) {
+                            fullContent += delta;
+                            if (!isJson) {
+                                // For plain text, update UI progressively
+                                setResult({ type: responseType, data: fullContent });
+                            }
+                        }
+                    } catch (e) {
+                        console.warn("Could not parse stream chunk:", jsonPart);
                     }
-                } catch(e) {
-                    console.warn("Could not parse stream chunk:", jsonPart);
                 }
             }
         }
@@ -472,7 +479,7 @@ function AppContent() {
                         </button>
                     ))}
                 </div>
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 text-center">{t[`mode${mode.charAt(0).toUpperCase() + mode.slice(1)}`]}</h2>
+                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 text-center">{t[`mode${mode.charAt(0).toUpperCase() + m.slice(1)}`]}</h2>
                 <p className="text-gray-600 dark:text-gray-400 mb-8 text-center text-md">{t[`${mode}Subheader`]}</p>
 
                 <Card lang={lang}>
