@@ -75,7 +75,7 @@ const getCache = (key) => {
 };
 
 const baseSystemPrompt = `You are CMDGEN, an expert command-line assistant. Provide practical, user-focused explanations. Use "فلگ" for command-line options in Persian.`;
-const modelName = 'gemini-1.5-flash';
+const modelName = 'meta-llama/llama-3.1-8b-instruct'; // This is just for reference, the server decides the model.
 
 // Components
 const CustomSelect = ({ label, value, onChange, options, placeholder, lang, error }) => (
@@ -345,22 +345,22 @@ function AppContent() {
       responseType = 'commands';
       isJson = true;
       const systemPrompt = `${baseSystemPrompt} Provide 3 practical commands in JSON format (array named "commands") for the user's environment: OS=${os}, Version=${osVersion}, Shell=${cli}. Language: ${langMap[lang]}. Each command must have "command", "explanation", and an optional "warning".`;
-      payload = { model: modelName, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: `Question: "${userInput}"` }], response_format: { type: "json_object" } };
+      payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: `Question: "${userInput}"` }] };
     } else if (mode === 'explain') {
       responseType = 'explanation';
       const systemPrompt = `${baseSystemPrompt} Provide a clear Markdown explanation for the command in ${langMap[lang]}. Include: "Purpose / هدف", "Breakdown / اجزاء دستور", "Usage Examples / مثال‌های کاربردی", "Pro Tip / نکته حرفه‌ای".`;
-      payload = { model: modelName, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: `Command: \`${userInput}\`. Environment: OS=${os}, Version=${osVersion}, Shell=${cli}.` }] };
+      payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: `Command: \`${userInput}\`. Environment: OS=${os}, Version=${osVersion}, Shell=${cli}.` }] };
     } else if (mode === 'script') {
         responseType = 'script';
         isJson = true;
         const scriptExtension = (os === 'windows' && cli === 'PowerShell') ? 'ps1' : (os === 'windows' && cli === 'CMD') ? 'bat' : 'sh';
         const systemPrompt = `${baseSystemPrompt} Generate a JSON object with a script for the task. Include: "filename" (e.g., "task.${scriptExtension}"), "script_lines" (array of code lines), "explanation". Language: ${langMap[lang]}.`;
-        payload = { model: modelName, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: `Task: "${userInput}". Environment: OS=${os}, Version=${osVersion}, Shell=${cli}.` }], response_format: { type: "json_object" } };
+        payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: `Task: "${userInput}". Environment: OS=${os}, Version=${osVersion}, Shell=${cli}.` }] };
     } else { // error
         responseType = 'error';
         isJson = true;
         const systemPrompt = `${baseSystemPrompt} Analyze the error in JSON format. Include: "cause", "explanation", "solution" (array of steps, prefix commands with 'CMD:'). Language: ${langMap[lang]}.`;
-        payload = { model: modelName, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: `Error: "${userInput}". Environment: OS=${os}, Version=${osVersion}, Shell=${cli}.` }], response_format: { type: "json_object" } };
+        payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: `Error: "${userInput}". Environment: OS=${os}, Version=${osVersion}, Shell=${cli}.` }] };
     }
 
     try {
@@ -371,29 +371,24 @@ function AppContent() {
         });
 
         if (!response.ok) {
-            throw new Error(t.errorServer);
+            const errorData = await response.json();
+            throw new Error(errorData.error || t.errorServer);
         }
 
+        const data = await response.json();
+        let finalResultData;
+
+        // The server now sends the content in a { content: "..." } wrapper.
+        // We need to parse this content.
         if (isJson) {
-            const data = await response.json();
-            const finalResult = { type: responseType, data: JSON.parse(data.content) };
-            setResult(finalResult);
-            setCache(getCacheKey(mode, os, userInput), finalResult.data);
-        } else { // Streaming for plain text
-            if (!response.body) throw new Error("Response body is missing.");
-            setResult({ type: responseType, data: '' });
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let accumulatedText = '';
-            
-            while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-                accumulatedText += decoder.decode(value, { stream: true });
-                setResult({ type: responseType, data: accumulatedText });
-            }
-            setCache(getCacheKey(mode, os, userInput), accumulatedText);
+            finalResultData = JSON.parse(data.content);
+        } else {
+            finalResultData = data.content;
         }
+
+        const finalResult = { type: responseType, data: finalResultData };
+        setResult(finalResult);
+        setCache(getCacheKey(mode, os, userInput), finalResult.data);
 
     } catch (err) {
         toast.error(err.message || t.errorNetwork);
