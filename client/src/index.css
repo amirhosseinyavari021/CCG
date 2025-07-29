@@ -6,17 +6,20 @@
   font-family: 'Inter', sans-serif;
 }
 
+/* Add some global smoothness and better font rendering */
 body {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 html {
   scroll-behavior: smooth;
 }
 
-/* RTL برای فارسی */
+/* RTL Styles */
 [dir="rtl"] {
   direction: rtl;
   text-align: right;
@@ -30,105 +33,36 @@ html {
   text-align: right;
 }
 
-/* استایل سایدبار برای PC (بالای 640px) */
-@media (min-width: 641px) {
-  aside {
-    width: 72px;
-    background: white;
-    @apply dark:bg-gray-900;
-    border-right: 1px solid #e5e7eb;
-    @apply dark:border-gray-700;
-    position: fixed;
-    top: 0;
-    bottom: 0;
-    overflow-y: auto;
-    transition: width 0.3s ease;
-  }
-
-  aside.w-72 {
-    width: 72px;
-  }
-
-  aside:hover,
-  aside.active {
-    width: 288px;
-  }
+/* Custom styles for better UI */
+@layer components {
+    .btn-primary {
+        @apply w-full bg-cyan-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-cyan-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200;
+    }
 }
 
-/* بهینه‌سازی برای موبایل (زیر 640px) */
-@media (max-width: 640px) {
-  body {
-    font-size: 14px;
-  }
-
-  h1, .text-2xl {
-    font-size: 1.5rem;
-  }
-
-  h2, .text-3xl {
-    font-size: 1.25rem;
-  }
-
-  button {
-    padding: 0.75rem 1rem;
-    min-height: 48px;
-    min-width: 48px;
-  }
-
-  input, textarea, select {
-    padding: 0.75rem;
-    font-size: 0.875rem;
-  }
-
-  .mobile-drawer {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 80%;
-    max-width: 300px;
-    height: 100%;
-    background-color: white;
-    @apply dark:bg-gray-900;
-    transform: translateX(-100%);
-    transition: transform 0.3s ease-in-out;
-    z-index: 1000;
-  }
-
-  .mobile-drawer.open {
-    transform: translateX(0);
-  }
-
-  header {
-    padding: 0.5rem 1rem;
-  }
-
-  .container {
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
-  }
-
-  .card {
-    padding: 1rem;
-  }
-
-  .grid-cols-3 {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* فونت فارسی */
+/* Persian Font */
 [lang="fa"] {
   font-family: 'Vazirmatn', sans-serif;
 }
 
-/* کارت‌ها */
-.card {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: auto;
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  body {
+    font-size: 14px;
+  }
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .card {
+    padding: 1rem;
+  }
+  h2 {
+    font-size: 1.75rem; /* Larger title on mobile */
+  }
 }
 
-/* جلوگیری از سرریز کدها */
+/* Code block styling */
 pre {
   white-space: pre-wrap;
   word-break: break-all;
