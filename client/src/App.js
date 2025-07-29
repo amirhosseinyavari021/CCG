@@ -111,7 +111,7 @@ const Card = ({ children, lang }) => (
     initial={{ opacity: 0, y: 10 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.3, ease: "easeOut" }}
-    className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-md"
+    className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-lg"
     style={{ fontFamily: lang === 'fa' ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }}
   >
     {children}
@@ -119,9 +119,9 @@ const Card = ({ children, lang }) => (
 );
 const CommandDisplay = ({ command, onCopy, copied }) => (
   <div className="relative bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden">
-    <pre className="p-3 pr-10 font-mono text-sm text-gray-800 dark:text-gray-200 break-words whitespace-pre-wrap">{command}</pre>
-    <button onClick={onCopy} className="absolute top-2 right-2 p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white bg-gray-100 dark:bg-gray-700 rounded transition-colors">
-      {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+    <pre className="p-4 pr-12 font-mono text-sm text-gray-800 dark:text-gray-200 break-words whitespace-pre-wrap">{command}</pre>
+    <button onClick={onCopy} className="absolute top-2 right-2 p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white bg-gray-100 dark:bg-gray-700 rounded-full transition-colors">
+      {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
     </button>
   </div>
 );
@@ -389,40 +389,24 @@ function AppContent() {
             accumulatedData += decoder.decode(value, { stream: true });
         }
         
-        let finalData;
-        
-        // At the end of the stream, process the complete data
+        let fullContent = '';
         const dataLines = accumulatedData.split('\n').filter(line => line.startsWith('data: '));
-        if (dataLines.length === 0) {
-            // It might not be a stream, just a simple JSON response.
-            finalData = JSON.parse(accumulatedData).content;
-        } else {
-            const lastDataLine = dataLines[dataLines.length - 1];
-            const jsonString = lastDataLine.substring(5); // Remove "data: "
-            if(jsonString.trim() === "[DONE]") {
-                // If the last message is [DONE], we need to assemble the full message from previous chunks
-                let fullContent = '';
-                for(const line of dataLines) {
-                    const jsonPart = line.substring(5);
-                    if(jsonPart.trim() !== "[DONE]") {
-                        try {
-                            const parsed = JSON.parse(jsonPart);
-                            if(parsed.choices[0].delta.content) {
-                                fullContent += parsed.choices[0].delta.content;
-                            }
-                        } catch(e) {
-                            // Ignore parsing errors for intermediate chunks
-                        }
+
+        for(const line of dataLines) {
+            const jsonPart = line.substring(5).trim();
+            if(jsonPart && jsonPart !== "[DONE]") {
+                try {
+                    const parsed = JSON.parse(jsonPart);
+                    if(parsed.choices[0].delta.content) {
+                        fullContent += parsed.choices[0].delta.content;
                     }
+                } catch(e) {
+                    console.warn("Could not parse stream chunk:", jsonPart);
                 }
-                finalData = fullContent;
-            } else {
-                 finalData = JSON.parse(jsonString).choices[0].message.content;
             }
         }
         
-        // Final parsing of the content if it's supposed to be JSON
-        const finalParsedData = isJson ? JSON.parse(finalData) : finalData;
+        const finalParsedData = isJson ? JSON.parse(fullContent) : fullContent;
 
         setResult({ type: responseType, data: finalParsedData });
         setCache(getCacheKey(mode, os, userInput), finalParsedData);
@@ -455,7 +439,7 @@ function AppContent() {
         <MobileDrawer lang={lang} isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} onAboutClick={() => setIsAboutModalOpen(true)} onLangChange={handleLangChange} />
 
         <header className="bg-white dark:bg-gray-900 shadow-sm sticky top-0 z-40">
-            <div className="container mx-auto px-4 py-2 flex justify-between items-center">
+            <div className="container mx-auto px-4 py-3 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                     <button onClick={() => setIsDrawerOpen(true)} className="md:hidden p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded">
                         <Menu size={20} />
@@ -466,7 +450,7 @@ function AppContent() {
                     </button>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button onClick={toggleTheme} className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded">
+                    <button onClick={toggleTheme} className="p-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
                         {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
                     </button>
                     <div className="hidden md:flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5">
@@ -477,19 +461,19 @@ function AppContent() {
             </div>
         </header>
 
-        <main className="container mx-auto px-4 py-6 flex-grow">
+        <main className="container mx-auto px-4 py-8 md:py-12 flex-grow">
             <div className="max-w-2xl mx-auto">
-                <div className="flex flex-wrap justify-center gap-2 mb-5">
+                <div className="flex flex-wrap justify-center gap-2 mb-6">
                     {['generate', 'explain', 'script', 'error'].map(m => (
-                        <button key={m} onClick={() => setMode(m)} className={`px-3 py-1.5 text-sm font-medium rounded-lg flex items-center gap-1.5 transition-colors ${mode === m ? 'bg-cyan-600 text-white' : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'}`}>
-                            {m === 'generate' && <Wand2 size={14} />} {m === 'explain' && <Search size={14} />}
-                            {m === 'script' && <FileCode2 size={14} />} {m === 'error' && <ShieldAlert size={14} />}
+                        <button key={m} onClick={() => setMode(m)} className={`px-4 py-2 text-sm font-semibold rounded-full flex items-center gap-2 transition-colors duration-200 ${mode === m ? 'bg-cyan-600 text-white' : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'}`}>
+                            {m === 'generate' && <Wand2 size={16} />} {m === 'explain' && <Search size={16} />}
+                            {m === 'script' && <FileCode2 size={16} />} {m === 'error' && <ShieldAlert size={16} />}
                             {t[`mode${m.charAt(0).toUpperCase() + m.slice(1)}`]}
                         </button>
                     ))}
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 text-center">{t[`mode${mode.charAt(0).toUpperCase() + mode.slice(1)}`]}</h2>
-                <p className="text-gray-600 dark:text-gray-400 mb-6 text-center text-sm">{t[`${mode}Subheader`]}</p>
+                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 text-center">{t[`mode${mode.charAt(0).toUpperCase() + mode.slice(1)}`]}</h2>
+                <p className="text-gray-600 dark:text-gray-400 mb-8 text-center text-md">{t[`${mode}Subheader`]}</p>
 
                 <Card lang={lang}>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
@@ -499,18 +483,18 @@ function AppContent() {
                     </div>
                     <div className="flex flex-col gap-2">
                         <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{currentModeData.label} <span className="text-red-500">*</span></label>
-                        <textarea value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder={currentModeData.placeholder} className="w-full h-28 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-cyan-500 resize-none" />
+                        <textarea value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder={currentModeData.placeholder} className="w-full h-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-cyan-500 resize-none" />
                         {formErrors.userInput && <p className="text-red-500 text-xs mt-1">{formErrors.userInput}</p>}
                     </div>
-                    <button onClick={handlePrimaryAction} disabled={isLoading} className="mt-4 w-full bg-cyan-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-cyan-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors">
+                    <button onClick={handlePrimaryAction} disabled={isLoading} className="mt-5 w-full bg-cyan-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-cyan-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200">
                         {isLoading ? currentModeData.loading : currentModeData.button}
                     </button>
                 </Card>
 
                 {result?.type === 'commands' && result.data.commands && (
-                    <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="mt-6 space-y-4">
+                    <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="mt-8 space-y-4">
                         <div className="flex justify-between items-center px-1">
-                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Generated Commands</h3>
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Generated Commands</h3>
                             <button onClick={copyAllCommands} className="flex items-center gap-1.5 text-sm text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 transition-colors"><Copy size={14} /> {t.copyAll}</button>
                         </div>
                         {result.data.commands.map((cmd, index) => <GeneratedCommandCard key={index} command={cmd.command} explanation={cmd.explanation} warning={cmd.warning} lang={lang} />)}
@@ -523,7 +507,7 @@ function AppContent() {
             </div>
         </main>
 
-        <footer className="bg-white dark:bg-gray-900 py-3 text-center text-gray-500 dark:text-gray-400 text-xs border-t border-gray-200 dark:border-gray-800">
+        <footer className="bg-white dark:bg-gray-900 py-4 text-center text-gray-500 dark:text-gray-400 text-xs border-t border-gray-200 dark:border-gray-800">
              <p>{t.footerLine1}</p>
              <p className="mt-1">{t.footerLine2}</p>
         </footer>
