@@ -478,6 +478,7 @@ function AppContent() {
                         </button>
                     ))}
                 </div>
+                {/* THIS IS THE FIX FOR THE WHITE SCREEN BUG */}
                 <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 text-center">{t[`mode${mode.charAt(0).toUpperCase() + mode.slice(1)}`]}</h2>
                 <p className="text-gray-600 dark:text-gray-400 mb-8 text-center text-md">{t[`${mode}Subheader`]}</p>
 
