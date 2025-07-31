@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Terminal, Copy, Check, Wand2, Search, ShieldAlert, Sun, Moon, FileCode2, Info, X, Menu, Download, ChevronDown, Bot, LoaderCircle } from 'lucide-react';
+import { Terminal, Copy, Check, Wand2, Search, ShieldAlert, Sun, Moon, FileCode2, Info, X, Menu, Download, ChevronDown, Bot, LoaderCircle, PlusCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 // --- Improved Translations ---
@@ -16,6 +16,7 @@ const translations = {
     os: "Operating System", osVersion: "OS Version", cli: "CLI / Shell", selectVersion: "Select Version", selectCli: "Select Shell",
     generate: "Generate Commands", explain: "Explain Command", generateScript: "Create Script", analyzeError: "Analyze Error",
     generating: "Generating...", explaining: "Explaining...", generatingScript: "Creating...", analyzing: "Analyzing...",
+    moreCommands: "More Commands", loadingMore: "Loading More...",
     copied: "Copied to clipboard!", copyAll: "Copy All as Script", downloadScript: "Download Script",
     errorNetwork: "Connection failed. Please check your internet.",
     errorServer: "A server-side error occurred. Please try again later.",
@@ -39,6 +40,7 @@ const translations = {
     os: "سیستم‌عامل", osVersion: "نسخه سیستم‌عامل", cli: "رابط خط فرمان", selectVersion: "انتخاب نسخه", selectCli: "انتخاب رابط",
     generate: "تولید دستورات", explain: "تحلیل دستور", generateScript: "ساخت اسکریپت", analyzeError: "تحلیل خطا",
     generating: "در حال تولید...", explaining: "در حال تحلیل...", generatingScript: "در حال ساخت...", analyzing: "در حال بررسی...",
+    moreCommands: "دستورات بیشتر", loadingMore: "در حال بارگذاری...",
     copied: "در کلیپ‌بورد کپی شد!", copyAll: "کپی همه به‌عنوان اسکریپت", downloadScript: "دانلود اسکریپت",
     errorNetwork: "اتصال برقرار نشد. لطفاً اینترنت خود را بررسی کنید.",
     errorServer: "یک خطای سمت سرور رخ داد. لطفاً بعداً تلاش کنید.",
@@ -61,48 +63,50 @@ const osDetails = {
 };
 
 const CACHE_DURATION = 3600000;
-const getCacheKey = (mode, os, osVersion, cli, userInput) => `${mode}-${os}-${osVersion}-${cli}-${userInput}`;
+const getCacheKey = (mode, os, osVersion, cli, userInput, iteration) => `${mode}-${os}-${osVersion}-${cli}-${userInput}-${iteration}`;
 const setCache = (key, value) => { try { const e = { value, timestamp: Date.now() }; localStorage.setItem(key, JSON.stringify(e)); } catch (t) { console.warn("Failed to set cache:", t); } };
 const getCache = (key) => { try { const e = localStorage.getItem(key); if (!e) return null; const { value, timestamp } = JSON.parse(e); return Date.now() - timestamp < CACHE_DURATION ? value : (localStorage.removeItem(key), null); } catch (t) { return console.warn("Failed to get cache:", t), null; } };
 
-// --- CORRECTED: Re-added baseSystemPrompt definition ---
 const baseSystemPrompt = `You are CMDGEN, an expert command-line assistant. Your primary goal is to provide accurate and safe command-line solutions. For Persian language requests, use "فلگ" for command-line options.`;
 
-// --- Advanced Prompt Engineering ---
-const getSystemPrompt = (mode, os, osVersion, cli, lang, scriptExtension) => {
+const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
     const langMap = { fa: 'Persian', en: 'English' };
     const language = langMap[lang];
+    const { scriptExtension, existingCommands = [] } = options;
 
-    const commonInstructions = `
-You MUST ONLY output a single, valid JSON object. Do not include any introductory text, apologies, or any text outside of the JSON structure.
+    const commonJsonInstructions = `
+You MUST ONLY output a single, valid, machine-readable JSON object. Do not include any introductory text, apologies, code block markers, or any text outside of the JSON structure.
 The language for all string values inside the JSON MUST be ${language}.
+All strings inside the JSON must be properly escaped. For example, newlines must be represented as \\n, and double quotes as \\".
 The user's environment is: OS=${os}, Version=${osVersion}, Shell=${cli}.
 Your response must be practical, safe, and directly address the user's request.
 `;
 
     switch (mode) {
         case 'generate':
+            const existingCommandsPrompt = existingCommands.length > 0
+                ? `You have already provided the following commands: ${existingCommands.join(', ')}. Provide 3 NEW and DIFFERENT commands that are also useful for the user's original request. Do not repeat commands.`
+                : 'Your task is to generate a JSON object containing an array of 3 highly practical and useful command-line suggestions.';
+            
             return `${baseSystemPrompt}
-Your task is to generate a JSON object containing an array of 3 highly practical and useful command-line suggestions.
-${commonInstructions}
+${existingCommandsPrompt}
+${commonJsonInstructions}
 The JSON object must have a key named "commands", which is an array of objects. Each object must contain:
 - "command": A string with the most effective and common command.
 - "explanation": A clear, concise string explaining what the command does and why it's useful.
-- "warning": A string with a potential warning (e.g., "This command is destructive, use with caution") or an empty string "" if there's no risk.
-Example Output:
-{ "commands": [ { "command": "find . -type f -name '*.log' -delete", "explanation": "این دستور تمام فایل‌ها با پسوند .log را در دایرکتوری فعلی و زیرشاخه‌ها پیدا و حذف می‌کند.", "warning": "این دستور فایل‌ها را برای همیشه حذف می‌کند. قبل از اجرا از مسیر خود مطمئن شوید." } ] }`;
+- "warning": A string with a potential warning (e.g., "This command is destructive, use with caution") or an empty string "" if there's no risk.`;
         case 'script':
              return `${baseSystemPrompt}
 Your task is to generate a JSON object that contains a complete, runnable shell script.
-${commonInstructions}
+${commonJsonInstructions}
 The JSON object must contain:
 - "filename": A string for the suggested script name (e.g., "backup_script.${scriptExtension}").
-- "script_lines": An array of strings, where each string is a line of the script. Include comments where necessary.
+- "script_lines": An array of strings, where each string is a single, complete line of the script.
 - "explanation": A string describing the script's function and how to use it.`;
         case 'error':
              return `${baseSystemPrompt}
 Your task is to analyze a command-line error and provide a direct, actionable solution in a JSON object.
-${commonInstructions}
+${commonJsonInstructions}
 The JSON object must contain:
 - "cause": A string explaining the most likely cause of the error.
 - "explanation": A brief string explaining what the error message means in simple terms.
@@ -112,9 +116,9 @@ The JSON object must contain:
     }
 };
 
-const LoadingSpinner = () => <LoaderCircle className="animate-spin" />;
+const LoadingSpinner = ({ className = "" }) => <LoaderCircle className={`animate-spin ${className}`} />;
 
-// --- Components (No change needed)
+// --- Components ---
 const SolutionStep = ({ step, t }) => {
     if (step.startsWith('CMD:')) {
         const command = step.substring(4).trim();
@@ -124,6 +128,7 @@ const SolutionStep = ({ step, t }) => {
     }
     return <p className="text-gray-600 dark:text-gray-300 text-sm">{step}</p>;
 };
+
 const CustomSelect = ({ label, value, onChange, options, placeholder, lang, error }) => (
   <motion.div className="flex flex-col gap-2" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
     <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">{label}&nbsp;<span className="text-red-500">*</span></label>
@@ -137,6 +142,7 @@ const CustomSelect = ({ label, value, onChange, options, placeholder, lang, erro
     {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
   </motion.div>
 );
+
 const Card = ({ children, lang, ...props }) => (
     <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -150,6 +156,7 @@ const Card = ({ children, lang, ...props }) => (
         {children}
     </motion.div>
 );
+
 const CommandDisplay = ({ command, onCopy, copied }) => (
   <div className="relative bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden">
     <pre className="p-4 pr-12 font-mono text-sm text-gray-800 dark:text-gray-200 break-words whitespace-pre-wrap">{command}</pre>
@@ -158,6 +165,7 @@ const CommandDisplay = ({ command, onCopy, copied }) => (
     </button>
   </div>
 );
+
 const GeneratedCommandCard = ({ command, explanation, warning, lang }) => {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => { navigator.clipboard.writeText(command); setCopied(true); setTimeout(() => setCopied(false), 2000); toast.success(translations[lang].copied); };
@@ -172,6 +180,7 @@ const GeneratedCommandCard = ({ command, explanation, warning, lang }) => {
     </Card>
   );
 };
+
 const ExplanationCard = ({ explanation, lang }) => (
   <motion.div className="mt-6 max-w-2xl mx-auto" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}>
     <Card lang={lang}>
@@ -180,6 +189,7 @@ const ExplanationCard = ({ explanation, lang }) => (
     </Card>
   </motion.div>
 );
+
 const ScriptCard = ({ filename, script_lines = [], explanation, lang }) => {
   const t = translations[lang];
   const [copied, setCopied] = useState(false);
@@ -199,6 +209,7 @@ const ScriptCard = ({ filename, script_lines = [], explanation, lang }) => {
     </motion.div>
   );
 };
+
 const ErrorAnalysisCard = ({ analysis, lang }) => {
     const t = translations[lang];
     return (
@@ -214,6 +225,7 @@ const ErrorAnalysisCard = ({ analysis, lang }) => {
         </motion.div>
     );
 };
+
 const AboutModal = ({ lang, onClose, onLangChange }) => {
     const t = translations[lang];
     return (
@@ -229,6 +241,7 @@ const AboutModal = ({ lang, onClose, onLangChange }) => {
         </motion.div>
     );
 };
+
 const MobileDrawer = ({ lang, isOpen, onClose, onAboutClick, onLangChange }) => {
   const t = translations[lang];
   return (
@@ -242,8 +255,6 @@ const MobileDrawer = ({ lang, isOpen, onClose, onAboutClick, onLangChange }) => 
   );
 };
 
-
-// --- New Error Analysis Prompt Component ---
 const ErrorAnalysisPrompt = ({ onAnalyze, lang, os, osVersion, cli }) => {
     const t = translations[lang];
     const [errorInput, setErrorInput] = useState('');
@@ -299,8 +310,14 @@ function AppContent() {
   const [osVersion, setOsVersion] = useState('');
   const [cli, setCli] = useState('');
   const [userInput, setUserInput] = useState('');
-  const [result, setResult] = useState(null);
+  
+  const [mainResult, setMainResult] = useState(null);
+  const [commandList, setCommandList] = useState([]);
+  
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [moreCommandsCount, setMoreCommandsCount] = useState(0);
+
   const [formErrors, setFormErrors] = useState({});
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -315,18 +332,27 @@ function AppContent() {
   }, []);
 
   useEffect(() => { document.body.dir = lang === 'fa' ? 'rtl' : 'ltr'; localStorage.setItem('lang', lang); }, [lang]);
-  useEffect(() => { setOsVersion(osDetails[os].versions[0]); setCli(osDetails[os].clis[0]); setResult(null); setUserInput(''); setFormErrors({}); }, [os, mode]);
+  useEffect(() => {
+    setOsVersion(osDetails[os].versions[0]);
+    setCli(osDetails[os].clis[0]);
+    setMainResult(null);
+    setCommandList([]);
+    setUserInput('');
+    setFormErrors({});
+    setMoreCommandsCount(0);
+  }, [os, mode]);
 
   const handleLangChange = (newLang) => { setLang(newLang); setIsAboutModalOpen(false); setIsDrawerOpen(false); };
   const toggleTheme = () => { const newTheme = theme === 'light' ? 'dark' : 'light'; setTheme(newTheme); localStorage.setItem('theme', newTheme); document.documentElement.classList.toggle('dark', newTheme === 'dark'); };
 
-  const callApi = async ({ mode, userInput, os, osVersion, cli, lang }) => {
+  const callApi = async ({ mode, userInput, os, osVersion, cli, lang, iteration = 0, existingCommands = [] }) => {
     const isJson = mode !== 'explain';
     const scriptExtension = (os === 'windows' && cli === 'PowerShell') ? 'ps1' : (os === 'windows' && cli === 'CMD') ? 'bat' : 'sh';
-    const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, scriptExtension);
+    const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, { scriptExtension, existingCommands });
     const userMessage = isJson ? `User request: "${userInput}"` : `Command: \`${userInput}\`.`;
     const payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMessage }] };
-    const currentCacheKey = getCacheKey(mode, os, osVersion, cli, userInput);
+    
+    const currentCacheKey = getCacheKey(mode, os, osVersion, cli, userInput, iteration);
     const cachedData = getCache(currentCacheKey);
     if (cachedData) return { type: mode, data: cachedData };
 
@@ -379,19 +405,37 @@ function AppContent() {
 
     setFormErrors({});
     setIsLoading(true);
-    setResult(null);
+    setMainResult(null);
+    setCommandList([]);
+    setMoreCommandsCount(0);
     
-    const apiResult = await callApi({ mode, userInput, os, osVersion, cli, lang });
+    const apiResult = await callApi({ mode, userInput, os, osVersion, cli, lang, iteration: 0 });
     if(apiResult) {
-        setResult(apiResult);
+        if(apiResult.type === 'generate'){
+            setCommandList(apiResult.data.commands || []);
+        } else {
+            setMainResult(apiResult);
+        }
     }
-    
     setIsLoading(false);
   };
+
+  const handleMoreCommands = async () => {
+    setIsLoadingMore(true);
+    const iteration = moreCommandsCount + 1;
+    const existing = commandList.map(c => c.command);
+
+    const apiResult = await callApi({ mode: 'generate', userInput, os, osVersion, cli, lang, iteration, existingCommands: existing });
+    if(apiResult && apiResult.data.commands) {
+        setCommandList(prev => [...prev, ...apiResult.data.commands]);
+        setMoreCommandsCount(iteration);
+    }
+    setIsLoadingMore(false);
+  }
   
   const copyAllCommands = () => {
-    if (result?.type === 'generate' && result.data.commands?.length > 0) {
-        const textToCopy = result.data.commands.map(cmd => cmd.command).join('\n');
+    if (commandList.length > 0) {
+        const textToCopy = commandList.map(cmd => cmd.command).join('\n');
         navigator.clipboard.writeText(textToCopy);
         toast.success(t.copied);
     }
@@ -405,9 +449,7 @@ function AppContent() {
 
   return (
     <motion.div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200" style={{ fontFamily: lang === 'fa' ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-        <AnimatePresence>
-            {isAboutModalOpen && <AboutModal lang={lang} onClose={() => setIsAboutModalOpen(false)} onLangChange={handleLangChange} />}
-        </AnimatePresence>
+        <AnimatePresence>{isAboutModalOpen && <AboutModal lang={lang} onClose={() => setIsAboutModalOpen(false)} onLangChange={handleLangChange} />}</AnimatePresence>
         <MobileDrawer lang={lang} isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} onAboutClick={() => setIsAboutModalOpen(true)} onLangChange={handleLangChange} />
 
         <header className="bg-white dark:bg-gray-900 shadow-sm sticky top-0 z-40">
@@ -462,22 +504,33 @@ function AppContent() {
                     </button>
                 </Card>
                 
+                <div className="mt-8 space-y-4">
+                    <AnimatePresence>
+                        {commandList.map((cmd, index) => (
+                            <motion.div key={index} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                                <GeneratedCommandCard {...cmd} lang={lang} />
+                            </motion.div>
+                        ))}
+                    </AnimatePresence>
+                </div>
+
                 <AnimatePresence>
-                {result?.type === 'generate' && result.data.commands && (
-                    <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="mt-8 space-y-4">
-                        <div className="flex justify-between items-center px-1"><h3 className="text-xl font-bold text-gray-900 dark:text-white">Generated Commands</h3><button onClick={copyAllCommands} className="flex items-center gap-1.5 text-sm text-cyan-600 dark:text-cyan-400"><Copy size={14} /> {t.copyAll}</button></div>
-                        {result.data.commands.map((cmd, index) => <GeneratedCommandCard key={index} {...cmd} lang={lang} />)}
-                    </motion.div>
-                )}
+                    {mode === 'generate' && commandList.length > 0 && moreCommandsCount < 5 && !isLoading && (
+                        <motion.div className="mt-6 text-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                            <button onClick={handleMoreCommands} disabled={isLoadingMore} className="w-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-4 py-2.5 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 disabled:bg-gray-400 flex items-center justify-center gap-2 min-h-[48px]">
+                                {isLoadingMore ? <><LoadingSpinner/> {t.loadingMore}</> : <><PlusCircle size={18}/> {t.moreCommands}</>}
+                            </button>
+                        </motion.div>
+                    )}
                 </AnimatePresence>
                 
                 <AnimatePresence>
-                    {result?.type === 'explain' && <ExplanationCard explanation={result.data} lang={lang} />}
-                    {result?.type === 'script' && result.data.filename && <ScriptCard {...result.data} lang={lang} />}
+                    {mainResult?.type === 'explain' && <ExplanationCard explanation={mainResult.data} lang={lang} />}
+                    {mainResult?.type === 'script' && mainResult.data.filename && <ScriptCard {...mainResult.data} lang={lang} />}
                 </AnimatePresence>
                 
                 <AnimatePresence>
-                    {result?.type === 'generate' && !isLoading && (
+                    {commandList.length > 0 && !isLoading && (
                         <ErrorAnalysisPrompt onAnalyze={callApi} lang={lang} os={os} osVersion={osVersion} cli={cli} />
                     )}
                 </AnimatePresence>
