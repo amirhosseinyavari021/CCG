@@ -65,6 +65,9 @@ const getCacheKey = (mode, os, osVersion, cli, userInput) => `${mode}-${os}-${os
 const setCache = (key, value) => { try { const e = { value, timestamp: Date.now() }; localStorage.setItem(key, JSON.stringify(e)); } catch (t) { console.warn("Failed to set cache:", t); } };
 const getCache = (key) => { try { const e = localStorage.getItem(key); if (!e) return null; const { value, timestamp } = JSON.parse(e); return Date.now() - timestamp < CACHE_DURATION ? value : (localStorage.removeItem(key), null); } catch (t) { return console.warn("Failed to get cache:", t), null; } };
 
+// --- CORRECTED: Re-added baseSystemPrompt definition ---
+const baseSystemPrompt = `You are CMDGEN, an expert command-line assistant. Your primary goal is to provide accurate and safe command-line solutions. For Persian language requests, use "فلگ" for command-line options.`;
+
 // --- Advanced Prompt Engineering ---
 const getSystemPrompt = (mode, os, osVersion, cli, lang, scriptExtension) => {
     const langMap = { fa: 'Persian', en: 'English' };
