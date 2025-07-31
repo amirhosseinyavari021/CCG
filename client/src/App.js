@@ -80,7 +80,64 @@ const getCache = (key) => {
   }
 };
 
-const baseSystemPrompt = `You are CMDGEN, an expert command-line assistant. Provide practical, user-focused explanations. Use "فلگ" for command-line options in Persian.`;
+const baseSystemPrompt = `You are CMDGEN, an expert command-line assistant. Your primary goal is to provide accurate and safe command-line solutions. For Persian language requests, use "فلگ" for command-line options.`;
+
+const getSystemPrompt = (mode, os, osVersion, cli, lang, scriptExtension) => {
+    const langMap = { 'fa': 'Persian', 'en': 'English' };
+    const language = langMap[lang];
+
+    const commonInstructions = `
+You MUST ONLY output a single, valid JSON object. Do not include any introductory text, explanations, code block markers like \`\`\`json, or any text outside of the JSON structure.
+The language for all string values inside the JSON MUST be ${language}.
+The user's environment is: OS=${os}, Version=${osVersion}, Shell=${cli}.
+`;
+
+    switch (mode) {
+        case 'generate':
+            return `
+${baseSystemPrompt}
+Your task is to generate a JSON object containing an array of 3 command-line suggestions for the user's request.
+${commonInstructions}
+The JSON object must have a key named "commands", which is an array of objects. Each object in the array must contain these exact keys:
+- "command": A string with the command.
+- "explanation": A string explaining what the command does.
+- "warning": A string with a potential warning or an empty string "" if there is no warning.
+
+Example of your required output format:
+{
+  "commands": [
+    {
+      "command": "find . -type f -size +100M",
+      "explanation": "این دستور فایل‌های بزرگتر از ۱۰۰ مگابایت را پیدا می‌کند.",
+      "warning": "این جستجو در دایرکتوری‌های بزرگ ممکن است زمان‌بر باشد."
+    }
+  ]
+}
+`;
+        case 'script':
+            return `
+${baseSystemPrompt}
+Your task is to generate a JSON object that contains a shell script for the user's request.
+${commonInstructions}
+The JSON object must contain these exact keys:
+- "filename": A string for the suggested script name (e.g., "task.${scriptExtension}").
+- "script_lines": An array of strings, where each string is a line of the script.
+- "explanation": A string describing what the script does.
+`;
+        case 'error':
+            return `
+${baseSystemPrompt}
+Your task is to analyze a user's command-line error and provide a solution in a JSON object.
+${commonInstructions}
+The JSON object must contain these exact keys:
+- "cause": A string explaining the most likely cause of the error.
+- "explanation": A brief string explaining what the error message means.
+- "solution": An array of strings describing the steps to solve the problem. For steps that are commands to be executed, prefix the string with "CMD: ".
+`;
+        default: // 'explain' mode does not require JSON
+            return `${baseSystemPrompt} Provide a clear Markdown explanation for the command in ${language}. Include these sections: "Purpose / هدف", "Breakdown / اجزاء دستور", "Usage Examples / مثال‌های کاربردی", and "Pro Tip / نکته حرفه‌ای".`;
+    }
+};
 
 // Standalone Component for a single step in the error analysis solution
 const SolutionStep = ({ step, t }) => {
@@ -343,33 +400,20 @@ function AppContent() {
     setIsLoading(true);
     setResult(null);
 
-    const langMap = { 'fa': 'Persian', 'en': 'English' };
-    let payload;
-    let responseType;
-    let isJson = false;
+    const isJson = mode !== 'explain';
+    const responseType = mode;
+    
+    const scriptExtension = (os === 'windows' && cli === 'PowerShell') ? 'ps1' : (os === 'windows' && cli === 'CMD') ? 'bat' : 'sh';
+    const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, scriptExtension);
+    const userMessage = isJson ? `User request: "${userInput}"` : `Command: \`${userInput}\`. Environment: OS=${os}, Version=${osVersion}, Shell=${cli}.`;
 
-    if (mode === 'generate') {
-      responseType = 'commands';
-      isJson = true;
-      const systemPrompt = `${baseSystemPrompt} Provide 3 practical commands in JSON format (array named "commands") for the user's environment: OS=${os}, Version=${osVersion}, Shell=${cli}. Language: ${langMap[lang]}. Each command must have "command", "explanation", and an optional "warning".`;
-      payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: `Question: "${userInput}"` }] };
-    } else if (mode === 'explain') {
-      responseType = 'explanation';
-      const systemPrompt = `${baseSystemPrompt} Provide a clear Markdown explanation for the command in ${langMap[lang]}. Include: "Purpose / هدف", "Breakdown / اجزاء دستور", "Usage Examples / مثال‌های کاربردی", "Pro Tip / نکته حرفه‌ای".`;
-      payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: `Command: \`${userInput}\`. Environment: OS=${os}, Version=${osVersion}, Shell=${cli}.` }] };
-    } else if (mode === 'script') {
-        responseType = 'script';
-        isJson = true;
-        const scriptExtension = (os === 'windows' && cli === 'PowerShell') ? 'ps1' : (os === 'windows' && cli === 'CMD') ? 'bat' : 'sh';
-        const systemPrompt = `${baseSystemPrompt} Generate a JSON object with a script for the task. Include: "filename" (e.g., "task.${scriptExtension}"), "script_lines" (array of code lines), "explanation". Language: ${langMap[lang]}.`;
-        payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: `Task: "${userInput}". Environment: OS=${os}, Version=${osVersion}, Shell=${cli}.` }] };
-    } else { // error
-        responseType = 'error';
-        isJson = true;
-        const systemPrompt = `${baseSystemPrompt} Analyze the error in JSON format. Include: "cause", "explanation", "solution" (array of steps, prefix commands with 'CMD:'). Language: ${langMap[lang]}.`;
-        payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: `Error: "${userInput}". Environment: OS=${os}, Version=${osVersion}, Shell=${cli}.` }] };
-    }
-
+    const payload = {
+        messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage }
+        ]
+    };
+    
     const currentCacheKey = getCacheKey(mode, os, osVersion, cli, userInput);
     const cachedData = getCache(currentCacheKey);
 
@@ -428,14 +472,21 @@ function AppContent() {
         }
         
         if (isJson) {
+            let jsonString = fullContent;
+            const firstBrace = fullContent.indexOf('{');
+            const lastBrace = fullContent.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace > firstBrace) {
+                jsonString = fullContent.substring(firstBrace, lastBrace + 1).trim();
+            }
+
             try {
-                const finalParsedData = JSON.parse(fullContent);
+                const finalParsedData = JSON.parse(jsonString);
                 const finalResult = { type: responseType, data: finalParsedData };
                 setResult(finalResult);
                 setCache(currentCacheKey, finalResult.data);
             } catch (error) {
                 console.error("Final JSON parsing failed:", error);
-                console.error("Content that failed parsing:", fullContent);
+                console.error("Content that failed parsing:", jsonString);
                 toast.error(t.errorJson);
                 setResult(null); 
             }
@@ -454,7 +505,7 @@ function AppContent() {
   };
 
   const copyAllCommands = () => {
-    if (result?.type === 'commands' && result.data.commands && result.data.commands.length > 0) {
+    if (result?.type === 'generate' && result.data.commands && result.data.commands.length > 0) {
         const textToCopy = result.data.commands.map(cmd => cmd.command).join('\n');
         navigator.clipboard.writeText(textToCopy);
         toast.success(t.copied);
@@ -521,12 +572,12 @@ function AppContent() {
                         <textarea value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder={currentModeData.placeholder} className="w-full h-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-cyan-500 resize-none" />
                         {formErrors.userInput && <p className="text-red-500 text-xs mt-1">{formErrors.userInput}</p>}
                     </div>
-                    <button onClick={handlePrimaryAction} disabled={isLoading} className="mt-5 w-full bg-cyan-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-cyan-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center whitespace-nowrap">
+                    <button onClick={handlePrimaryAction} disabled={isLoading} className="mt-5 w-full bg-cyan-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-cyan-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center min-h-[48px]">
                         {isLoading ? currentModeData.loading : currentModeData.button}
                     </button>
                 </Card>
 
-                {result?.type === 'commands' && result.data.commands && (
+                {result?.type === 'generate' && result.data.commands && (
                     <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="mt-8 space-y-4">
                         <div className="flex justify-between items-center px-1">
                             <h3 className="text-xl font-bold text-gray-900 dark:text-white">Generated Commands</h3>
@@ -536,7 +587,7 @@ function AppContent() {
                     </motion.div>
                 )}
                 
-                {result?.type === 'explanation' && <ExplanationCard explanation={result.data} lang={lang} />}
+                {result?.type === 'explain' && <ExplanationCard explanation={result.data} lang={lang} />}
                 {result?.type === 'script' && result.data.filename && <ScriptCard filename={result.data.filename} script_lines={result.data.script_lines} explanation={result.data.explanation} lang={lang} />}
                 {result?.type === 'error' && result.data.cause && <ErrorAnalysisCard analysis={result.data} lang={lang} />}
             </div>
