@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Terminal, Copy, Check, ServerCrash, Wand2, Search, ShieldAlert, Sun, Moon, FileCode2, Info, X, Menu, Download, ChevronDown, Bot } from 'lucide-react';
+import { Terminal, Copy, Check, Wand2, Search, ShieldAlert, Sun, Moon, FileCode2, Info, X, Menu, Download, ChevronDown, Bot } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 // Translations
@@ -20,6 +20,7 @@ const translations = {
     errorNetwork: "Unable to connect. Please check your internet connection.",
     errorServer: "Something went wrong on our end. Please try again later.",
     errorInput: "Invalid input. Please provide a valid question or command.",
+    errorJson: "The server's response was not in the correct format. Please try again.",
     fieldRequired: "This field is required",
     detailedExplanation: "Command Explanation", scriptExplanation: "Script Details", errorAnalysis: "Error Analysis", cause: "Cause", solution: "Solution", explanation: "Explanation",
     aboutMeTitle: "About Me", aboutToolTitle: "About CMDGEN", aboutMeText: "I'm Amirhossein Yavari, born in 2008, passionate about IT and building tools like CMDGEN.",
@@ -40,6 +41,7 @@ const translations = {
     errorNetwork: "اتصال برقرار نشد. لطفاً اینترنت خود را بررسی کنید.",
     errorServer: "مشکلی از سمت ما پیش آمده. لطفاً بعداً دوباره امتحان کنید.",
     errorInput: "ورودی نامعتبر است. لطفاً سوال یا دستور معتبری وارد کنید.",
+    errorJson: "پاسخ سرور در فرمت صحیحی نبود. لطفاً دوباره تلاش کنید.",
     fieldRequired: "این فیلد الزامی است",
     detailedExplanation: "توضیحات دستور", scriptExplanation: "جزئیات اسکریپت", errorAnalysis: "تحلیل خطا", cause: "علت", solution: "راه‌حل", explanation: "توضیحات",
     aboutMeTitle: "درباره من", aboutToolTitle: "درباره CMDGEN", aboutMeText: "من امیرحسین یاوری هستم، متولد ۱۳۸۷، علاقه‌مند به IT و ساخت ابزارهایی مثل CMDGEN.",
@@ -47,19 +49,23 @@ const translations = {
     footerLine2: "ساخته شده توسط امیرحسین یاوری",
   }
 };
+
 const osDetails = {
   linux: { versions: ['Ubuntu 22.04', 'Debian 11', 'Fedora 38', 'Arch Linux'], clis: ['Bash', 'Zsh', 'Fish'] },
   windows: { versions: ['Windows 11', 'Windows 10', 'Windows Server 2022'], clis: ['PowerShell', 'CMD'] },
   macos: { versions: ['Sonoma (14)', 'Ventura (13)'], clis: ['Zsh', 'Bash'] }
 };
+
 const CACHE_DURATION = 3600000;
-const getCacheKey = (mode, os, userInput) => `${mode}-${os}-${userInput}`;
+const getCacheKey = (mode, os, osVersion, cli, userInput) => `${mode}-${os}-${osVersion}-${cli}-${userInput}`;
+
 const setCache = (key, value) => {
   try {
     const cacheEntry = { value, timestamp: Date.now() };
     localStorage.setItem(key, JSON.stringify(cacheEntry));
   } catch (e) { console.warn("Failed to set cache:", e); }
 };
+
 const getCache = (key) => {
   try {
     const cached = localStorage.getItem(key);
@@ -305,6 +311,7 @@ function AppContent() {
     setCli(osDetails[os].clis[0]);
     setResult(null);
     setUserInput('');
+    setFormErrors({});
   }, [os, mode]);
 
   const handleLangChange = (newLang) => {
@@ -363,6 +370,15 @@ function AppContent() {
         payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: `Error: "${userInput}". Environment: OS=${os}, Version=${osVersion}, Shell=${cli}.` }] };
     }
 
+    const currentCacheKey = getCacheKey(mode, os, osVersion, cli, userInput);
+    const cachedData = getCache(currentCacheKey);
+
+    if (cachedData) {
+        setResult({ type: responseType, data: cachedData });
+        setIsLoading(false);
+        return;
+    }
+
     try {
         const response = await fetch('/api/proxy', {
             method: 'POST',
@@ -405,20 +421,33 @@ function AppContent() {
                             }
                         }
                     } catch (e) {
-                        console.warn("Could not parse stream chunk:", jsonPart);
+                         console.warn("Could not parse stream chunk:", jsonPart);
                     }
                 }
             }
         }
         
-        const finalParsedData = isJson ? JSON.parse(fullContent) : fullContent;
-        const finalResult = { type: responseType, data: finalParsedData };
-
-        setResult(finalResult);
-        setCache(getCacheKey(mode, os, userInput), finalResult.data);
+        if (isJson) {
+            try {
+                const finalParsedData = JSON.parse(fullContent);
+                const finalResult = { type: responseType, data: finalParsedData };
+                setResult(finalResult);
+                setCache(currentCacheKey, finalResult.data);
+            } catch (error) {
+                console.error("Final JSON parsing failed:", error);
+                console.error("Content that failed parsing:", fullContent);
+                toast.error(t.errorJson);
+                setResult(null); 
+            }
+        } else {
+             const finalResult = { type: responseType, data: fullContent };
+             setResult(finalResult);
+             setCache(currentCacheKey, finalResult.data);
+        }
 
     } catch (err) {
         toast.error(err.message || t.errorNetwork);
+        setResult(null);
     } finally {
         setIsLoading(false);
     }
@@ -478,7 +507,6 @@ function AppContent() {
                         </button>
                     ))}
                 </div>
-                {/* THIS IS THE FIX FOR THE WHITE SCREEN BUG */}
                 <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 text-center">{t[`mode${mode.charAt(0).toUpperCase() + mode.slice(1)}`]}</h2>
                 <p className="text-gray-600 dark:text-gray-400 mb-8 text-center text-md">{t[`${mode}Subheader`]}</p>
 
@@ -493,7 +521,7 @@ function AppContent() {
                         <textarea value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder={currentModeData.placeholder} className="w-full h-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-cyan-500 resize-none" />
                         {formErrors.userInput && <p className="text-red-500 text-xs mt-1">{formErrors.userInput}</p>}
                     </div>
-                    <button onClick={handlePrimaryAction} disabled={isLoading} className="mt-5 w-full bg-cyan-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-cyan-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200">
+                    <button onClick={handlePrimaryAction} disabled={isLoading} className="mt-5 w-full bg-cyan-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-cyan-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center whitespace-nowrap">
                         {isLoading ? currentModeData.loading : currentModeData.button}
                     </button>
                 </Card>
