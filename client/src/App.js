@@ -8,7 +8,7 @@ const translations = {
   en: {
     about: "About", modeGenerate: "Generate", modeExplain: "Explain", modeScript: "Script",
     generateSubheader: "Ask a question to get practical, real-world commands.", explainSubheader: "Enter a command for a clear, simple explanation.",
-    scriptSubheader: "Describe a multi-step task to create a useful script.",
+    scriptSubheader: "Describe a task to get a clean, executable script.",
     questionLabel: "Your Question", taskLabel: "Describe Your Task", commandLabel: "Command to Explain",
     questionPlaceholder: "e.g., how to find and delete all temp files older than 30 days", taskPlaceholder: "e.g., create a backup of a directory and compress it",
     commandPlaceholder: "e.g., tar -czvf archive.tar.gz /path/to/dir",
@@ -32,7 +32,7 @@ const translations = {
   fa: {
     about: "درباره", modeGenerate: "تولید دستور", modeExplain: "تحلیل دستور", modeScript: "ساخت اسکریپت",
     generateSubheader: "سوال خود را برای دریافت دستورات کاربردی و واقعی وارد کنید.", explainSubheader: "یک دستور را برای دریافت توضیحات ساده و روان وارد کنید.",
-    scriptSubheader: "یک وظیفه چند مرحله‌ای را برای ساخت یک اسکریپت مفید شرح دهید.",
+    scriptSubheader: "یک وظیفه را برای دریافت یک اسکریپت تمیز و قابل اجرا شرح دهید.",
     questionLabel: "سوال شما", taskLabel: "وظیفه خود را توصیف کنید", commandLabel: "دستور برای تحلیل",
     questionPlaceholder: "مثلاً: چطور فایل‌های موقت قدیمی‌تر از ۳۰ روز را پیدا و حذف کنم؟", taskPlaceholder: "مثلاً: از یک پوشه پشتیبان تهیه و آن را فشرده کن",
     commandPlaceholder: "مثلاً: tar -czvf archive.tar.gz /path/to/dir",
@@ -71,7 +71,7 @@ const baseSystemPrompt = `You are CMDGEN, a world-class Senior System Administra
 const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
     const langMap = { fa: 'Persian', en: 'English' };
     const language = langMap[lang];
-    const { scriptExtension, existingCommands = [] } = options;
+    const { existingCommands = [] } = options;
 
     const commonTextInstructions = `
 You MUST ONLY output plain text. Do not use Markdown, JSON, or any other formatting.
@@ -99,13 +99,25 @@ Example of a single line of output:
 find /tmp -type f -mtime +30 -delete|||این دستور فایل‌های موقت در پوشه tmp که بیش از ۳۰ روز از آخرین تغییرشان گذشته را پیدا و حذف می‌کند.|||این دستور فایل‌ها را برای همیشه حذف می‌کند. با احتیاط استفاده شود.`;
 
         case 'script':
-             return `${baseSystemPrompt}
-Your task is to provide the details for a complete, runnable shell script.
-${commonTextInstructions}
-Your output must be structured exactly as follows:
-Line 1: The suggested filename (e.g., backup_script.${scriptExtension})
-Line 2: A one-sentence explanation of what the script does, in simple terms.
-Line 3 onwards: Each subsequent line is a line of the script code. Add comments inside the script to explain complex parts.`;
+             return `**Strict Rules:**
+- ONLY produce raw code output. No explanations, titles, intros, or extra messages outside the code.
+- The code structure must be clear, readable, and well-organized.
+- Add short explanations ONLY with inline comments (# for Bash/PowerShell, :: for CMD).
+- The code MUST be tailored exactly for the user's specified OS and Shell.
+- If Shell is Bash, the script MUST start with #!/bin/bash.
+- If Shell is PowerShell, use ONLY PowerShell cmdlets.
+- If Shell is CMD, use ONLY DOS commands.
+- The output MUST be immediately executable in a terminal without any edits.
+
+**Goal:**
+Your output must be a single, clean, executable code block.
+
+**User Environment:**
+- OS: ${os}
+- Shell: ${cli}
+- Language for comments: ${language}
+
+**User Task:**`;
 
         case 'error':
              return `${baseSystemPrompt}
@@ -178,7 +190,7 @@ const ExplanationCard = ({ explanation, lang }) => (
     </Card>
   </div>
 );
-const ScriptCard = ({ filename, script_lines = [], explanation, lang }) => {
+const ScriptCard = ({ filename, script_lines = [], lang }) => {
   const t = translations[lang];
   const [copied, setCopied] = useState(false);
   const fullScript = script_lines.join('\n');
@@ -192,7 +204,6 @@ const ScriptCard = ({ filename, script_lines = [], explanation, lang }) => {
           <button onClick={downloadScript} className="flex items-center gap-1 text-sm text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 transition-colors"><Download size={16} /> {t.downloadScript}</button>
         </div>
         <CommandDisplay command={fullScript} onCopy={handleCopy} copied={copied} />
-        {explanation && <div className="mt-3"><h4 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">{t.scriptExplanation}</h4><p className="text-gray-600 dark:text-gray-300 text-sm">{explanation}</p></div>}
       </Card>
     </div>
   );
@@ -320,9 +331,9 @@ function AppContent() {
   const handleLangChange = (newLang) => { setLang(newLang); setIsAboutModalOpen(false); setIsDrawerOpen(false); };
   const toggleTheme = () => { const newTheme = theme === 'light' ? 'dark' : 'light'; setTheme(newTheme); localStorage.setItem('theme', newTheme); document.documentElement.classList.toggle('dark', newTheme === 'dark'); };
 
-  const parseAndConstructData = (textResponse, mode) => {
+  const parseAndConstructData = (textResponse, mode, cli) => {
     try {
-        const lines = textResponse.trim().split('\n').filter(line => line.trim() !== '');
+        const lines = textResponse.trim().split('\n').filter(line => line || line === '');
         if (mode === 'generate') {
             const commands = lines.map(line => {
                 const parts = line.split('|||');
@@ -331,10 +342,14 @@ function AppContent() {
             return { commands };
         }
         if (mode === 'script') {
+            const getExtension = (cli) => {
+                if (cli === 'PowerShell') return 'ps1';
+                if (cli === 'CMD') return 'bat';
+                return 'sh';
+            }
             return {
-                filename: lines[0] || 'script.sh',
-                explanation: lines[1] || '',
-                script_lines: lines.slice(2)
+                filename: `script.${getExtension(cli)}`,
+                script_lines: lines
             };
         }
         if (mode === 'error') {
@@ -353,8 +368,7 @@ function AppContent() {
 
   const callApi = async ({ mode, userInput, os, osVersion, cli, lang, iteration = 0, existingCommands = [] }) => {
     const isPlainText = mode !== 'explain';
-    const scriptExtension = (os === 'windows' && cli === 'PowerShell') ? 'ps1' : (os === 'windows' && cli === 'CMD') ? 'bat' : 'sh';
-    const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, { scriptExtension, existingCommands });
+    const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, { existingCommands });
     const userMessage = `User request: "${userInput}"`;
     const payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMessage }] };
     
@@ -383,9 +397,9 @@ function AppContent() {
                 }
             }
         }
-
+        
         if (isPlainText) {
-            const finalData = parseAndConstructData(fullContent, mode);
+            const finalData = parseAndConstructData(fullContent, mode, cli);
             if (!finalData) { toast.error(t.errorParse); return null; }
             setCache(currentCacheKey, finalData);
             return { type: mode, data: finalData };
