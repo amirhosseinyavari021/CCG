@@ -17,7 +17,7 @@ export const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) =>
                 ? `You have already suggested: ${existingCommands.join(', ')}. Provide 3 NEW, DIFFERENT, and useful commands for the same initial request. Think of alternative methods or related tasks.`
                 : 'Provide 3 useful command-line suggestions for the user's request.';
             
-            return `${baseSystemPrompt}
+return `${baseSystemPrompt}
 ${existingCommandsPrompt}
 ${commonTextInstructions}
 **Output Format:**
@@ -25,7 +25,7 @@ You must output 3 lines. Each line must follow this exact format, using "|||" as
 command|||explanation|||warning (or leave empty if no warning)
 **Example:**
 find . -type f -name "*.tmp" -delete|||این دستور تمام فایل‌ها با پسوند tmp را پیدا و حذف می‌کند.|||این دستور فایل‌ها را برای همیشه حذف می‌کند.`;
-
+            
         case 'script':
              return `**Strict Rules:**
 - ONLY produce raw code output. No explanations, titles, intros, or extra messages outside the code block.
