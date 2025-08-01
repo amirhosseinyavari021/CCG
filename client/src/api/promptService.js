@@ -12,10 +12,24 @@ export const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) =>
 `;
 
     switch (mode) {
-        case 'generate':
+       case 'generate':
             const existingCommandsPrompt = existingCommands.length > 0
                 ? `You have already suggested: ${existingCommands.join(', ')}. Provide 3 NEW, DIFFERENT, and useful commands for the same initial request. Think of alternative methods or related tasks.`
-                : 'Provide 3 useful command-line suggestions for the user's request.';
+                : 'Provide 3 useful command-line suggestions for the user\'s request.';
+
+            const formatExplanation = `
+**Output Format:**
+You must output 3 lines. Each line must follow this exact format, using "|||" as a separator:
+command|||explanation|||warning (or leave empty if no warning)
+**Example:**`;
+            
+            const exampleCommand = 'find . -type f -name "*.tmp" -delete|||این دستور تمام فایل‌ها با پسوند tmp را پیدا و حذف می‌کند.|||این دستور فایل‌ها را برای همیشه حذف می‌کند.';
+
+            return `${baseSystemPrompt}
+${existingCommandsPrompt}
+${commonTextInstructions}
+${formatExplanation}
+${exampleCommand}`;
             
 return `${baseSystemPrompt}
 ${existingCommandsPrompt}
