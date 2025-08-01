@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { translations } from './constants/translations';
 import { callApi } from './api/apiService';
 
-// Import all the new components
+// Import all the new, refactored components
 import Header from './components/Header';
 import Form from './components/Form';
 import ErrorAnalysis from './components/ErrorAnalysis';
@@ -17,9 +18,12 @@ function AppContent() {
   const [theme, setTheme] = useState('dark');
   const [mode, setMode] = useState('generate');
   
-  const [formState, setFormState] = useState({}); // To hold the submitted form data
-  const [mainResult, setMainResult] = useState(null);
-  const [commandList, setCommandList] = useState([]);
+  // This state holds the form data after submission, to be used by "More Commands"
+  const [formState, setFormState] = useState({}); 
+  
+  // Results for different modes are handled separately now
+  const [mainResult, setMainResult] = useState(null); // For explain/script modes
+  const [commandList, setCommandList] = useState([]); // For generate mode
   
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -28,22 +32,26 @@ function AppContent() {
 
   const t = translations[lang];
 
+  // Effect to set theme and language from localStorage on initial load
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'dark';
     setTheme(savedTheme);
     document.documentElement.classList.toggle('dark', savedTheme === 'dark');
+    
     const savedLang = localStorage.getItem('lang') || 'en';
     setLang(savedLang);
     document.body.dir = savedLang === 'fa' ? 'rtl' : 'ltr';
   }, []);
 
+  // Handler to change language
   const handleLangChange = (newLang) => {
     setLang(newLang);
     localStorage.setItem('lang', newLang);
     document.body.dir = newLang === 'fa' ? 'rtl' : 'ltr';
-    setIsAboutModalOpen(false); // Close modal on lang change
+    setIsAboutModalOpen(false); // Close modal on language change
   };
 
+  // Handler to toggle theme
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
@@ -51,12 +59,13 @@ function AppContent() {
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
   };
   
+  // Main handler for form submission
   const handleSubmit = async (formData) => {
     setIsLoading(true);
     setMainResult(null);
     setCommandList([]);
     setMoreCommandsCount(0);
-    setFormState(formData); // Save form state for "More Commands"
+    setFormState(formData); // Save form state for "More Commands" feature
 
     const apiResult = await callApi({ ...formData, lang, mode, iteration: 0 });
     
@@ -70,6 +79,7 @@ function AppContent() {
     setIsLoading(false);
   };
   
+  // Handler for the "More Commands" button
   const handleMoreCommands = async () => {
     setIsLoadingMore(true);
     const iteration = moreCommandsCount + 1;
