@@ -11,7 +11,6 @@ export const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) =>
 - For Persian, use natural language and avoid English words unless absolutely necessary (like 'Git').
 `;
 
-
     switch (mode) {
         case 'generate':
             const existingCommandsPrompt = existingCommands.length > 0
