@@ -77,9 +77,9 @@ const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
     const commonJsonInstructions = `
 You MUST ONLY output a single, valid, machine-readable JSON object. Do not include any introductory text, apologies, code block markers, or any text outside of the JSON structure.
 The language for all string values inside the JSON MUST be ${language}.
-All strings inside the JSON must be properly escaped. For example, newlines must be represented as \\n, and double quotes as \\".
 The user's environment is: OS=${os}, Version=${osVersion}, Shell=${cli}.
 Your response must be practical, safe, and directly address the user's request.
+Do NOT escape the double quotes of the JSON structure itself. Only escape characters inside string values when necessary (e.g., a quote inside a string).
 `;
 
     switch (mode) {
@@ -379,15 +379,18 @@ function AppContent() {
         }
 
         if (isJson) {
-            let jsonString = fullContent;
-            const firstBrace = fullContent.indexOf('{');
-            const lastBrace = fullContent.lastIndexOf('}');
-            if (firstBrace !== -1 && lastBrace > firstBrace) jsonString = fullContent.substring(firstBrace, lastBrace + 1).trim();
+            let jsonString = fullContent.trim();
+            // --- FIX for over-escaped quotes from the AI ---
+            if (jsonString.startsWith('"') && jsonString.endsWith('"')) {
+                jsonString = jsonString.substring(1, jsonString.length - 1);
+            }
+            jsonString = jsonString.replace(/\\"/g, '"').replace(/\\n/g, '\n');
+            
             try {
                 const finalData = JSON.parse(jsonString);
                 setCache(currentCacheKey, finalData);
                 return { type: mode, data: finalData };
-            } catch (error) { toast.error(t.errorJson); console.error("Final JSON parsing failed:", error, "Content:", jsonString); return null; }
+            } catch (error) { toast.error(t.errorJson); console.error("Final JSON parsing failed:", error, "Cleaned Content:", jsonString); return null; }
         } else {
             setCache(currentCacheKey, fullContent);
             return { type: mode, data: fullContent };
