@@ -1,26 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter } from 'react-router-dom';
-import toast from 'react-hot-toast';
 import { translations } from './constants/translations';
-import { osDetails } from './constants/osDetails';
 import { callApi } from './api/apiService';
 
-// این کامپوننت‌ها را در مراحل بعدی خواهیم ساخت
-// import Header from './components/Header'; 
-// import Form from './components/Form';
-// import Results from './components/Results';
+// Import all the new components
+import Header from './components/Header';
+import Form from './components/Form';
+import ErrorAnalysis from './components/ErrorAnalysis';
+import { GeneratedCommandCard, ExplanationCard, ScriptCard } from './components/CommandCard';
+import AboutModal from './components/AboutModal';
+import { PlusCircle } from 'lucide-react';
+import LoadingSpinner from './components/common/LoadingSpinner';
 
 function AppContent() {
   const [lang, setLang] = useState('en');
   const [theme, setTheme] = useState('dark');
   const [mode, setMode] = useState('generate');
   
+  const [formState, setFormState] = useState({}); // To hold the submitted form data
   const [mainResult, setMainResult] = useState(null);
   const [commandList, setCommandList] = useState([]);
   
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [moreCommandsCount, setMoreCommandsCount] = useState(0);
+  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
 
   const t = translations[lang];
 
@@ -37,6 +41,7 @@ function AppContent() {
     setLang(newLang);
     localStorage.setItem('lang', newLang);
     document.body.dir = newLang === 'fa' ? 'rtl' : 'ltr';
+    setIsAboutModalOpen(false); // Close modal on lang change
   };
 
   const toggleTheme = () => {
@@ -51,6 +56,7 @@ function AppContent() {
     setMainResult(null);
     setCommandList([]);
     setMoreCommandsCount(0);
+    setFormState(formData); // Save form state for "More Commands"
 
     const apiResult = await callApi({ ...formData, lang, mode, iteration: 0 });
     
@@ -64,12 +70,12 @@ function AppContent() {
     setIsLoading(false);
   };
   
-  const handleMoreCommands = async (formData) => {
+  const handleMoreCommands = async () => {
     setIsLoadingMore(true);
     const iteration = moreCommandsCount + 1;
     const existing = commandList.map(c => c.command);
 
-    const apiResult = await callApi({ ...formData, lang, mode: 'generate', iteration, existingCommands: existing });
+    const apiResult = await callApi({ ...formState, lang, mode: 'generate', iteration, existingCommands: existing });
     
     if (apiResult && apiResult.data.commands) {
       setCommandList(prev => [...prev, ...apiResult.data.commands]);
@@ -77,20 +83,56 @@ function AppContent() {
     }
     setIsLoadingMore(false);
   };
-  
-  // در این مرحله، برای سادگی، ما هنوز رابط کاربری را نساخته‌ایم.
-  // شما می‌توانید کدهای JSX مربوط به Header, Form و Results را که در فایل قبلی بود،
-  // به اینجا منتقل کرده و سپس به تدریج به کامپوننت‌های جداگانه ببرید.
-  // اما فعلاً برای اینکه ساختار اصلی را ببینید، این فایل را تمیز نگه می‌داریم.
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200" style={{ fontFamily: lang === 'fa' ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }}>
-       {/* Placeholder for UI components */}
-       <div className="container mx-auto p-4">
-            <h1 className="text-2xl font-bold text-center">CMDGEN - Refactored</h1>
-            <p className="text-center">The new architecture is in place. Next step is to build the UI components.</p>
-            {/* We will add <Header />, <Form />, and <Results /> here later */}
-       </div>
+       {isAboutModalOpen && <AboutModal lang={lang} onClose={() => setIsAboutModalOpen(false)} onLangChange={handleLangChange} />}
+       
+       <Header 
+         lang={lang} 
+         theme={theme} 
+         onLangChange={handleLangChange} 
+         onThemeChange={toggleTheme}
+         onAboutClick={() => setIsAboutModalOpen(true)}
+       />
+
+        <main className="container mx-auto px-4 py-8 md:py-12 flex-grow">
+            <div className="max-w-2xl mx-auto">
+                <Form 
+                    mode={mode}
+                    setMode={setMode}
+                    onSubmit={handleSubmit}
+                    isLoading={isLoading}
+                    lang={lang}
+                />
+
+                <div className="mt-8 space-y-4">
+                    {commandList.map((cmd, index) => (
+                        <GeneratedCommandCard key={index} {...cmd} lang={lang} />
+                    ))}
+                </div>
+
+                {mode === 'generate' && commandList.length > 0 && moreCommandsCount < 5 && !isLoading && (
+                    <div className="mt-6 text-center">
+                        <button onClick={handleMoreCommands} disabled={isLoadingMore} className="w-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-4 py-2.5 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 disabled:bg-gray-400 flex items-center justify-center gap-2 min-h-[48px]">
+                            {isLoadingMore ? <><LoadingSpinner/> {t.loadingMore}</> : <><PlusCircle size={18}/> {t.moreCommands}</>}
+                        </button>
+                    </div>
+                )}
+                
+                {mainResult?.type === 'explain' && <ExplanationCard explanation={mainResult.data} lang={lang} />}
+                {mainResult?.type === 'script' && mainResult.data.filename && <ScriptCard {...mainResult.data} lang={lang} />}
+                
+                {commandList.length > 0 && !isLoading && (
+                    <ErrorAnalysis {...formState} lang={lang} />
+                )}
+            </div>
+        </main>
+
+        <footer className="bg-white dark:bg-gray-900 py-4 text-center text-gray-500 dark:text-gray-400 text-xs border-t border-gray-200 dark:border-gray-800">
+             <p>{t.footerLine1}</p>
+             <p className="mt-1">{t.footerLine2}</p>
+        </footer>
     </div>
   );
 }
