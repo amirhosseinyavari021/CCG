@@ -26,7 +26,7 @@ app.post('/api/proxy', async (req, res) => {
     
     // --- MODEL UPGRADE FOR MAXIMUM QUALITY ---
     // Using OpenAI's GPT-4.1 for the highest quality and most reliable responses.
-    const modelName = 'openai/gpt-4.1-turbo'; // Using the specific turbo version for best performance
+    const modelName = 'openai/gpt-4.1'; // Using the specific turbo version for best performance
 
     const payload = {
       model: modelName,
