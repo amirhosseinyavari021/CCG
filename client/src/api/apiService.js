@@ -3,13 +3,19 @@ import { parseAndConstructData } from '../utils/responseParser';
 import toast from 'react-hot-toast';
 import { translations } from '../constants/translations';
 
-// A simple cache for this session
+// A simple session cache to avoid refetching the same data during a session.
 const sessionCache = new Map();
 
+/**
+ * Main function to communicate with the backend proxy.
+ * It constructs the payload, sends the request, and processes the streamed response.
+ * @param {object} params - The parameters for the API call.
+ * @returns {object|null} A structured result object or null if an error occurs.
+ */
 export const callApi = async ({ mode, userInput, os, osVersion, cli, lang, iteration = 0, existingCommands = [] }) => {
     const t = translations[lang];
     
-    // A more robust cache key
+    // Use a robust cache key that includes all relevant parameters
     const cacheKey = `${mode}-${os}-${osVersion}-${cli}-${userInput}-${iteration}`;
     if (sessionCache.has(cacheKey)) {
         return sessionCache.get(cacheKey);
@@ -28,13 +34,14 @@ export const callApi = async ({ mode, userInput, os, osVersion, cli, lang, itera
         });
 
         if (!response.ok) {
-            const err = await response.json().catch(() => ({}));
+            const err = await response.json().catch(() => ({})); // Try to parse JSON error, fallback to empty object
             throw new Error(err?.error?.message || t.errorServer);
         }
         if (!response.body) {
             throw new Error("Response body is missing.");
         }
 
+        // Process the streamed response from the server
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let fullContent = '';
@@ -58,6 +65,7 @@ export const callApi = async ({ mode, userInput, os, osVersion, cli, lang, itera
         
         let result;
         if (isPlainText) {
+            // Use the dedicated parser for structured text responses
             const finalData = parseAndConstructData(fullContent, mode, cli);
             if (!finalData) {
                 toast.error(t.errorParse);
@@ -65,6 +73,7 @@ export const callApi = async ({ mode, userInput, os, osVersion, cli, lang, itera
             }
             result = { type: mode, data: finalData };
         } else {
+            // For 'explain' mode, the raw markdown is the result
             result = { type: mode, data: fullContent };
         }
         
