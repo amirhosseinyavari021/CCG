@@ -24,9 +24,8 @@ app.post('/api/proxy', async (req, res) => {
 
     const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
     
-    // --- MODEL UPGRADE FOR MAXIMUM QUALITY ---
-    // Using OpenAI's GPT-4.1 for the highest quality and most reliable responses.
-    const modelName = 'openai/gpt-4.1'; // Using the specific turbo version for best performance
+    // --- Using the new free model ---
+    const modelName = 'qwen/qwen3-coder:free'; // CORRECTED: Using the free model you provided
 
     const payload = {
       model: modelName,
@@ -87,5 +86,5 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT} using model: openai/gpt-4.1`);
+  console.log(`Server running on port ${PORT} using model: qwen/qwen3-coder:free`);
 });
