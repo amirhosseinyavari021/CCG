@@ -66,69 +66,65 @@ const getCacheKey = (mode, os, osVersion, cli, userInput, iteration) => `${mode}
 const setCache = (key, value) => { try { const e = { value, timestamp: Date.now() }; localStorage.setItem(key, JSON.stringify(e)); } catch (t) { console.warn("Failed to set cache:", t); } };
 const getCache = (key) => { try { const e = localStorage.getItem(key); if (!e) return null; const { value, timestamp } = JSON.parse(e); return Date.now() - timestamp < CACHE_DURATION ? value : (localStorage.removeItem(key), null); } catch (t) { return console.warn("Failed to get cache:", t), null; } };
 
-const baseSystemPrompt = `You are CMDGEN, a world-class Senior System Administrator and DevOps expert. Your goal is to provide extremely practical, safe, and efficient command-line solutions. You must act as a helpful mentor.`;
+const baseSystemPrompt = `You are an expert command-line assistant. Your goal is to provide practical, safe, and efficient solutions.`;
 
 const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
     const langMap = { fa: 'Persian', en: 'English' };
     const language = langMap[lang];
     const { existingCommands = [] } = options;
 
-    const commonTextInstructions = `
-You MUST ONLY output plain text. Do not use Markdown, JSON, or any other formatting.
-The language for all text MUST be ${language}.
-The user's environment is: OS=${os}, Version=${osVersion}, Shell=${cli}.
-
-**Tone and Quality Rules:**
-1.  **Be an Expert Mentor:** Provide commands that a professional would use. Think about real-world scenarios, efficiency, and safety.
-2.  **Simple Language:** Explain everything in simple, everyday terms (In Persian: "به زبان ساده و عامیانه توضیح بده"). Avoid jargon. If a technical term is unavoidable, explain it briefly.
-3.  **Strict Localization:** For Persian responses, you MUST NOT use any non-Persian (e.g., English) words, except for universally recognized technical names like 'Git', 'Docker', 'React', 'npm', etc.
+    const commonInstructions = `
+- The user's environment is: OS=${os}, Version=${osVersion}, Shell=${cli}.
+- Your explanations must be simple, clear, and easy for anyone to understand.
+- For Persian, use natural language and avoid English words unless absolutely necessary (like 'Git').
 `;
 
     switch (mode) {
         case 'generate':
             const existingCommandsPrompt = existingCommands.length > 0
-                ? `You have already provided the following commands: ${existingCommands.join(', ')}. Now, provide 3 NEW and DIFFERENT commands that are also useful for the user's original request. Think of alternative methods or related tasks.`
-                : 'Your task is to provide 3 highly practical and useful command-line suggestions based on the user request.';
+                ? `You have already suggested: ${existingCommands.join(', ')}. Provide 3 NEW, DIFFERENT, and useful commands for the same initial request.`
+                : 'Provide 3 useful command-line suggestions for the user's request.';
             
             return `${baseSystemPrompt}
 ${existingCommandsPrompt}
-${commonTextInstructions}
-Provide each command on a new line. Each line must follow this exact format, using "|||" as a separator:
-command|||explanation|||warning
-Example of a single line of output:
-find /tmp -type f -mtime +30 -delete|||این دستور فایل‌های موقت در پوشه tmp که بیش از ۳۰ روز از آخرین تغییرشان گذشته را پیدا و حذف می‌کند.|||این دستور فایل‌ها را برای همیشه حذف می‌کند. با احتیاط استفاده شود.`;
+${commonInstructions}
+**Output Format:**
+You must output 3 lines. Each line must use "|||" as a separator with this exact structure:
+command|||explanation|||warning (or leave empty if no warning)
+**Example:**
+find . -type f -name "*.tmp" -delete|||این دستور تمام فایل‌ها با پسوند tmp را پیدا و حذف می‌کند.|||این دستور فایل‌ها را برای همیشه حذف می‌کند.`;
 
         case 'script':
-             return `**Strict Rules:**
-- ONLY produce raw code output. No explanations, titles, intros, or extra messages outside the code.
-- The code structure must be clear, readable, and well-organized.
-- Add short explanations ONLY with inline comments (# for Bash/PowerShell, :: for CMD).
-- The code MUST be tailored exactly for the user's specified OS and Shell.
-- If Shell is Bash, the script MUST start with #!/bin/bash.
-- If Shell is PowerShell, use ONLY PowerShell cmdlets.
-- If Shell is CMD, use ONLY DOS commands.
-- The output MUST be immediately executable in a terminal without any edits.
-
-**Goal:**
-Your output must be a single, clean, executable code block.
-
-**User Environment:**
-- OS: ${os}
-- Shell: ${cli}
-- Language for comments: ${language}
+             return `Your only job is to create a clean, executable script.
+**Strict Rules:**
+- ONLY output raw code. No explanations or extra text outside the code block.
+- Use inline comments for explanations (# for Bash/PowerShell, :: for CMD).
+- The code MUST be for this specific environment: OS=${os}, Shell=${cli}.
+- If Shell is Bash, start with #!/bin/bash.
+- If Shell is PowerShell, use only PowerShell cmdlets.
+- If Shell is CMD, use only DOS commands.
+- All comments inside the code should be in ${language}.
 
 **User Task:**`;
 
         case 'error':
              return `${baseSystemPrompt}
-Your task is to analyze a command-line error and provide a direct, actionable solution.
-${commonTextInstructions}
-Your output must be structured exactly as follows, using "|||" as a separator:
-cause|||explanation|||solution_step_1|||solution_step_2...
+Analyze the user's error message.
+${commonInstructions}
+**Output Format:**
+You must output a single line using "|||" as a separator with this exact structure:
+probable_cause|||simple_explanation|||solution_step_1|||solution_step_2
 For solution steps that are commands, prefix them with "CMD: ".`;
 
         default: // explain
-            return `${baseSystemPrompt} Provide a clear, detailed Markdown explanation for the given command in ${language}. Structure your response with these sections: "Purpose / هدف", "Breakdown / اجزاء دستور", "Practical Examples / مثال‌های کاربردی", and "Pro Tip / نکته حرفه‌ای". Focus on real-world use cases and simple language.`;
+            return `${baseSystemPrompt}
+Explain the following command in simple, easy-to-understand ${language}.
+${commonInstructions}
+Structure your explanation with these Markdown sections:
+- **Purpose / هدف**
+- **Breakdown / اجزاء دستور**
+- **Practical Examples / مثال‌های کاربردی**
+- **Pro Tip / نکته حرفه‌ای**`;
     }
 };
 
@@ -333,12 +329,13 @@ function AppContent() {
 
   const parseAndConstructData = (textResponse, mode, cli) => {
     try {
-        const lines = textResponse.trim().split('\n').filter(line => line || line === '');
+        const lines = textResponse.trim().split('\n').filter(line => line.trim() !== '');
         if (mode === 'generate') {
             const commands = lines.map(line => {
                 const parts = line.split('|||');
+                if (parts.length < 2) return null; // Skip malformed lines
                 return { command: parts[0] || '', explanation: parts[1] || '', warning: parts[2] || '' };
-            });
+            }).filter(Boolean); // Remove null entries
             return { commands };
         }
         if (mode === 'script') {
