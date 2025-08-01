@@ -21,7 +21,7 @@ const translations = {
     errorNetwork: "Connection failed. Please check your internet.",
     errorServer: "A server-side error occurred. Please try again later.",
     errorInput: "Invalid input. Please provide a valid request.",
-    errorJson: "The server's response was malformed. Please try again.",
+    errorParse: "Could not understand the server's response.",
     fieldRequired: "This field is required",
     detailedExplanation: "Command Explanation", scriptExplanation: "Script Details", errorAnalysis: "Error Analysis", cause: "Probable Cause", solution: "Proposed Solution", explanation: "Error Meaning",
     errorPromptTitle: "Did a command fail?", errorPromptSubheader: "Paste the error message below to get a solution.",
@@ -45,7 +45,7 @@ const translations = {
     errorNetwork: "اتصال برقرار نشد. لطفاً اینترنت خود را بررسی کنید.",
     errorServer: "یک خطای سمت سرور رخ داد. لطفاً بعداً تلاش کنید.",
     errorInput: "ورودی نامعتبر است. لطفاً یک درخواست معتبر وارد کنید.",
-    errorJson: "پاسخ سرور در فرمت صحیحی نبود. لطفاً دوباره تلاش کنید.",
+    errorParse: "پاسخ سرور قابل درک نبود.",
     fieldRequired: "این فیلد الزامی است",
     detailedExplanation: "توضیحات دستور", scriptExplanation: "جزئیات اسکریپت", errorAnalysis: "تحلیل خطا", cause: "علت احتمالی", solution: "راه‌حل پیشنهادی", explanation: "معنای خطا",
     errorPromptTitle: "دستوری که اجرا کردید خطا داد؟", errorPromptSubheader: "پیغام خطا را در کادر زیر وارد کنید تا راه‌حل آن را دریافت کنید.",
@@ -74,43 +74,44 @@ const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
     const language = langMap[lang];
     const { scriptExtension, existingCommands = [] } = options;
 
-    const commonJsonInstructions = `
-You MUST ONLY output a single, valid, machine-readable JSON object. Do not include any introductory text, apologies, code block markers, or any text outside of the JSON structure.
-The language for all string values inside the JSON MUST be ${language}.
+    const commonTextInstructions = `
+You MUST ONLY output plain text. Do not use Markdown, JSON, or any other formatting.
+The language for all text MUST be ${language}.
 The user's environment is: OS=${os}, Version=${osVersion}, Shell=${cli}.
 Your response must be practical, safe, and directly address the user's request.
-Do NOT escape the double quotes of the JSON structure itself. Only escape characters inside string values when necessary (e.g., a quote inside a string).
 `;
 
     switch (mode) {
         case 'generate':
             const existingCommandsPrompt = existingCommands.length > 0
                 ? `You have already provided the following commands: ${existingCommands.join(', ')}. Provide 3 NEW and DIFFERENT commands that are also useful for the user's original request. Do not repeat commands.`
-                : 'Your task is to generate a JSON object containing an array of 3 highly practical and useful command-line suggestions.';
+                : 'Your task is to provide 3 highly practical and useful command-line suggestions.';
             
             return `${baseSystemPrompt}
 ${existingCommandsPrompt}
-${commonJsonInstructions}
-The JSON object must have a key named "commands", which is an array of objects. Each object must contain:
-- "command": A string with the most effective and common command.
-- "explanation": A clear, concise string explaining what the command does and why it's useful.
-- "warning": A string with a potential warning (e.g., "This command is destructive, use with caution") or an empty string "" if there's no risk.`;
+${commonTextInstructions}
+Provide each command on a new line. Each line must follow this exact format, using "|||" as a separator:
+command|||explanation|||warning
+Example of a single line of output:
+find . -type f -size +100M|||Finds files larger than 100MB in the current directory.|||This can be slow on large directories.`;
+
         case 'script':
              return `${baseSystemPrompt}
-Your task is to generate a JSON object that contains a complete, runnable shell script.
-${commonJsonInstructions}
-The JSON object must contain:
-- "filename": A string for the suggested script name (e.g., "backup_script.${scriptExtension}").
-- "script_lines": An array of strings, where each string is a single, complete line of the script.
-- "explanation": A string describing the script's function and how to use it.`;
+Your task is to provide the details for a complete, runnable shell script.
+${commonTextInstructions}
+Your output must be structured exactly as follows:
+Line 1: The suggested filename (e.g., backup_script.${scriptExtension})
+Line 2: A one-sentence explanation of what the script does.
+Line 3 onwards: Each subsequent line is a line of the script code. Start the code from line 3.
+`;
         case 'error':
              return `${baseSystemPrompt}
-Your task is to analyze a command-line error and provide a direct, actionable solution in a JSON object.
-${commonJsonInstructions}
-The JSON object must contain:
-- "cause": A string explaining the most likely cause of the error.
-- "explanation": A brief string explaining what the error message means in simple terms.
-- "solution": An array of strings describing the step-by-step solution. For steps that are commands, prefix the string with "CMD: ".`;
+Your task is to analyze a command-line error and provide a direct, actionable solution.
+${commonTextInstructions}
+Your output must be structured exactly as follows, using "|||" as a separator:
+cause|||explanation|||solution_step_1|||solution_step_2...
+For solution steps that are commands, prefix them with "CMD: ".
+`;
         default: // explain
             return `${baseSystemPrompt} Provide a clear, detailed Markdown explanation for the given command in ${language}. Structure your response with these sections: "Purpose / هدف", "Breakdown / اجزاء دستور", "Practical Examples / مثال‌های کاربردی", and "Pro Tip / نکته حرفه‌ای". Focus on real-world use cases.`;
     }
@@ -128,7 +129,6 @@ const SolutionStep = ({ step, t }) => {
     }
     return <p className="text-gray-600 dark:text-gray-300 text-sm">{step}</p>;
 };
-
 const CustomSelect = ({ label, value, onChange, options, placeholder, lang, error }) => (
   <motion.div className="flex flex-col gap-2" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
     <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">{label}&nbsp;<span className="text-red-500">*</span></label>
@@ -142,21 +142,9 @@ const CustomSelect = ({ label, value, onChange, options, placeholder, lang, erro
     {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
   </motion.div>
 );
-
 const Card = ({ children, lang, ...props }) => (
-    <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -10 }}
-        transition={{ duration: 0.3, ease: "easeOut" }}
-        className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-lg"
-        style={{ fontFamily: lang === 'fa' ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }}
-        {...props}
-    >
-        {children}
-    </motion.div>
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3, ease: "easeOut" }} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-lg" style={{ fontFamily: lang === 'fa' ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }} {...props} >{children}</motion.div>
 );
-
 const CommandDisplay = ({ command, onCopy, copied }) => (
   <div className="relative bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden">
     <pre className="p-4 pr-12 font-mono text-sm text-gray-800 dark:text-gray-200 break-words whitespace-pre-wrap">{command}</pre>
@@ -165,7 +153,6 @@ const CommandDisplay = ({ command, onCopy, copied }) => (
     </button>
   </div>
 );
-
 const GeneratedCommandCard = ({ command, explanation, warning, lang }) => {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => { navigator.clipboard.writeText(command); setCopied(true); setTimeout(() => setCopied(false), 2000); toast.success(translations[lang].copied); };
@@ -180,7 +167,6 @@ const GeneratedCommandCard = ({ command, explanation, warning, lang }) => {
     </Card>
   );
 };
-
 const ExplanationCard = ({ explanation, lang }) => (
   <motion.div className="mt-6 max-w-2xl mx-auto" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}>
     <Card lang={lang}>
@@ -189,7 +175,6 @@ const ExplanationCard = ({ explanation, lang }) => (
     </Card>
   </motion.div>
 );
-
 const ScriptCard = ({ filename, script_lines = [], explanation, lang }) => {
   const t = translations[lang];
   const [copied, setCopied] = useState(false);
@@ -209,7 +194,6 @@ const ScriptCard = ({ filename, script_lines = [], explanation, lang }) => {
     </motion.div>
   );
 };
-
 const ErrorAnalysisCard = ({ analysis, lang }) => {
     const t = translations[lang];
     return (
@@ -225,7 +209,6 @@ const ErrorAnalysisCard = ({ analysis, lang }) => {
         </motion.div>
     );
 };
-
 const AboutModal = ({ lang, onClose, onLangChange }) => {
     const t = translations[lang];
     return (
@@ -241,7 +224,6 @@ const AboutModal = ({ lang, onClose, onLangChange }) => {
         </motion.div>
     );
 };
-
 const MobileDrawer = ({ lang, isOpen, onClose, onAboutClick, onLangChange }) => {
   const t = translations[lang];
   return (
@@ -254,7 +236,6 @@ const MobileDrawer = ({ lang, isOpen, onClose, onAboutClick, onLangChange }) => 
     </motion.div>
   );
 };
-
 const ErrorAnalysisPrompt = ({ onAnalyze, lang, os, osVersion, cli }) => {
     const t = translations[lang];
     const [errorInput, setErrorInput] = useState('');
@@ -262,20 +243,11 @@ const ErrorAnalysisPrompt = ({ onAnalyze, lang, os, osVersion, cli }) => {
     const [analysisResult, setAnalysisResult] = useState(null);
 
     const handleAnalyze = async () => {
-        if (!errorInput.trim()) {
-            toast.error(t.fieldRequired);
-            return;
-        }
+        if (!errorInput.trim()) { toast.error(t.fieldRequired); return; }
         setIsLoading(true);
         setAnalysisResult(null);
-        const result = await onAnalyze({
-            mode: 'error',
-            userInput: errorInput,
-            os, osVersion, cli, lang
-        });
-        if(result) {
-            setAnalysisResult(result);
-        }
+        const result = await onAnalyze({ mode: 'error', userInput: errorInput, os, osVersion, cli, lang });
+        if(result) { setAnalysisResult(result); }
         setIsLoading(false);
     };
 
@@ -345,11 +317,42 @@ function AppContent() {
   const handleLangChange = (newLang) => { setLang(newLang); setIsAboutModalOpen(false); setIsDrawerOpen(false); };
   const toggleTheme = () => { const newTheme = theme === 'light' ? 'dark' : 'light'; setTheme(newTheme); localStorage.setItem('theme', newTheme); document.documentElement.classList.toggle('dark', newTheme === 'dark'); };
 
+  const parseAndConstructData = (textResponse, mode) => {
+    try {
+        const lines = textResponse.trim().split('\n').filter(line => line.trim() !== '');
+        if (mode === 'generate') {
+            const commands = lines.map(line => {
+                const parts = line.split('|||');
+                return { command: parts[0] || '', explanation: parts[1] || '', warning: parts[2] || '' };
+            });
+            return { commands };
+        }
+        if (mode === 'script') {
+            return {
+                filename: lines[0] || 'script.sh',
+                explanation: lines[1] || '',
+                script_lines: lines.slice(2)
+            };
+        }
+        if (mode === 'error') {
+            const parts = lines[0].split('|||');
+            return {
+                cause: parts[0] || '',
+                explanation: parts[1] || '',
+                solution: parts.slice(2)
+            };
+        }
+    } catch (error) {
+        console.error("Failed to parse AI text response:", error);
+        return null;
+    }
+  };
+
   const callApi = async ({ mode, userInput, os, osVersion, cli, lang, iteration = 0, existingCommands = [] }) => {
-    const isJson = mode !== 'explain';
+    const isPlainText = mode !== 'explain';
     const scriptExtension = (os === 'windows' && cli === 'PowerShell') ? 'ps1' : (os === 'windows' && cli === 'CMD') ? 'bat' : 'sh';
     const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, { scriptExtension, existingCommands });
-    const userMessage = isJson ? `User request: "${userInput}"` : `Command: \`${userInput}\`.`;
+    const userMessage = `User request: "${userInput}"`;
     const payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMessage }] };
     
     const currentCacheKey = getCacheKey(mode, os, osVersion, cli, userInput, iteration);
@@ -378,19 +381,11 @@ function AppContent() {
             }
         }
 
-        if (isJson) {
-            let jsonString = fullContent.trim();
-            // --- FIX for over-escaped quotes from the AI ---
-            if (jsonString.startsWith('"') && jsonString.endsWith('"')) {
-                jsonString = jsonString.substring(1, jsonString.length - 1);
-            }
-            jsonString = jsonString.replace(/\\"/g, '"').replace(/\\n/g, '\n');
-            
-            try {
-                const finalData = JSON.parse(jsonString);
-                setCache(currentCacheKey, finalData);
-                return { type: mode, data: finalData };
-            } catch (error) { toast.error(t.errorJson); console.error("Final JSON parsing failed:", error, "Cleaned Content:", jsonString); return null; }
+        if (isPlainText) {
+            const finalData = parseAndConstructData(fullContent, mode);
+            if (!finalData) { toast.error(t.errorParse); return null; }
+            setCache(currentCacheKey, finalData);
+            return { type: mode, data: finalData };
         } else {
             setCache(currentCacheKey, fullContent);
             return { type: mode, data: fullContent };
