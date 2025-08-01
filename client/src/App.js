@@ -89,7 +89,7 @@ const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
 ${existingCommandsPrompt}
 ${commonTextInstructions}
 **Output Format:**
-You must output 3 lines. Each line must use "|||" as a separator with this exact structure:
+You must output 3 lines. Each line must follow this exact format, using "|||" as a separator:
 command|||explanation|||warning (or leave empty if no warning)
 **Example:**
 find . -type f -name "*.tmp" -delete|||این دستور تمام فایل‌ها با پسوند tmp را پیدا و حذف می‌کند.|||این دستور فایل‌ها را برای همیشه حذف می‌کند.`;
@@ -332,9 +332,9 @@ function AppContent() {
         if (mode === 'generate') {
             const commands = lines.map(line => {
                 const parts = line.split('|||');
-                if (parts.length < 2) return null; // Skip malformed lines
+                if (parts.length < 2) return null;
                 return { command: parts[0] || '', explanation: parts[1] || '', warning: parts[2] || '' };
-            }).filter(Boolean); // Remove null entries
+            }).filter(Boolean);
             return { commands };
         }
         if (mode === 'script') {
@@ -342,7 +342,7 @@ function AppContent() {
                 if (cli === 'PowerShell') return 'ps1';
                 if (cli === 'CMD') return 'bat';
                 return 'sh';
-            }
+            };
             return {
                 filename: `script.${getExtension(cli)}`,
                 script_lines: lines
