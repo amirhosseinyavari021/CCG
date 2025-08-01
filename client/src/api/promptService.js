@@ -6,15 +6,15 @@ export const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) =>
     const { existingCommands = [] } = options;
 
     const commonTextInstructions = `
-- The user's environment is: OS=${os}, Version=${osVersion}, Shell=${cli}.
-- Your explanations must be simple, clear, and easy for anyone to understand.
-- For Persian, use natural language and avoid English words unless absolutely necessary (like 'Git').
+- The user's environment is: OS=${os}, Version=${osVersion}, Shell=${cli}.;
+- Your explanations must be simple, clear, and easy for anyone to understand.;
+- For Persian, use natural language and avoid English words unless absolutely necessary (like 'Git').;
 `;
 
     switch (mode) {
         case 'generate':
             const existingCommandsPrompt = existingCommands.length > 0
-                ? `You have already suggested: ${existingCommands.join(', ')}. Provide 3 NEW, DIFFERENT, and useful commands for the same initial request. Think of alternative methods or related tasks.`
+                ? `You have already suggested: ${existingCommands.join(', ')}. Provide 3 NEW, DIFFERENT, and useful commands for the same initial request. Think of alternative methods or related tasks.';
                 : 'Provide 3 useful command-line suggestions for the user's request.';
             
             return `${baseSystemPrompt}
