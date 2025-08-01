@@ -4,15 +4,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Terminal, Copy, Check, Wand2, Search, ShieldAlert, Sun, Moon, FileCode2, Info, X, Menu, Download, ChevronDown, Bot, LoaderCircle, PlusCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-// --- Improved Translations ---
+// --- Final Translations ---
 const translations = {
   en: {
     about: "About", modeGenerate: "Generate", modeExplain: "Explain", modeScript: "Script",
-    generateSubheader: "Ask a question to generate useful commands.", explainSubheader: "Enter a command for a detailed explanation.",
-    scriptSubheader: "Describe a multi-step task to create a script.",
+    generateSubheader: "Ask a question to get practical, real-world commands.", explainSubheader: "Enter a command for a clear, simple explanation.",
+    scriptSubheader: "Describe a multi-step task to create a useful script.",
     questionLabel: "Your Question", taskLabel: "Describe Your Task", commandLabel: "Command to Explain",
-    questionPlaceholder: "e.g., how to find all files larger than 100MB", taskPlaceholder: "e.g., zip all .log files and move them to /tmp",
-    commandPlaceholder: "e.g., grep -r 'error' /var/log",
+    questionPlaceholder: "e.g., how to find and delete all temp files older than 30 days", taskPlaceholder: "e.g., create a backup of a directory and compress it",
+    commandPlaceholder: "e.g., tar -czvf archive.tar.gz /path/to/dir",
     os: "Operating System", osVersion: "OS Version", cli: "CLI / Shell", selectVersion: "Select Version", selectCli: "Select Shell",
     generate: "Generate Commands", explain: "Explain Command", generateScript: "Create Script", analyzeError: "Analyze Error",
     generating: "Generating...", explaining: "Explaining...", generatingScript: "Creating...", analyzing: "Analyzing...",
@@ -32,11 +32,11 @@ const translations = {
   },
   fa: {
     about: "درباره", modeGenerate: "تولید دستور", modeExplain: "تحلیل دستور", modeScript: "ساخت اسکریپت",
-    generateSubheader: "سوال خود را برای تولید دستورات کاربردی وارد کنید.", explainSubheader: "یک دستور را برای دریافت توضیحات کامل وارد کنید.",
-    scriptSubheader: "یک وظیفه چند مرحله‌ای را برای ساخت اسکریپت شرح دهید.",
+    generateSubheader: "سوال خود را برای دریافت دستورات کاربردی و واقعی وارد کنید.", explainSubheader: "یک دستور را برای دریافت توضیحات ساده و روان وارد کنید.",
+    scriptSubheader: "یک وظیفه چند مرحله‌ای را برای ساخت یک اسکریپت مفید شرح دهید.",
     questionLabel: "سوال شما", taskLabel: "وظیفه خود را توصیف کنید", commandLabel: "دستور برای تحلیل",
-    questionPlaceholder: "مثلاً: چطور تمام فایل‌های بزرگتر از ۱۰۰ مگابایت را پیدا کنم؟", taskPlaceholder: "مثلاً: تمام فایل‌های log را فشرده و به پوشه tmp منتقل کن",
-    commandPlaceholder: "مثلاً: grep -r 'error' /var/log",
+    questionPlaceholder: "مثلاً: چطور فایل‌های موقت قدیمی‌تر از ۳۰ روز را پیدا و حذف کنم؟", taskPlaceholder: "مثلاً: از یک پوشه پشتیبان تهیه و آن را فشرده کن",
+    commandPlaceholder: "مثلاً: tar -czvf archive.tar.gz /path/to/dir",
     os: "سیستم‌عامل", osVersion: "نسخه سیستم‌عامل", cli: "رابط خط فرمان", selectVersion: "انتخاب نسخه", selectCli: "انتخاب رابط",
     generate: "تولید دستورات", explain: "تحلیل دستور", generateScript: "ساخت اسکریپت", analyzeError: "تحلیل خطا",
     generating: "در حال تولید...", explaining: "در حال تحلیل...", generatingScript: "در حال ساخت...", analyzing: "در حال بررسی...",
@@ -67,7 +67,7 @@ const getCacheKey = (mode, os, osVersion, cli, userInput, iteration) => `${mode}
 const setCache = (key, value) => { try { const e = { value, timestamp: Date.now() }; localStorage.setItem(key, JSON.stringify(e)); } catch (t) { console.warn("Failed to set cache:", t); } };
 const getCache = (key) => { try { const e = localStorage.getItem(key); if (!e) return null; const { value, timestamp } = JSON.parse(e); return Date.now() - timestamp < CACHE_DURATION ? value : (localStorage.removeItem(key), null); } catch (t) { return console.warn("Failed to get cache:", t), null; } };
 
-const baseSystemPrompt = `You are CMDGEN, an expert command-line assistant. Your primary goal is to provide accurate and safe command-line solutions. For Persian language requests, use "فلگ" for command-line options.`;
+const baseSystemPrompt = `You are CMDGEN, a world-class Senior System Administrator and DevOps expert. Your goal is to provide extremely practical, safe, and efficient command-line solutions. You must act as a helpful mentor.`;
 
 const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
     const langMap = { fa: 'Persian', en: 'English' };
@@ -78,14 +78,18 @@ const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
 You MUST ONLY output plain text. Do not use Markdown, JSON, or any other formatting.
 The language for all text MUST be ${language}.
 The user's environment is: OS=${os}, Version=${osVersion}, Shell=${cli}.
-Your response must be practical, safe, and directly address the user's request.
+
+**Tone and Quality Rules:**
+1.  **Be an Expert Mentor:** Provide commands that a professional would use. Think about real-world scenarios, efficiency, and safety.
+2.  **Simple Language:** Explain everything in simple, everyday terms (In Persian: "به زبان ساده و عامیانه توضیح بده"). Avoid jargon. If a technical term is unavoidable, explain it briefly.
+3.  **Strict Localization:** For Persian responses, you MUST NOT use any non-Persian (e.g., English) words, except for universally recognized technical names like 'Git', 'Docker', 'React', 'npm', etc.
 `;
 
     switch (mode) {
         case 'generate':
             const existingCommandsPrompt = existingCommands.length > 0
-                ? `You have already provided the following commands: ${existingCommands.join(', ')}. Provide 3 NEW and DIFFERENT commands that are also useful for the user's original request. Do not repeat commands.`
-                : 'Your task is to provide 3 highly practical and useful command-line suggestions.';
+                ? `You have already provided the following commands: ${existingCommands.join(', ')}. Now, provide 3 NEW and DIFFERENT commands that are also useful for the user's original request. Think of alternative methods or related tasks.`
+                : 'Your task is to provide 3 highly practical and useful command-line suggestions based on the user request.';
             
             return `${baseSystemPrompt}
 ${existingCommandsPrompt}
@@ -93,7 +97,7 @@ ${commonTextInstructions}
 Provide each command on a new line. Each line must follow this exact format, using "|||" as a separator:
 command|||explanation|||warning
 Example of a single line of output:
-find . -type f -size +100M|||Finds files larger than 100MB in the current directory.|||This can be slow on large directories.`;
+find /tmp -type f -mtime +30 -delete|||این دستور فایل‌های موقت در پوشه tmp که بیش از ۳۰ روز از آخرین تغییرشان گذشته را پیدا و حذف می‌کند.|||این دستور فایل‌ها را برای همیشه حذف می‌کند. با احتیاط استفاده شود.`;
 
         case 'script':
              return `${baseSystemPrompt}
@@ -101,25 +105,25 @@ Your task is to provide the details for a complete, runnable shell script.
 ${commonTextInstructions}
 Your output must be structured exactly as follows:
 Line 1: The suggested filename (e.g., backup_script.${scriptExtension})
-Line 2: A one-sentence explanation of what the script does.
-Line 3 onwards: Each subsequent line is a line of the script code. Start the code from line 3.
-`;
+Line 2: A one-sentence explanation of what the script does, in simple terms.
+Line 3 onwards: Each subsequent line is a line of the script code. Add comments inside the script to explain complex parts.`;
+
         case 'error':
              return `${baseSystemPrompt}
 Your task is to analyze a command-line error and provide a direct, actionable solution.
 ${commonTextInstructions}
 Your output must be structured exactly as follows, using "|||" as a separator:
 cause|||explanation|||solution_step_1|||solution_step_2...
-For solution steps that are commands, prefix them with "CMD: ".
-`;
+For solution steps that are commands, prefix them with "CMD: ".`;
+
         default: // explain
-            return `${baseSystemPrompt} Provide a clear, detailed Markdown explanation for the given command in ${language}. Structure your response with these sections: "Purpose / هدف", "Breakdown / اجزاء دستور", "Practical Examples / مثال‌های کاربردی", and "Pro Tip / نکته حرفه‌ای". Focus on real-world use cases.`;
+            return `${baseSystemPrompt} Provide a clear, detailed Markdown explanation for the given command in ${language}. Structure your response with these sections: "Purpose / هدف", "Breakdown / اجزاء دستور", "Practical Examples / مثال‌های کاربردی", and "Pro Tip / نکته حرفه‌ای". Focus on real-world use cases and simple language.`;
     }
 };
 
 const LoadingSpinner = ({ className = "" }) => <LoaderCircle className={`animate-spin ${className}`} />;
 
-// --- Components ---
+// --- Components (No changes, they are robust)
 const SolutionStep = ({ step, t }) => {
     if (step.startsWith('CMD:')) {
         const command = step.substring(4).trim();
@@ -477,7 +481,7 @@ function AppContent() {
                 </div>
                 <AnimatePresence mode="wait">
                     <motion.div key={mode} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}>
-                        <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 text-center">{t[`mode${mode.charAt(0).toUpperCase() + mode.slice(1)}`]}</h2>
+                        <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 text-center">{t[`mode${mode.charAt(0).toUpperCase() + m.slice(1)}`]}</h2>
                         <p className="text-gray-600 dark:text-gray-400 mb-8 text-center text-md">{t[`${mode}Subheader`]}</p>
                     </motion.div>
                 </AnimatePresence>
