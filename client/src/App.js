@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Terminal, Copy, Check, Wand2, Search, ShieldAlert, Sun, Moon, FileCode2, Info, X, Menu, Download, ChevronDown, Bot, LoaderCircle, PlusCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -123,7 +122,7 @@ For solution steps that are commands, prefix them with "CMD: ".`;
 
 const LoadingSpinner = ({ className = "" }) => <LoaderCircle className={`animate-spin ${className}`} />;
 
-// --- Components (No changes, they are robust)
+// --- Components ---
 const SolutionStep = ({ step, t }) => {
     if (step.startsWith('CMD:')) {
         const command = step.substring(4).trim();
@@ -134,7 +133,7 @@ const SolutionStep = ({ step, t }) => {
     return <p className="text-gray-600 dark:text-gray-300 text-sm">{step}</p>;
 };
 const CustomSelect = ({ label, value, onChange, options, placeholder, lang, error }) => (
-  <motion.div className="flex flex-col gap-2" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+  <div className="flex flex-col gap-2">
     <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">{label}&nbsp;<span className="text-red-500">*</span></label>
     <div className="relative">
       <select value={value} onChange={e => onChange(e.target.value)} className="w-full appearance-none bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500">
@@ -144,10 +143,10 @@ const CustomSelect = ({ label, value, onChange, options, placeholder, lang, erro
       <ChevronDown className={`w-5 h-5 absolute text-gray-500 dark:text-gray-400 pointer-events-none ${lang === 'fa' ? 'left-2' : 'right-2'} top-1/2 -translate-y-1/2`} />
     </div>
     {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
-  </motion.div>
+  </div>
 );
 const Card = ({ children, lang, ...props }) => (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3, ease: "easeOut" }} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-lg" style={{ fontFamily: lang === 'fa' ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }} {...props} >{children}</motion.div>
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-lg" style={{ fontFamily: lang === 'fa' ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }} {...props} >{children}</div>
 );
 const CommandDisplay = ({ command, onCopy, copied }) => (
   <div className="relative bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden">
@@ -172,12 +171,12 @@ const GeneratedCommandCard = ({ command, explanation, warning, lang }) => {
   );
 };
 const ExplanationCard = ({ explanation, lang }) => (
-  <motion.div className="mt-6 max-w-2xl mx-auto" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}>
+  <div className="mt-6 max-w-2xl mx-auto">
     <Card lang={lang}>
       <h3 className="text-lg font-bold text-cyan-600 dark:text-cyan-400 flex items-center gap-2 mb-4"><Bot size={18} /> {translations[lang].detailedExplanation}</h3>
       <div className="prose prose-sm dark:prose-invert text-gray-700 dark:text-gray-300 max-w-none" dangerouslySetInnerHTML={{ __html: explanation.replace(/\n/g, '<br />').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
     </Card>
-  </motion.div>
+  </div>
 );
 const ScriptCard = ({ filename, script_lines = [], explanation, lang }) => {
   const t = translations[lang];
@@ -186,7 +185,7 @@ const ScriptCard = ({ filename, script_lines = [], explanation, lang }) => {
   const handleCopy = () => { navigator.clipboard.writeText(fullScript); setCopied(true); setTimeout(() => setCopied(false), 2000); toast.success(t.copied); };
   const downloadScript = () => { const blob = new Blob([fullScript], { type: 'text/plain' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url); };
   return (
-    <motion.div className="mt-6 max-w-2xl mx-auto" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}>
+    <div className="mt-6 max-w-2xl mx-auto">
       <Card lang={lang}>
         <div className="flex justify-between items-center mb-3">
           <h4 className="flex items-center gap-2 text-lg font-semibold text-cyan-600 dark:text-cyan-400"><FileCode2 size={18} /> {filename}</h4>
@@ -195,13 +194,13 @@ const ScriptCard = ({ filename, script_lines = [], explanation, lang }) => {
         <CommandDisplay command={fullScript} onCopy={handleCopy} copied={copied} />
         {explanation && <div className="mt-3"><h4 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">{t.scriptExplanation}</h4><p className="text-gray-600 dark:text-gray-300 text-sm">{explanation}</p></div>}
       </Card>
-    </motion.div>
+    </div>
   );
 };
 const ErrorAnalysisCard = ({ analysis, lang }) => {
     const t = translations[lang];
     return (
-        <motion.div className="mt-6 max-w-2xl mx-auto" initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}>
+        <div className="mt-6 max-w-2xl mx-auto">
             <Card lang={lang}>
                 <h3 className="text-lg font-bold text-cyan-600 dark:text-cyan-400 flex items-center gap-2 mb-4"><ShieldAlert size={18} /> {t.errorAnalysis}</h3>
                 <div className="space-y-5">
@@ -210,34 +209,34 @@ const ErrorAnalysisCard = ({ analysis, lang }) => {
                     {analysis.solution && <div><h4 className="font-semibold text-green-600 dark:text-green-400 mb-2">{t.solution}</h4><div className="space-y-2">{analysis.solution.map((step, index) => <SolutionStep key={index} step={step} t={t} />)}</div></div>}
                 </div>
             </Card>
-        </motion.div>
+        </div>
     );
 };
 const AboutModal = ({ lang, onClose, onLangChange }) => {
     const t = translations[lang];
     return (
-        <motion.div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
-            <motion.div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-sm p-5 shadow-lg" initial={{ scale: 0.95 }} animate={{ scale: 1 }} onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-sm p-5 shadow-lg" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-4"><h2 className="text-lg font-bold text-gray-900 dark:text-white">About CMDGEN</h2><button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><X size={18} /></button></div>
                 <div className="space-y-4 text-gray-700 dark:text-gray-300">
                     <div><h3 className="font-medium text-cyan-600 dark:text-cyan-400">{t.aboutMeTitle}</h3><p className="text-sm">{t.aboutMeText}</p></div>
                     <div><h3 className="font-medium text-cyan-600 dark:text-cyan-400">{t.aboutToolTitle}</h3><p className="text-sm">{t.aboutToolText}</p></div>
                     <div className="flex items-center justify-center pt-2"><div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5"><button onClick={() => onLangChange('en')} className={`px-3 py-1 rounded-full text-xs ${lang === 'en' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>EN</button><button onClick={() => onLangChange('fa')} className={`px-3 py-1 rounded-full text-xs ${lang === 'fa' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>FA</button></div></div>
                 </div>
-            </motion.div>
-        </motion.div>
+            </div>
+        </div>
     );
 };
 const MobileDrawer = ({ lang, isOpen, onClose, onAboutClick, onLangChange }) => {
   const t = translations[lang];
   return (
-    <motion.div className={`fixed inset-y-0 ${lang === 'fa' ? 'right-0' : 'left-0'} bg-white dark:bg-gray-900 w-64 z-50 shadow-lg transition-transform duration-300 ${isOpen ? 'translate-x-0' : (lang === 'fa' ? 'translate-x-full' : '-translate-x-full')}`} initial={{ x: lang === 'fa' ? '100%' : '-100%' }} animate={{ x: isOpen ? 0 : (lang === 'fa' ? '100%' : '-100%') }}>
+    <div className={`fixed inset-y-0 ${lang === 'fa' ? 'right-0' : 'left-0'} bg-white dark:bg-gray-900 w-64 z-50 shadow-lg transition-transform duration-300 ${isOpen ? 'translate-x-0' : (lang === 'fa' ? 'translate-x-full' : '-translate-x-full')}`}>
       <div className="p-4 h-full flex flex-col">
         <div className="flex justify-between items-center mb-5"><h2 className="text-lg font-bold text-gray-900 dark:text-white">Menu</h2><button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><X size={20} /></button></div>
         <button onClick={() => { onAboutClick(); onClose(); }} className="flex items-center gap-3 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded w-full text-left"><Info size={20} /> {t.about}</button>
         <div className="mt-auto pt-4 border-t border-gray-200 dark:border-gray-700"><div className="flex items-center justify-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5"><button onClick={() => onLangChange('en')} className={`px-4 py-1.5 rounded-full text-sm w-full ${lang === 'en' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>EN</button><button onClick={() => onLangChange('fa')} className={`px-4 py-1.5 rounded-full text-sm w-full ${lang === 'fa' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>FA</button></div></div>
       </div>
-    </motion.div>
+    </div>
   );
 };
 const ErrorAnalysisPrompt = ({ onAnalyze, lang, os, osVersion, cli }) => {
@@ -256,7 +255,7 @@ const ErrorAnalysisPrompt = ({ onAnalyze, lang, os, osVersion, cli }) => {
     };
 
     return (
-        <motion.div className="mt-10" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+        <div className="mt-10">
             <Card lang={lang}>
                 <div className="text-center">
                     <ShieldAlert className="mx-auto h-10 w-10 text-amber-500" />
@@ -272,7 +271,7 @@ const ErrorAnalysisPrompt = ({ onAnalyze, lang, os, osVersion, cli }) => {
                 </button>
             </Card>
             {analysisResult && <ErrorAnalysisCard analysis={analysisResult.data} lang={lang} />}
-        </motion.div>
+        </div>
     );
 };
 
@@ -450,9 +449,9 @@ function AppContent() {
   };
 
   return (
-    <motion.div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200" style={{ fontFamily: lang === 'fa' ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-        <AnimatePresence>{isAboutModalOpen && <AboutModal lang={lang} onClose={() => setIsAboutModalOpen(false)} onLangChange={handleLangChange} />}</AnimatePresence>
-        <MobileDrawer lang={lang} isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} onAboutClick={() => setIsAboutModalOpen(true)} onLangChange={handleLangChange} />
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200" style={{ fontFamily: lang === 'fa' ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }}>
+        {isAboutModalOpen && <AboutModal lang={lang} onClose={() => setIsAboutModalOpen(false)} onLangChange={handleLangChange} />}
+        {isDrawerOpen && <MobileDrawer lang={lang} isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} onAboutClick={() => setIsAboutModalOpen(true)} onLangChange={handleLangChange} />}
 
         <header className="bg-white dark:bg-gray-900 shadow-sm sticky top-0 z-40">
             <div className="container mx-auto px-4 py-3 flex justify-between items-center">
@@ -462,7 +461,7 @@ function AppContent() {
                     <button onClick={() => setIsAboutModalOpen(true)} className="hidden md:inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-cyan-600"><Info size={16} /> {t.about}</button>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button onClick={toggleTheme} className="p-1.5 text-gray-600 dark:text-gray-300 rounded-full"><AnimatePresence mode="wait">{theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}</AnimatePresence></button>
+                    <button onClick={toggleTheme} className="p-1.5 text-gray-600 dark:text-gray-300 rounded-full">{theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}</button>
                     <div className="hidden md:flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5"><button onClick={() => setLang('en')} className={`px-2.5 py-1 rounded-full text-xs ${lang === 'en' ? 'bg-cyan-600 text-white' : ''}`}>EN</button><button onClick={() => setLang('fa')} className={`px-2.5 py-1 rounded-full text-xs ${lang === 'fa' ? 'bg-cyan-600 text-white' : ''}`}>FA</button></div>
                 </div>
             </div>
@@ -479,12 +478,10 @@ function AppContent() {
                         </button>
                     ))}
                 </div>
-                <AnimatePresence mode="wait">
-                    <motion.div key={mode} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}>
-                        <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 text-center">{t[`mode${mode.charAt(0).toUpperCase() + m.slice(1)}`]}</h2>
-                        <p className="text-gray-600 dark:text-gray-400 mb-8 text-center text-md">{t[`${mode}Subheader`]}</p>
-                    </motion.div>
-                </AnimatePresence>
+                <div>
+                    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 text-center">{t[`mode${mode.charAt(0).toUpperCase() + mode.slice(1)}`]}</h2>
+                    <p className="text-gray-600 dark:text-gray-400 mb-8 text-center text-md">{t[`${mode}Subheader`]}</p>
+                </div>
 
                 <Card lang={lang}>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -498,44 +495,32 @@ function AppContent() {
                         {formErrors.userInput && <p className="text-red-500 text-xs mt-1">{formErrors.userInput}</p>}
                     </div>
                     <button onClick={handlePrimaryAction} disabled={isLoading} className="mt-5 w-full bg-cyan-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-cyan-700 disabled:bg-gray-400 flex items-center justify-center min-h-[48px]">
-                        <AnimatePresence mode="wait">
-                            <motion.span key={isLoading ? 'loading' : 'ready'} initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -10, opacity: 0 }} transition={{ duration: 0.2 }}>
-                                {isLoading ? <LoadingSpinner/> : currentModeData[mode].button}
-                            </motion.span>
-                        </AnimatePresence>
+                        {isLoading ? <LoadingSpinner/> : currentModeData[mode].button}
                     </button>
                 </Card>
                 
                 <div className="mt-8 space-y-4">
-                    <AnimatePresence>
-                        {commandList.map((cmd, index) => (
-                            <motion.div key={index} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                                <GeneratedCommandCard {...cmd} lang={lang} />
-                            </motion.div>
-                        ))}
-                    </AnimatePresence>
+                    {commandList.map((cmd, index) => (
+                        <div key={index}>
+                            <GeneratedCommandCard {...cmd} lang={lang} />
+                        </div>
+                    ))}
                 </div>
 
-                <AnimatePresence>
-                    {mode === 'generate' && commandList.length > 0 && moreCommandsCount < 5 && !isLoading && (
-                        <motion.div className="mt-6 text-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                            <button onClick={handleMoreCommands} disabled={isLoadingMore} className="w-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-4 py-2.5 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 disabled:bg-gray-400 flex items-center justify-center gap-2 min-h-[48px]">
-                                {isLoadingMore ? <><LoadingSpinner/> {t.loadingMore}</> : <><PlusCircle size={18}/> {t.moreCommands}</>}
-                            </button>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                {mode === 'generate' && commandList.length > 0 && moreCommandsCount < 5 && !isLoading && (
+                    <div className="mt-6 text-center">
+                        <button onClick={handleMoreCommands} disabled={isLoadingMore} className="w-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-4 py-2.5 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 disabled:bg-gray-400 flex items-center justify-center gap-2 min-h-[48px]">
+                            {isLoadingMore ? <><LoadingSpinner/> {t.loadingMore}</> : <><PlusCircle size={18}/> {t.moreCommands}</>}
+                        </button>
+                    </div>
+                )}
                 
-                <AnimatePresence>
-                    {mainResult?.type === 'explain' && <ExplanationCard explanation={mainResult.data} lang={lang} />}
-                    {mainResult?.type === 'script' && mainResult.data.filename && <ScriptCard {...mainResult.data} lang={lang} />}
-                </AnimatePresence>
+                {mainResult?.type === 'explain' && <ExplanationCard explanation={mainResult.data} lang={lang} />}
+                {mainResult?.type === 'script' && mainResult.data.filename && <ScriptCard {...mainResult.data} lang={lang} />}
                 
-                <AnimatePresence>
-                    {commandList.length > 0 && !isLoading && (
-                        <ErrorAnalysisPrompt onAnalyze={callApi} lang={lang} os={os} osVersion={osVersion} cli={cli} />
-                    )}
-                </AnimatePresence>
+                {commandList.length > 0 && !isLoading && (
+                    <ErrorAnalysisPrompt onAnalyze={callApi} lang={lang} os={os} osVersion={osVersion} cli={cli} />
+                )}
             </div>
         </main>
 
@@ -543,7 +528,7 @@ function AppContent() {
              <p>{t.footerLine1}</p>
              <p className="mt-1">{t.footerLine2}</p>
         </footer>
-    </motion.div>
+    </div>
   );
 }
 
