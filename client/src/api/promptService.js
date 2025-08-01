@@ -1,5 +1,4 @@
-
-const baseSystemPrompt = `You are CMDGEN, a world-class Senior System Administrator and DevOps expert. Your goal is to provide extremely practical, safe, and efficient command-line solutions. You must act as a helpful mentor.`;
+const baseSystemPrompt = `You are an expert command-line assistant. Your goal is to provide practical, safe, and efficient solutions.`;
 
 export const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
     const langMap = { fa: 'Persian', en: 'English' };
@@ -59,4 +58,3 @@ Structure your explanation with these Markdown sections:
 - **Pro Tip / نکته حرفه‌ای**`;
     }
 };
-
