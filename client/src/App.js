@@ -1,296 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter } from 'react-router-dom';
-import { Terminal, Copy, Check, Wand2, Search, ShieldAlert, Sun, Moon, FileCode2, Info, X, Menu, Download, ChevronDown, Bot, LoaderCircle, PlusCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { translations } from './constants/translations';
+import { osDetails } from './constants/osDetails';
+import { callApi } from './api/apiService';
 
-// --- Final Translations ---
-const translations = {
-  en: {
-    about: "About", modeGenerate: "Generate", modeExplain: "Explain", modeScript: "Script",
-    generateSubheader: "Ask a question to get practical, real-world commands.", explainSubheader: "Enter a command for a clear, simple explanation.",
-    scriptSubheader: "Describe a task to get a clean, executable script.",
-    questionLabel: "Your Question", taskLabel: "Describe Your Task", commandLabel: "Command to Explain",
-    questionPlaceholder: "e.g., how to find and delete all temp files older than 30 days", taskPlaceholder: "e.g., create a backup of a directory and compress it",
-    commandPlaceholder: "e.g., tar -czvf archive.tar.gz /path/to/dir",
-    os: "Operating System", osVersion: "OS Version", cli: "CLI / Shell", selectVersion: "Select Version", selectCli: "Select Shell",
-    generate: "Generate Commands", explain: "Explain Command", generateScript: "Create Script", analyzeError: "Analyze Error",
-    generating: "Generating...", explaining: "Explaining...", generatingScript: "Creating...", analyzing: "Analyzing...",
-    moreCommands: "More Commands", loadingMore: "Loading More...",
-    copied: "Copied to clipboard!", copyAll: "Copy All as Script", downloadScript: "Download Script",
-    errorNetwork: "Connection failed. Please check your internet.",
-    errorServer: "A server-side error occurred. Please try again later.",
-    errorInput: "Invalid input. Please provide a valid request.",
-    errorParse: "Could not understand the server's response.",
-    fieldRequired: "This field is required",
-    detailedExplanation: "Command Explanation", scriptExplanation: "Script Details", errorAnalysis: "Error Analysis", cause: "Probable Cause", solution: "Proposed Solution", explanation: "Error Meaning",
-    errorPromptTitle: "Did a command fail?", errorPromptSubheader: "Paste the error message below to get a solution.",
-    errorLabel: "Paste Your Error Message Here", errorPlaceholder: "e.g., bash: command not found: git",
-    aboutMeTitle: "About Me", aboutToolTitle: "About CMDGEN", aboutMeText: "I'm Amirhossein Yavari, born in 2008, passionate about IT and building helpful tools like CMDGEN.",
-    aboutToolText: "CMDGEN is a smart assistant designed to make your command-line tasks easier, built with React and a powerful AI.",
-    footerLine1: "All rights reserved.", footerLine2: "Created by Amirhossein Yavari",
-  },
-  fa: {
-    about: "درباره", modeGenerate: "تولید دستور", modeExplain: "تحلیل دستور", modeScript: "ساخت اسکریپت",
-    generateSubheader: "سوال خود را برای دریافت دستورات کاربردی و واقعی وارد کنید.", explainSubheader: "یک دستور را برای دریافت توضیحات ساده و روان وارد کنید.",
-    scriptSubheader: "یک وظیفه را برای دریافت یک اسکریپت تمیز و قابل اجرا شرح دهید.",
-    questionLabel: "سوال شما", taskLabel: "وظیفه خود را توصیف کنید", commandLabel: "دستور برای تحلیل",
-    questionPlaceholder: "مثلاً: چطور فایل‌های موقت قدیمی‌تر از ۳۰ روز را پیدا و حذف کنم؟", taskPlaceholder: "مثلاً: از یک پوشه پشتیبان تهیه و آن را فشرده کن",
-    commandPlaceholder: "مثلاً: tar -czvf archive.tar.gz /path/to/dir",
-    os: "سیستم‌عامل", osVersion: "نسخه سیستم‌عامل", cli: "رابط خط فرمان", selectVersion: "انتخاب نسخه", selectCli: "انتخاب رابط",
-    generate: "تولید دستورات", explain: "تحلیل دستور", generateScript: "ساخت اسکریپت", analyzeError: "تحلیل خطا",
-    generating: "در حال تولید...", explaining: "در حال تحلیل...", generatingScript: "در حال ساخت...", analyzing: "در حال بررسی...",
-    moreCommands: "دستورات بیشتر", loadingMore: "در حال بارگذاری...",
-    copied: "در کلیپ‌بورد کپی شد!", copyAll: "کپی همه به‌عنوان اسکریپت", downloadScript: "دانلود اسکریپت",
-    errorNetwork: "اتصال برقرار نشد. لطفاً اینترنت خود را بررسی کنید.",
-    errorServer: "یک خطای سمت سرور رخ داد. لطفاً بعداً تلاش کنید.",
-    errorInput: "ورودی نامعتبر است. لطفاً یک درخواست معتبر وارد کنید.",
-    errorParse: "پاسخ سرور قابل درک نبود.",
-    fieldRequired: "این فیلد الزامی است",
-    detailedExplanation: "توضیحات دستور", scriptExplanation: "جزئیات اسکریپت", errorAnalysis: "تحلیل خطا", cause: "علت احتمالی", solution: "راه‌حل پیشنهادی", explanation: "معنای خطا",
-    errorPromptTitle: "دستوری که اجرا کردید خطا داد؟", errorPromptSubheader: "پیغام خطا را در کادر زیر وارد کنید تا راه‌حل آن را دریافت کنید.",
-    errorLabel: "پیغام خطای خود را اینجا وارد کنید", errorPlaceholder: "مثلاً: bash: command not found: git",
-    aboutMeTitle: "درباره من", aboutToolTitle: "درباره CMDGEN", aboutMeText: "من امیرحسین یاوری هستم، متولد ۱۳۸۷، علاقه‌مند به IT و ساخت ابزارهای مفیدی مثل CMDGEN.",
-    aboutToolText: "CMDGEN یک دستیار هوشمند است که برای ساده‌سازی کارهای شما در خط فرمان طراحی شده و با React و هوش مصنوعی قدرتمند ساخته شده است.",
-    footerLine1: "تمامی حقوق محفوظ است.", footerLine2: "ساخته شده توسط امیرحسین یاوری",
-  }
-};
+// این کامپوننت‌ها را در مراحل بعدی خواهیم ساخت
+// import Header from './components/Header'; 
+// import Form from './components/Form';
+// import Results from './components/Results';
 
-const osDetails = {
-  linux: { versions: ['Ubuntu 22.04', 'Debian 11', 'Fedora 38', 'Arch Linux'], clis: ['Bash', 'Zsh', 'Fish'] },
-  windows: { versions: ['Windows 11', 'Windows 10', 'Windows Server 2022'], clis: ['PowerShell', 'CMD'] },
-  macos: { versions: ['Sonoma (14)', 'Ventura (13)'], clis: ['Zsh', 'Bash'] }
-};
-
-const CACHE_DURATION = 3600000;
-const getCacheKey = (mode, os, osVersion, cli, userInput, iteration) => `${mode}-${os}-${osVersion}-${cli}-${userInput}-${iteration}`;
-const setCache = (key, value) => { try { const e = { value, timestamp: Date.now() }; localStorage.setItem(key, JSON.stringify(e)); } catch (t) { console.warn("Failed to set cache:", t); } };
-const getCache = (key) => { try { const e = localStorage.getItem(key); if (!e) return null; const { value, timestamp } = JSON.parse(e); return Date.now() - timestamp < CACHE_DURATION ? value : (localStorage.removeItem(key), null); } catch (t) { return console.warn("Failed to get cache:", t), null; } };
-
-const baseSystemPrompt = `You are an expert command-line assistant. Your goal is to provide practical, safe, and efficient solutions.`;
-
-const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
-    const langMap = { fa: 'Persian', en: 'English' };
-    const language = langMap[lang];
-    const { existingCommands = [] } = options;
-
-    const commonTextInstructions = `
-- The user's environment is: OS=${os}, Version=${osVersion}, Shell=${cli}.
-- Your explanations must be simple, clear, and easy for anyone to understand.
-- For Persian, use natural language and avoid English words unless absolutely necessary (like 'Git').
-`;
-
-    switch (mode) {
-        case 'generate':
-            const existingCommandsPrompt = existingCommands.length > 0
-                ? `You have already suggested: ${existingCommands.join(', ')}. Provide 3 NEW, DIFFERENT, and useful commands for the same initial request.`
-                : 'Provide 3 useful command-line suggestions for the user's request.';
-            
-            return `${baseSystemPrompt}
-${existingCommandsPrompt}
-${commonTextInstructions}
-**Output Format:**
-You must output 3 lines. Each line must follow this exact format, using "|||" as a separator:
-command|||explanation|||warning (or leave empty if no warning)
-**Example:**
-find . -type f -name "*.tmp" -delete|||این دستور تمام فایل‌ها با پسوند tmp را پیدا و حذف می‌کند.|||این دستور فایل‌ها را برای همیشه حذف می‌کند.`;
-
-        case 'script':
-             return `**Strict Rules:**
-- ONLY produce raw code output. No explanations, titles, intros, or extra messages outside the code block.
-- Use inline comments for explanations (# for Bash/PowerShell, :: for CMD).
-- The code MUST be tailored exactly for the user's specified OS and Shell.
-- If Shell is Bash, the script MUST start with #!/bin/bash.
-- If Shell is PowerShell, use only PowerShell cmdlets.
-- If Shell is CMD, use only DOS commands.
-- All comments inside the code should be in ${language}.
-
-**User Task:**`;
-
-        case 'error':
-             return `${baseSystemPrompt}
-Analyze the user's error message.
-${commonTextInstructions}
-**Output Format:**
-You must output a single line using "|||" as a separator with this exact structure:
-probable_cause|||simple_explanation|||solution_step_1|||solution_step_2
-For solution steps that are commands, prefix them with "CMD: ".`;
-
-        default: // explain
-            return `${baseSystemPrompt}
-Explain the following command in simple, easy-to-understand ${language}.
-${commonTextInstructions}
-Structure your explanation with these Markdown sections:
-- **Purpose / هدف**
-- **Breakdown / اجزاء دستور**
-- **Practical Examples / مثال‌های کاربردی**
-- **Pro Tip / نکته حرفه‌ای**`;
-    }
-};
-
-const LoadingSpinner = ({ className = "" }) => <LoaderCircle className={`animate-spin ${className}`} />;
-
-// --- Components ---
-const SolutionStep = ({ step, t }) => {
-    if (step.startsWith('CMD:')) {
-        const command = step.substring(4).trim();
-        const [copied, setCopied] = useState(false);
-        const handleCopy = () => { navigator.clipboard.writeText(command); setCopied(true); setTimeout(() => setCopied(false), 2000); toast.success(t.copied); };
-        return <CommandDisplay command={command} onCopy={handleCopy} copied={copied} />;
-    }
-    return <p className="text-gray-600 dark:text-gray-300 text-sm">{step}</p>;
-};
-const CustomSelect = ({ label, value, onChange, options, placeholder, lang, error }) => (
-  <div className="flex flex-col gap-2">
-    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">{label}&nbsp;<span className="text-red-500">*</span></label>
-    <div className="relative">
-      <select value={value} onChange={e => onChange(e.target.value)} className="w-full appearance-none bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500">
-        <option value="" disabled>{placeholder}</option>
-        {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-      </select>
-      <ChevronDown className={`w-5 h-5 absolute text-gray-500 dark:text-gray-400 pointer-events-none ${lang === 'fa' ? 'left-2' : 'right-2'} top-1/2 -translate-y-1/2`} />
-    </div>
-    {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
-  </div>
-);
-const Card = ({ children, lang, ...props }) => (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-lg" style={{ fontFamily: lang === 'fa' ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }} {...props} >{children}</div>
-);
-const CommandDisplay = ({ command, onCopy, copied }) => (
-  <div className="relative bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden">
-    <pre className="p-4 pr-12 font-mono text-sm text-gray-800 dark:text-gray-200 break-words whitespace-pre-wrap">{command}</pre>
-    <button onClick={onCopy} className="absolute top-2 right-2 p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white bg-gray-100 dark:bg-gray-700 rounded-full transition-colors">
-      {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
-    </button>
-  </div>
-);
-const GeneratedCommandCard = ({ command, explanation, warning, lang }) => {
-  const [copied, setCopied] = useState(false);
-  const handleCopy = () => { navigator.clipboard.writeText(command); setCopied(true); setTimeout(() => setCopied(false), 2000); toast.success(translations[lang].copied); };
-  return (
-    <Card lang={lang}>
-      <div className="flex justify-between items-center mb-3">
-        <h4 className="flex items-center gap-2 text-lg font-semibold text-cyan-600 dark:text-cyan-400"><Terminal size={18} /> Command</h4>
-      </div>
-      <CommandDisplay command={command} onCopy={handleCopy} copied={copied} />
-      {explanation && <p className="mt-3 text-gray-600 dark:text-gray-300 text-sm">{explanation}</p>}
-      {warning && warning.trim() !== '' && <p className="mt-2 text-xs text-amber-600 dark:text-amber-400 italic">{warning}</p>}
-    </Card>
-  );
-};
-const ExplanationCard = ({ explanation, lang }) => (
-  <div className="mt-6 max-w-2xl mx-auto">
-    <Card lang={lang}>
-      <h3 className="text-lg font-bold text-cyan-600 dark:text-cyan-400 flex items-center gap-2 mb-4"><Bot size={18} /> {translations[lang].detailedExplanation}</h3>
-      <div className="prose prose-sm dark:prose-invert text-gray-700 dark:text-gray-300 max-w-none" dangerouslySetInnerHTML={{ __html: explanation.replace(/\n/g, '<br />').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
-    </Card>
-  </div>
-);
-const ScriptCard = ({ filename, script_lines = [], lang }) => {
-  const t = translations[lang];
-  const [copied, setCopied] = useState(false);
-  const fullScript = script_lines.join('\n');
-  const handleCopy = () => { navigator.clipboard.writeText(fullScript); setCopied(true); setTimeout(() => setCopied(false), 2000); toast.success(t.copied); };
-  const downloadScript = () => { const blob = new Blob([fullScript], { type: 'text/plain' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url); };
-  return (
-    <div className="mt-6 max-w-2xl mx-auto">
-      <Card lang={lang}>
-        <div className="flex justify-between items-center mb-3">
-          <h4 className="flex items-center gap-2 text-lg font-semibold text-cyan-600 dark:text-cyan-400"><FileCode2 size={18} /> {filename}</h4>
-          <button onClick={downloadScript} className="flex items-center gap-1 text-sm text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 transition-colors"><Download size={16} /> {t.downloadScript}</button>
-        </div>
-        <CommandDisplay command={fullScript} onCopy={handleCopy} copied={copied} />
-      </Card>
-    </div>
-  );
-};
-const ErrorAnalysisCard = ({ analysis, lang }) => {
-    const t = translations[lang];
-    return (
-        <div className="mt-6 max-w-2xl mx-auto">
-            <Card lang={lang}>
-                <h3 className="text-lg font-bold text-cyan-600 dark:text-cyan-400 flex items-center gap-2 mb-4"><ShieldAlert size={18} /> {t.errorAnalysis}</h3>
-                <div className="space-y-5">
-                    {analysis.cause && <div><h4 className="font-semibold text-red-500 dark:text-red-400 mb-2">{t.cause}</h4><p className="text-gray-600 dark:text-gray-300 text-sm">{analysis.cause}</p></div>}
-                    {analysis.explanation && <div><h4 className="font-semibold text-amber-500 dark:text-amber-400 mb-2">{t.explanation}</h4><p className="text-gray-600 dark:text-gray-300 text-sm">{analysis.explanation}</p></div>}
-                    {analysis.solution && <div><h4 className="font-semibold text-green-600 dark:text-green-400 mb-2">{t.solution}</h4><div className="space-y-2">{analysis.solution.map((step, index) => <SolutionStep key={index} step={step} t={t} />)}</div></div>}
-                </div>
-            </Card>
-        </div>
-    );
-};
-const AboutModal = ({ lang, onClose, onLangChange }) => {
-    const t = translations[lang];
-    return (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-sm p-5 shadow-lg" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center mb-4"><h2 className="text-lg font-bold text-gray-900 dark:text-white">About CMDGEN</h2><button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><X size={18} /></button></div>
-                <div className="space-y-4 text-gray-700 dark:text-gray-300">
-                    <div><h3 className="font-medium text-cyan-600 dark:text-cyan-400">{t.aboutMeTitle}</h3><p className="text-sm">{t.aboutMeText}</p></div>
-                    <div><h3 className="font-medium text-cyan-600 dark:text-cyan-400">{t.aboutToolTitle}</h3><p className="text-sm">{t.aboutToolText}</p></div>
-                    <div className="flex items-center justify-center pt-2"><div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5"><button onClick={() => onLangChange('en')} className={`px-3 py-1 rounded-full text-xs ${lang === 'en' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>EN</button><button onClick={() => onLangChange('fa')} className={`px-3 py-1 rounded-full text-xs ${lang === 'fa' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>FA</button></div></div>
-                </div>
-            </div>
-        </div>
-    );
-};
-const MobileDrawer = ({ lang, isOpen, onClose, onAboutClick, onLangChange }) => {
-  const t = translations[lang];
-  return (
-    <div className={`fixed inset-y-0 ${lang === 'fa' ? 'right-0' : 'left-0'} bg-white dark:bg-gray-900 w-64 z-50 shadow-lg transition-transform duration-300 ${isOpen ? 'translate-x-0' : (lang === 'fa' ? 'translate-x-full' : '-translate-x-full')}`}>
-      <div className="p-4 h-full flex flex-col">
-        <div className="flex justify-between items-center mb-5"><h2 className="text-lg font-bold text-gray-900 dark:text-white">Menu</h2><button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"><X size={20} /></button></div>
-        <button onClick={() => { onAboutClick(); onClose(); }} className="flex items-center gap-3 p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded w-full text-left"><Info size={20} /> {t.about}</button>
-        <div className="mt-auto pt-4 border-t border-gray-200 dark:border-gray-700"><div className="flex items-center justify-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5"><button onClick={() => onLangChange('en')} className={`px-4 py-1.5 rounded-full text-sm w-full ${lang === 'en' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>EN</button><button onClick={() => onLangChange('fa')} className={`px-4 py-1.5 rounded-full text-sm w-full ${lang === 'fa' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>FA</button></div></div>
-      </div>
-    </div>
-  );
-};
-const ErrorAnalysisPrompt = ({ onAnalyze, lang, os, osVersion, cli }) => {
-    const t = translations[lang];
-    const [errorInput, setErrorInput] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [analysisResult, setAnalysisResult] = useState(null);
-
-    const handleAnalyze = async () => {
-        if (!errorInput.trim()) { toast.error(t.fieldRequired); return; }
-        setIsLoading(true);
-        setAnalysisResult(null);
-        const result = await onAnalyze({ mode: 'error', userInput: errorInput, os, osVersion, cli, lang });
-        if(result) { setAnalysisResult(result); }
-        setIsLoading(false);
-    };
-
-    return (
-        <div className="mt-10">
-            <Card lang={lang}>
-                <div className="text-center">
-                    <ShieldAlert className="mx-auto h-10 w-10 text-amber-500" />
-                    <h3 className="mt-2 text-lg font-semibold text-gray-900 dark:text-white">{t.errorPromptTitle}</h3>
-                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{t.errorPromptSubheader}</p>
-                </div>
-                <div className="mt-4 flex flex-col gap-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.errorLabel} <span className="text-red-500">*</span></label>
-                    <textarea value={errorInput} onChange={(e) => setErrorInput(e.target.value)} placeholder={t.errorPlaceholder} className="w-full h-24 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-cyan-500 resize-none" />
-                </div>
-                <button onClick={handleAnalyze} disabled={isLoading} className="mt-4 w-full bg-amber-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-amber-700 disabled:bg-gray-400 flex items-center justify-center min-h-[44px]">
-                    {isLoading ? <LoadingSpinner /> : t.analyzeError}
-                </button>
-            </Card>
-            {analysisResult && <ErrorAnalysisCard analysis={analysisResult.data} lang={lang} />}
-        </div>
-    );
-};
-
-
-// --- Main App Component ---
 function AppContent() {
   const [lang, setLang] = useState('en');
   const [theme, setTheme] = useState('dark');
   const [mode, setMode] = useState('generate');
-  const [os, setOs] = useState('linux');
-  const [osVersion, setOsVersion] = useState('');
-  const [cli, setCli] = useState('');
-  const [userInput, setUserInput] = useState('');
   
   const [mainResult, setMainResult] = useState(null);
   const [commandList, setCommandList] = useState([]);
@@ -299,9 +22,6 @@ function AppContent() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [moreCommandsCount, setMoreCommandsCount] = useState(0);
 
-  const [formErrors, setFormErrors] = useState({});
-  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const t = translations[lang];
 
   useEffect(() => {
@@ -310,236 +30,75 @@ function AppContent() {
     document.documentElement.classList.toggle('dark', savedTheme === 'dark');
     const savedLang = localStorage.getItem('lang') || 'en';
     setLang(savedLang);
+    document.body.dir = savedLang === 'fa' ? 'rtl' : 'ltr';
   }, []);
 
-  useEffect(() => { document.body.dir = lang === 'fa' ? 'rtl' : 'ltr'; localStorage.setItem('lang', lang); }, [lang]);
-  useEffect(() => {
-    setOsVersion(osDetails[os].versions[0]);
-    setCli(osDetails[os].clis[0]);
-    setMainResult(null);
-    setCommandList([]);
-    setUserInput('');
-    setFormErrors({});
-    setMoreCommandsCount(0);
-  }, [os, mode]);
-
-  const handleLangChange = (newLang) => { setLang(newLang); setIsAboutModalOpen(false); setIsDrawerOpen(false); };
-  const toggleTheme = () => { const newTheme = theme === 'light' ? 'dark' : 'light'; setTheme(newTheme); localStorage.setItem('theme', newTheme); document.documentElement.classList.toggle('dark', newTheme === 'dark'); };
-
-  const parseAndConstructData = (textResponse, mode, cli) => {
-    try {
-        const lines = textResponse.trim().split('\n').filter(line => line.trim() !== '');
-        if (mode === 'generate') {
-            const commands = lines.map(line => {
-                const parts = line.split('|||');
-                if (parts.length < 2) return null;
-                return { command: parts[0] || '', explanation: parts[1] || '', warning: parts[2] || '' };
-            }).filter(Boolean);
-            return { commands };
-        }
-        if (mode === 'script') {
-            const getExtension = (cli) => {
-                if (cli === 'PowerShell') return 'ps1';
-                if (cli === 'CMD') return 'bat';
-                return 'sh';
-            };
-            return {
-                filename: `script.${getExtension(cli)}`,
-                script_lines: lines
-            };
-        }
-        if (mode === 'error') {
-            const parts = lines[0].split('|||');
-            return {
-                cause: parts[0] || '',
-                explanation: parts[1] || '',
-                solution: parts.slice(2)
-            };
-        }
-    } catch (error) {
-        console.error("Failed to parse AI text response:", error);
-        return null;
-    }
+  const handleLangChange = (newLang) => {
+    setLang(newLang);
+    localStorage.setItem('lang', newLang);
+    document.body.dir = newLang === 'fa' ? 'rtl' : 'ltr';
   };
 
-  const callApi = async ({ mode, userInput, os, osVersion, cli, lang, iteration = 0, existingCommands = [] }) => {
-    const isPlainText = mode !== 'explain';
-    const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, { existingCommands });
-    const userMessage = `User request: "${userInput}"`;
-    const payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMessage }] };
-    
-    const currentCacheKey = getCacheKey(mode, os, osVersion, cli, userInput, iteration);
-    const cachedData = getCache(currentCacheKey);
-    if (cachedData) return { type: mode, data: cachedData };
-
-    try {
-        const response = await fetch('/api/proxy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        if (!response.ok) { const err = await response.json().catch(() => ({})); throw new Error(err?.error?.message || t.errorServer); }
-        if (!response.body) throw new Error("Response body is missing.");
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let fullContent = '';
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value, { stream: true });
-            const dataLines = chunk.split('\n').filter(line => line.startsWith('data: '));
-            for (const line of dataLines) {
-                const jsonPart = line.substring(5).trim();
-                if (jsonPart && jsonPart !== "[DONE]") {
-                    try { const p = JSON.parse(jsonPart); fullContent += p.choices[0].delta.content || ''; }
-                    catch (e) { console.warn("Stream chunk parsing error:", e); }
-                }
-            }
-        }
-        
-        if (isPlainText) {
-            const finalData = parseAndConstructData(fullContent, mode, cli);
-            if (!finalData) { toast.error(t.errorParse); return null; }
-            setCache(currentCacheKey, finalData);
-            return { type: mode, data: finalData };
-        } else {
-            setCache(currentCacheKey, fullContent);
-            return { type: mode, data: fullContent };
-        }
-    } catch (err) { toast.error(err.message || t.errorNetwork); return null; }
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    document.documentElement.classList.toggle('dark', newTheme === 'dark');
   };
-
-  const handlePrimaryAction = async () => {
-    const newErrors = {};
-    if (!userInput.trim()) newErrors.userInput = t.fieldRequired;
-    if (!os) newErrors.os = t.fieldRequired;
-    if (!osVersion) newErrors.osVersion = t.fieldRequired;
-    if (!cli) newErrors.cli = t.fieldRequired;
-    if (Object.keys(newErrors).length) { setFormErrors(newErrors); return toast.error(Object.values(newErrors)[0]); }
-
-    setFormErrors({});
+  
+  const handleSubmit = async (formData) => {
     setIsLoading(true);
     setMainResult(null);
     setCommandList([]);
     setMoreCommandsCount(0);
+
+    const apiResult = await callApi({ ...formData, lang, mode, iteration: 0 });
     
-    const apiResult = await callApi({ mode, userInput, os, osVersion, cli, lang, iteration: 0 });
-    if(apiResult) {
-        if(apiResult.type === 'generate'){
-            setCommandList(apiResult.data.commands || []);
-        } else {
-            setMainResult(apiResult);
-        }
+    if (apiResult) {
+      if (apiResult.type === 'generate') {
+        setCommandList(apiResult.data.commands || []);
+      } else {
+        setMainResult(apiResult);
+      }
     }
     setIsLoading(false);
   };
-
-  const handleMoreCommands = async () => {
+  
+  const handleMoreCommands = async (formData) => {
     setIsLoadingMore(true);
     const iteration = moreCommandsCount + 1;
     const existing = commandList.map(c => c.command);
 
-    const apiResult = await callApi({ mode: 'generate', userInput, os, osVersion, cli, lang, iteration, existingCommands: existing });
-    if(apiResult && apiResult.data.commands) {
-        setCommandList(prev => [...prev, ...apiResult.data.commands]);
-        setMoreCommandsCount(iteration);
+    const apiResult = await callApi({ ...formData, lang, mode: 'generate', iteration, existingCommands: existing });
+    
+    if (apiResult && apiResult.data.commands) {
+      setCommandList(prev => [...prev, ...apiResult.data.commands]);
+      setMoreCommandsCount(iteration);
     }
     setIsLoadingMore(false);
-  }
+  };
   
-  const copyAllCommands = () => {
-    if (commandList.length > 0) {
-        const textToCopy = commandList.map(cmd => cmd.command).join('\n');
-        navigator.clipboard.writeText(textToCopy);
-        toast.success(t.copied);
-    }
-  };
-
-  const currentModeData = {
-    generate: { label: t.questionLabel, placeholder: t.questionPlaceholder, button: t.generate, loading: t.generating },
-    explain: { label: t.commandLabel, placeholder: t.commandPlaceholder, button: t.explain, loading: t.explaining },
-    script: { label: t.taskLabel, placeholder: t.taskPlaceholder, button: t.generateScript, loading: t.generatingScript },
-  };
+  // در این مرحله، برای سادگی، ما هنوز رابط کاربری را نساخته‌ایم.
+  // شما می‌توانید کدهای JSX مربوط به Header, Form و Results را که در فایل قبلی بود،
+  // به اینجا منتقل کرده و سپس به تدریج به کامپوننت‌های جداگانه ببرید.
+  // اما فعلاً برای اینکه ساختار اصلی را ببینید، این فایل را تمیز نگه می‌داریم.
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200" style={{ fontFamily: lang === 'fa' ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }}>
-        {isAboutModalOpen && <AboutModal lang={lang} onClose={() => setIsAboutModalOpen(false)} onLangChange={handleLangChange} />}
-        {isDrawerOpen && <MobileDrawer lang={lang} isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} onAboutClick={() => setIsAboutModalOpen(true)} onLangChange={handleLangChange} />}
-
-        <header className="bg-white dark:bg-gray-900 shadow-sm sticky top-0 z-40">
-            <div className="container mx-auto px-4 py-3 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                    <button onClick={() => setIsDrawerOpen(true)} className="md:hidden p-1.5 text-gray-600 dark:text-gray-300"><Menu size={20} /></button>
-                    <h1 className="text-xl font-bold text-cyan-600 dark:text-cyan-400">CMDGEN</h1>
-                    <button onClick={() => setIsAboutModalOpen(true)} className="hidden md:inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-cyan-600"><Info size={16} /> {t.about}</button>
-                </div>
-                <div className="flex items-center gap-3">
-                    <button onClick={toggleTheme} className="p-1.5 text-gray-600 dark:text-gray-300 rounded-full">{theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}</button>
-                    <div className="hidden md:flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5"><button onClick={() => setLang('en')} className={`px-2.5 py-1 rounded-full text-xs ${lang === 'en' ? 'bg-cyan-600 text-white' : ''}`}>EN</button><button onClick={() => setLang('fa')} className={`px-2.5 py-1 rounded-full text-xs ${lang === 'fa' ? 'bg-cyan-600 text-white' : ''}`}>FA</button></div>
-                </div>
-            </div>
-        </header>
-
-        <main className="container mx-auto px-4 py-8 md:py-12 flex-grow">
-            <div className="max-w-2xl mx-auto">
-                <div className="flex flex-wrap justify-center gap-2 mb-6">
-                    {['generate', 'explain', 'script'].map(m => (
-                        <button key={m} onClick={() => setMode(m)} className={`px-4 py-2 text-sm font-semibold rounded-full flex items-center gap-2 transition-colors duration-200 ${mode === m ? 'bg-cyan-600 text-white' : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600'}`}>
-                            {m === 'generate' && <Wand2 size={16} />} {m === 'explain' && <Search size={16} />}
-                            {m === 'script' && <FileCode2 size={16} />}
-                            {t[`mode${m.charAt(0).toUpperCase() + m.slice(1)}`]}
-                        </button>
-                    ))}
-                </div>
-                <div>
-                    <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 text-center">{t[`mode${mode.charAt(0).toUpperCase() + mode.slice(1)}`]}</h2>
-                    <p className="text-gray-600 dark:text-gray-400 mb-8 text-center text-md">{t[`${mode}Subheader`]}</p>
-                </div>
-
-                <Card lang={lang}>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        <CustomSelect label={t.os} value={os} onChange={setOs} options={Object.keys(osDetails)} placeholder={t.os} lang={lang} error={formErrors.os} />
-                        <CustomSelect label={t.osVersion} value={osVersion} onChange={setOsVersion} options={osDetails[os]?.versions || []} placeholder={t.selectVersion} lang={lang} error={formErrors.osVersion} />
-                        <CustomSelect label={t.cli} value={cli} onChange={setCli} options={osDetails[os]?.clis || []} placeholder={t.selectCli} lang={lang} error={formErrors.cli} />
-                    </div>
-                    <div className="flex flex-col gap-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{currentModeData[mode].label} <span className="text-red-500">*</span></label>
-                        <textarea value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder={currentModeData[mode].placeholder} className="w-full h-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-cyan-500 resize-none" />
-                        {formErrors.userInput && <p className="text-red-500 text-xs mt-1">{formErrors.userInput}</p>}
-                    </div>
-                    <button onClick={handlePrimaryAction} disabled={isLoading} className="mt-5 w-full bg-cyan-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-cyan-700 disabled:bg-gray-400 flex items-center justify-center min-h-[48px]">
-                        {isLoading ? <LoadingSpinner/> : currentModeData[mode].button}
-                    </button>
-                </Card>
-                
-                <div className="mt-8 space-y-4">
-                    {commandList.map((cmd, index) => (
-                        <div key={index}>
-                            <GeneratedCommandCard {...cmd} lang={lang} />
-                        </div>
-                    ))}
-                </div>
-
-                {mode === 'generate' && commandList.length > 0 && moreCommandsCount < 5 && !isLoading && (
-                    <div className="mt-6 text-center">
-                        <button onClick={handleMoreCommands} disabled={isLoadingMore} className="w-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-4 py-2.5 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 disabled:bg-gray-400 flex items-center justify-center gap-2 min-h-[48px]">
-                            {isLoadingMore ? <><LoadingSpinner/> {t.loadingMore}</> : <><PlusCircle size={18}/> {t.moreCommands}</>}
-                        </button>
-                    </div>
-                )}
-                
-                {mainResult?.type === 'explain' && <ExplanationCard explanation={mainResult.data} lang={lang} />}
-                {mainResult?.type === 'script' && mainResult.data.filename && <ScriptCard {...mainResult.data} lang={lang} />}
-                
-                {commandList.length > 0 && !isLoading && (
-                    <ErrorAnalysisPrompt onAnalyze={callApi} lang={lang} os={os} osVersion={osVersion} cli={cli} />
-                )}
-            </div>
-        </main>
-
-        <footer className="bg-white dark:bg-gray-900 py-4 text-center text-gray-500 dark:text-gray-400 text-xs border-t border-gray-200 dark:border-gray-800">
-             <p>{t.footerLine1}</p>
-             <p className="mt-1">{t.footerLine2}</p>
-        </footer>
+       {/* Placeholder for UI components */}
+       <div className="container mx-auto p-4">
+            <h1 className="text-2xl font-bold text-center">CMDGEN - Refactored</h1>
+            <p className="text-center">The new architecture is in place. Next step is to build the UI components.</p>
+            {/* We will add <Header />, <Form />, and <Results /> here later */}
+       </div>
     </div>
   );
 }
 
-export default function App() { return <BrowserRouter><AppContent /></BrowserRouter>; }
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
+    </BrowserRouter>
+  );
+}
