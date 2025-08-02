@@ -15,8 +15,11 @@ const sessionCache = new Map();
 export const callApi = async ({ mode, userInput, os, osVersion, cli, lang, iteration = 0, existingCommands = [] }) => {
     const t = translations[lang];
     
-    // Use a robust cache key that includes all relevant parameters
-    const cacheKey = `${mode}-${os}-${osVersion}-${cli}-${userInput}-${iteration}`;
+    // --- Start of Correction ---
+    // The cache key now includes the language (`lang`) to ensure language changes trigger a new API call.
+    const cacheKey = `${lang}-${mode}-${os}-${osVersion}-${cli}-${userInput}-${iteration}`;
+    // --- End of Correction ---
+    
     if (sessionCache.has(cacheKey)) {
         return sessionCache.get(cacheKey);
     }
