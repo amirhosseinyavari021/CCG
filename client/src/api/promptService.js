@@ -14,6 +14,17 @@ export const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) =>
 - **Environment:** The user's environment is: OS=${os}, Version=${osVersion}, Shell=${cli}.
 `;
 
+    // --- Start of Correction ---
+    // Dynamic example based on the selected language
+    const generateExample = (lang) => {
+        if (lang === 'fa') {
+            return `find /tmp -type f -mtime +30 -delete|||این دستور فایل‌های موقت در پوشه tmp که بیش از ۳۰ روز از آخرین تغییرشان گذشته را پیدا و حذف می‌کند.|||این دستور فایل‌ها را برای همیشه حذف می‌کند.`;
+        }
+        // English example as default
+        return `find /tmp -type f -mtime +30 -delete|||This command finds and deletes files in the /tmp directory that are older than 30 days.|||This command permanently deletes files.`;
+    };
+    // --- End of Correction ---
+
     switch (mode) {
         case 'generate':
             const existingCommandsPrompt = existingCommands.length > 0
@@ -27,7 +38,7 @@ ${existingCommandsPrompt}
 You must output 3 lines. Each line must follow this exact format, using "|||" as a separator:
 command|||explanation|||warning (or leave empty if no warning)
 **Example:**
-find /tmp -type f -mtime +30 -delete|||این دستور فایل‌های موقت در پوشه tmp که بیش از ۳۰ روز از آخرین تغییرشان گذشته را پیدا و حذف می‌کند.|||این دستور فایل‌ها را برای همیشه حذف می‌کند.`;
+${generateExample(lang)}`; // Using the dynamic example here
 
         case 'script':
              // This is the advanced, engineering-focused prompt for GPT-4.1
