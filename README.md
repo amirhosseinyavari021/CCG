@@ -65,4 +65,4 @@ The project connects to Large Language Models (LLMs) via a proxy server through 
 CMDGEN fully supports both English and Persian (Farsi). The entire user interface and the AI-generated responses are tailored to the user's selected language.
 
 👨‍💻 About the Creator
-I'm Amirhossein Yavari, born in 2008, and I'm passionate about the IT world and programming. I built CMDGEN with love and dedication to simplify the daily challenges of working with the command line for everyone, from beginners to experts.
+I'm Amirhossein Yavari, born in 2008, and I'm passionate about the IT world. I built CMDGEN with love and dedication to simplify the daily challenges of working with the command line for everyone, from beginners to experts.
