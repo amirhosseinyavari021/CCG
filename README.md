@@ -1,7 +1,7 @@
 CMDGEN - Your Intelligent Command-Line Assistant
 CMDGEN is a smart web-based tool designed to help developers, system administrators, and new users work effortlessly with the command line. This project was created to simplify the complex processes of generating, explaining, and scripting terminal commands.
 
-This project was created by Amirhossein Yavari, a young developer passionate about IT and building useful, practical tools.
+This project was created by Amirhossein Yavari, a young ITman and ITlover and ITlearner passionate about IT and building useful, practical tools.
 
 ✨ Key Features
 CMDGEN offers three core, powerful features to its users:
