@@ -13,14 +13,15 @@ export const callApi = async ({ mode, userInput, os, osVersion, cli, lang, itera
         return sessionCache.get(cacheKey);
     }
 
-    const isPlainText = mode !== 'explain';
     const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, { existingCommands });
-    const userMessage = `User request: "${userInput}"`;
+    const userMessage = userInput;
+
     const payload = {
         messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userMessage }
-        ]
+        ],
+        stream: true
     };
 
     try {
@@ -46,6 +47,7 @@ export const callApi = async ({ mode, userInput, os, osVersion, cli, lang, itera
         while (true) {
             const { value, done } = await reader.read();
             if (done) break;
+
             const chunk = decoder.decode(value, { stream: true });
             const dataLines = chunk.split('\n').filter(line => line.startsWith('data: '));
             for (const line of dataLines) {
@@ -54,27 +56,21 @@ export const callApi = async ({ mode, userInput, os, osVersion, cli, lang, itera
                     try {
                         const p = JSON.parse(jsonPart);
                         fullContent += p.choices[0].delta.content || '';
-                    } catch (e) {
-                        console.warn("Stream chunk parsing error:", e);
-                    }
+                    } catch {}
                 }
             }
         }
 
-        let result;
-        if (isPlainText) {
-            const finalData = parseAndConstructData(fullContent, mode, cli);
-            if (!finalData) {
-                toast.error(t.errorParse);
-                return null;
-            }
-            result = { type: mode, data: finalData };
-        } else {
-            result = { type: mode, data: fullContent };
+        const finalData = parseAndConstructData(fullContent, mode, cli);
+        if (!finalData) {
+            toast.error(t.errorParse);
+            return null;
         }
 
+        const result = { type: mode, data: finalData };
         sessionCache.set(cacheKey, result);
         return result;
+
     } catch (err) {
         toast.error(err.message || t.errorNetwork);
         return null;
