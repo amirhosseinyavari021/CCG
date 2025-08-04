@@ -14,23 +14,23 @@ export const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) =>
 - **Environment:** The user's environment is: OS=${os}, Version=${osVersion}, Shell=${cli}.
 `;
 
-    // --- Start of Correction ---
-    // Dynamic example based on the selected language
     const generateExample = (lang) => {
         if (lang === 'fa') {
             return `find /tmp -type f -mtime +30 -delete|||این دستور فایل‌های موقت در پوشه tmp که بیش از ۳۰ روز از آخرین تغییرشان گذشته را پیدا و حذف می‌کند.|||این دستور فایل‌ها را برای همیشه حذف می‌کند.`;
         }
-        // English example as default
         return `find /tmp -type f -mtime +30 -delete|||This command finds and deletes files in the /tmp directory that are older than 30 days.|||This command permanently deletes files.`;
     };
-    // --- End of Correction ---
 
     switch (mode) {
         case 'generate':
             const existingCommandsPrompt = existingCommands.length > 0
-                ? `You have already suggested: ${existingCommands.join(', ')}. Provide 3 NEW, DIFFERENT, and useful commands for the same initial request.`
-                : 'Provide 3 useful command-line suggestions for the user\'s request.';
-            
+                ? (lang === 'fa'
+                    ? `شما قبلاً این دستورات را پیشنهاد داده‌اید: ${existingCommands.join(', ')}. لطفاً ۳ دستور جدید و متفاوت پیشنهاد دهید که هنوز گفته نشده‌اند.`
+                    : `You have already suggested: ${existingCommands.join(', ')}. Provide 3 NEW, DIFFERENT, and useful commands for the same initial request.`)
+                : (lang === 'fa'
+                    ? 'لطفاً ۳ دستور مفید خط فرمان برای درخواست کاربر پیشنهاد بده.'
+                    : 'Provide 3 useful command-line suggestions for the user\'s request.');
+
             return `${baseSystemPrompt}
 ${commonQualityRules}
 ${existingCommandsPrompt}
@@ -38,11 +38,10 @@ ${existingCommandsPrompt}
 You must output 3 lines. Each line must follow this exact format, using "|||" as a separator:
 command|||explanation|||warning (or leave empty if no warning)
 **Example:**
-${generateExample(lang)}`; // Using the dynamic example here
+${generateExample(lang)}`;
 
         case 'script':
-             // This is the advanced, engineering-focused prompt for GPT-4.1
-             return `${baseSystemPrompt}
+            return `${baseSystemPrompt}
 **Your mission is to create a single, clean, production-ready, executable script based on the user's request.**
 
 **CRITICAL ENGINEERING RULES - YOU MUST FOLLOW ALL OF THEM:**
@@ -58,19 +57,22 @@ ${generateExample(lang)}`; // Using the dynamic example here
 **User Task:**`;
 
         case 'error':
-             return `${baseSystemPrompt}
+            return `${baseSystemPrompt}
 ${commonQualityRules}
-Analyze the user's error message and provide a clear, actionable solution.
+${lang === 'fa'
+    ? 'پیام خطای کاربر را بررسی کرده و یک راه‌حل واضح و قابل اجرا ارائه بده.'
+    : 'Analyze the user\'s error message and provide a clear, actionable solution.'}
 **Output Format:**
 You must output a single line using "|||" as a separator with this exact structure:
 probable_cause|||simple_explanation|||solution_step_1|||solution_step_2
 For solution steps that are commands, prefix them with "CMD: ".`;
 
-        default: // explain
+        default:
             return `${baseSystemPrompt}
 ${commonQualityRules}
-Explain the following command in simple, easy-to-understand ${language}.
-Structure your explanation with these Markdown sections:
+${lang === 'fa'
+    ? 'دستور زیر را به زبان ساده و قابل‌فهم فارسی توضیح بده. ساختار توضیح باید به صورت زیر باشد:'
+    : 'Explain the following command in simple, easy-to-understand English. Structure your explanation with these Markdown sections:'}
 - **Purpose / هدف**
 - **Breakdown / اجزاء دستور**
 - **Practical Examples / مثال‌های کاربردی**
