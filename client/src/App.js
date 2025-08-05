@@ -27,6 +27,7 @@ function AppContent() {
   
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   const [moreCommandsCount, setMoreCommandsCount] = useState(0);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
 
@@ -62,12 +63,20 @@ function AppContent() {
   // Main handler for form submission
   const handleSubmit = async (formData) => {
     setIsLoading(true);
+    setLoadingMessage(t.connecting);
     setMainResult(null);
     setCommandList([]);
     setMoreCommandsCount(0);
     setFormState(formData); // Save form state for "More Commands" feature
 
-    const apiResult = await callApi({ ...formData, lang, mode, iteration: 0 });
+    const apiResult = await callApi(
+        { ...formData, lang, mode, iteration: 0 },
+        (stage) => {
+            if (stage === 'fetching') {
+                setLoadingMessage(t.fetching);
+            }
+        }
+    );
     
     if (apiResult) {
       if (apiResult.type === 'generate') {
@@ -77,21 +86,31 @@ function AppContent() {
       }
     }
     setIsLoading(false);
+    setLoadingMessage('');
   };
   
   // Handler for the "More Commands" button
   const handleMoreCommands = async () => {
     setIsLoadingMore(true);
+    setLoadingMessage(t.connecting);
     const iteration = moreCommandsCount + 1;
     const existing = commandList.map(c => c.command);
 
-    const apiResult = await callApi({ ...formState, lang, mode: 'generate', iteration, existingCommands: existing });
+    const apiResult = await callApi(
+        { ...formState, lang, mode: 'generate', iteration, existingCommands: existing },
+        (stage) => {
+            if (stage === 'fetching') {
+                setLoadingMessage(t.fetching);
+            }
+        }
+    );
     
     if (apiResult && apiResult.data.commands) {
       setCommandList(prev => [...prev, ...apiResult.data.commands]);
       setMoreCommandsCount(iteration);
     }
     setIsLoadingMore(false);
+    setLoadingMessage('');
   };
 
   return (
@@ -113,6 +132,7 @@ function AppContent() {
                     setMode={setMode}
                     onSubmit={handleSubmit}
                     isLoading={isLoading}
+                    loadingMessage={loadingMessage}
                     lang={lang}
                 />
 
@@ -125,7 +145,7 @@ function AppContent() {
                 {mode === 'generate' && commandList.length > 0 && moreCommandsCount < 5 && !isLoading && (
                     <div className="mt-6 text-center">
                         <button onClick={handleMoreCommands} disabled={isLoadingMore} className="w-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-4 py-2.5 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 disabled:bg-gray-400 flex items-center justify-center gap-2 min-h-[48px]">
-                            {isLoadingMore ? <><LoadingSpinner/> {t.loadingMore}</> : <><PlusCircle size={18}/> {t.moreCommands}</>}
+                            {isLoadingMore ? <><LoadingSpinner/> {loadingMessage || t.loadingMore}</> : <><PlusCircle size={18}/> {t.moreCommands}</>}
                         </button>
                     </div>
                 )}
