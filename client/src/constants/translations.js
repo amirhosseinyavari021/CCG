@@ -1,4 +1,3 @@
-
 export const translations = {
   en: {
     about: "About", modeGenerate: "Generate", modeExplain: "Explain", modeScript: "Script",
@@ -23,6 +22,8 @@ export const translations = {
     aboutMeTitle: "About Me", aboutToolTitle: "About CMDGEN", aboutMeText: "I'm Amirhossein Yavari, born in 2008, passionate about IT and building helpful tools like CMDGEN.",
     aboutToolText: "CMDGEN is a smart assistant designed to make your command-line tasks easier, built with React and a powerful AI.",
     footerLine1: "All rights reserved.", footerLine2: "Created by Amirhossein Yavari",
+    connecting: "Connecting to server...",
+    fetching: "Fetching response...",
   },
   fa: {
     about: "درباره", modeGenerate: "تولید دستور", modeExplain: "تحلیل دستور", modeScript: "ساخت اسکریپت",
@@ -47,6 +48,7 @@ export const translations = {
     aboutMeTitle: "درباره من", aboutToolTitle: "درباره CMDGEN", aboutMeText: "من امیرحسین یاوری هستم، متولد ۱۳۸۷، علاقه‌مند به IT و ساخت ابزارهای مفیدی مثل CMDGEN.",
     aboutToolText: "CMDGEN یک دستیار هوشمند است که برای ساده‌سازی کارهای شما در خط فرمان طراحی شده و با React و هوش مصنوعی قدرتمند ساخته شده است.",
     footerLine1: "تمامی حقوق محفوظ است.", footerLine2: "ساخته شده توسط امیرحسین یاوری",
+    connecting: "در حال اتصال به سرور...",
+    fetching: "در حال دریافت پاسخ...",
   }
 };
-
