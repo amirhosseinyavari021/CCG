@@ -5,7 +5,7 @@ import { translations } from '../constants/translations';
 
 const sessionCache = new Map();
 
-export const callApi = async ({ mode, userInput, os, osVersion, cli, lang, iteration = 0, existingCommands = [] }) => {
+export const callApi = async ({ mode, userInput, os, osVersion, cli, lang, iteration = 0, existingCommands = [] }, onUpdate) => {
     const t = translations[lang];
     const cacheKey = `${lang}-${mode}-${os}-${osVersion}-${cli}-${userInput}-${iteration}`;
 
@@ -30,6 +30,8 @@ export const callApi = async ({ mode, userInput, os, osVersion, cli, lang, itera
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
+
+        onUpdate?.('fetching');
 
         if (!response.ok) {
             const err = await response.json().catch(() => ({}));
