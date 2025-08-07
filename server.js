@@ -6,6 +6,9 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(express.json());
 
+// --- CORRECTED: Moved modelName to the top-level scope ---
+const modelName = 'openai/gpt-oss-20b:free';
+
 app.post('/api/proxy', async (req, res) => {
   console.log('Received a request at /api/proxy');
 
@@ -24,16 +27,13 @@ app.post('/api/proxy', async (req, res) => {
 
     const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
     
-    // --- UPDATED MODEL AS PER YOUR REQUEST ---
-    const modelName = 'openai/gpt-oss-20b:free'; 
-
     const payload = {
-      model: modelName,
+      model: modelName, // Now it correctly references the variable from the outer scope
       messages: messages,
       stream: true,
     };
 
-    console.log(`Sending request to OpenRouter with new model: ${modelName}`);
+    console.log(`Sending request to OpenRouter with model: ${modelName}`);
 
     const apiResponse = await axios.post(
       openRouterUrl,
@@ -86,5 +86,6 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
+  // Now this line will work correctly
   console.log(`Server running on port ${PORT} using model: ${modelName}`);
 });
