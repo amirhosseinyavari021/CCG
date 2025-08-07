@@ -2,7 +2,7 @@
  * Parses the raw text response from the AI and constructs a structured object.
  * This function is designed to be robust against malformed AI responses.
  * @param {string} textResponse - The raw text from the AI.
- * @param {string} mode - The current application mode ('generate', 'script', 'error').
+ * @param {string} mode - The current application mode ('generate', 'script', 'error', 'explain').
  * @param {string} cli - The current command-line interface (e.g., 'Bash', 'PowerShell').
  * @returns {object|null} A structured object or null if parsing fails.
  */
@@ -46,6 +46,13 @@ export const parseAndConstructData = (textResponse, mode, cli) => {
                 explanation: parts[1]?.trim() || '',
                 solution: parts.slice(2).map(s => s.trim())
             };
+        }
+        
+        // --- FIX ADDED HERE ---
+        // This handles the response for the 'explain' mode by treating the entire
+        // response as a single block of text, which is what the UI expects.
+        if (mode === 'explain') {
+            return lines.join('\n');
         }
         
         return null; // Should not be reached
