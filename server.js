@@ -24,8 +24,8 @@ app.post('/api/proxy', async (req, res) => {
 
     const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
     
-    // --- Using the new free model ---
-    const modelName = 'qwen/qwen3-coder:free'; // CORRECTED: Using the free model you provided
+    // --- UPDATED MODEL AS PER YOUR REQUEST ---
+    const modelName = 'openai/gpt-oss-20b:free'; 
 
     const payload = {
       model: modelName,
@@ -86,5 +86,5 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT} using model: qwen/qwen3-coder:free`);
+  console.log(`Server running on port ${PORT} using model: ${modelName}`);
 });
