@@ -1,43 +1,39 @@
-export const parseAndConstructData = (textResponse, mode, cli) => {
+/**
+ * Parses the raw text response from the AI.
+ * This version is more robust and correctly handles different modes.
+ */
+export const parseAndConstructData = (textResponse, mode) => {
     try {
-        const lines = textResponse.trim().replace(/```/g, '').split('\n').filter(line => line.trim() !== '');
-        if (lines.length === 0) return null;
+        const trimmedResponse = textResponse.trim();
+        if (!trimmedResponse) return null;
 
         if (mode === 'generate') {
+            const lines = trimmedResponse.split('\n').filter(line => line.trim());
             const commands = lines.map(line => {
                 const parts = line.split('|||');
-                if (parts.length < 2) return null;
+                if (parts.length < 2) return null; // A valid line needs a command and explanation
                 return {
                     command: parts[0]?.trim() || '',
                     explanation: parts[1]?.trim() || '',
                     warning: parts[2]?.trim() || ''
                 };
-            }).filter(Boolean);
+            }).filter(Boolean); // Clean up any malformed lines
             return { commands };
         }
 
-        if (mode === 'script') {
-            const getExtension = (cli) => {
-                if (cli === 'PowerShell') return 'ps1';
-                if (cli === 'CMD') return 'bat';
-                return 'sh';
-            };
-            return { filename: `script.${getExtension(cli)}`, script_lines: lines };
+        if (mode === 'explain') {
+            // The entire response is the explanation content
+            return { explanation: trimmedResponse };
         }
-
+        
         if (mode === 'error') {
-            const parts = lines[0].split('|||');
+            const parts = trimmedResponse.split('|||');
+            if (parts.length < 3) return null;
             return {
                 cause: parts[0]?.trim() || '',
                 explanation: parts[1]?.trim() || '',
-                solution: parts.slice(2).map(s => s.trim())
+                solution: parts.slice(2).map(s => s.trim()).filter(s => s)
             };
-        }
-        
-        // --- FIX for Explain Mode ---
-        if (mode === 'explain') {
-            // The entire response is the explanation
-            return textResponse.trim();
         }
         
         return null;
