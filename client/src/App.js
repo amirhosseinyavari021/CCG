@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast'; // Import Toaster
+import { Toaster } from 'react-hot-toast';
 import { translations } from './constants/translations';
 import { callApi } from './api/apiService';
 
 import Header from './components/Header';
 import Form from './components/Form';
 import ErrorAnalysis from './components/ErrorAnalysis';
-import { GeneratedCommandCard, ExplanationCard, ScriptCard } from './components/CommandCard';
+import { GeneratedCommandCard, ExplanationCard } from './components/CommandCard';
 import AboutModal from './components/AboutModal';
 import { PlusCircle } from 'lucide-react';
 import LoadingSpinner from './components/common/LoadingSpinner';
@@ -15,17 +15,17 @@ import LoadingSpinner from './components/common/LoadingSpinner';
 function AppContent() {
   const [lang, setLang] = useState('en');
   const [theme, setTheme] = useState('dark');
-  const [mode, setMode] = useState('generate');
   
-  const [formState, setFormState] = useState({}); 
-  const [mainResult, setMainResult] = useState(null);
   const [commandList, setCommandList] = useState([]);
+  const [explanation, setExplanation] = useState(null);
   
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [moreCommandsCount, setMoreCommandsCount] = useState(0);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
+  
+  const [formState, setFormState] = useState({}); 
 
   const t = translations[lang];
 
@@ -52,42 +52,53 @@ function AppContent() {
     localStorage.setItem('theme', newTheme);
     document.documentElement.className = newTheme;
   };
-  
-  const handleSubmit = async (formData) => {
-    setIsLoading(true);
-    setLoadingMessage(t.connecting);
-    setMainResult(null);
+
+  // Helper to reset state before any API call
+  const resetStateForNewRequest = () => {
     setCommandList([]);
+    setExplanation(null);
     setMoreCommandsCount(0);
+    setIsLoading(true);
+  };
+  
+  const handleGenerate = async (formData) => {
+    resetStateForNewRequest();
     setFormState(formData);
 
     const apiResult = await callApi(
-        { ...formData, lang, mode, iteration: 0 },
-        (stage) => { if (stage === 'fetching') setLoadingMessage(t.fetching); }
+        { ...formData, lang, mode: 'generate' },
+        (stage) => setLoadingMessage(stage === 'fetching' ? t.fetching : t.connecting)
     );
     
-    if (apiResult) {
-      if (apiResult.type === 'generate') {
-        setCommandList(apiResult.data.commands || []);
-      } else {
-        // For explain and script modes
-        setMainResult(apiResult.data);
-      }
+    if (apiResult?.data?.commands) {
+      setCommandList(apiResult.data.commands);
     }
     setIsLoading(false);
-    setLoadingMessage('');
   };
-  
+
+  const handleExplain = async (formData) => {
+    resetStateForNewRequest();
+    setFormState(formData);
+
+    const apiResult = await callApi(
+        { ...formData, lang, mode: 'explain' },
+        (stage) => setLoadingMessage(stage === 'fetching' ? t.fetching : t.connecting)
+    );
+    
+    if (apiResult?.data?.explanation) {
+      setExplanation(apiResult.data.explanation);
+    }
+    setIsLoading(false);
+  };
+
   const handleMoreCommands = async () => {
     setIsLoadingMore(true);
     const iteration = moreCommandsCount + 1;
     const existing = commandList.map(c => c.command);
 
-    const apiResult = await callApi(
-        { ...formState, lang, mode: 'generate', iteration, existingCommands: existing }
-    );
+    const apiResult = await callApi({ ...formState, lang, mode: 'generate', iteration, existingCommands: existing });
     
-    if (apiResult && apiResult.data.commands) {
+    if (apiResult?.data?.commands) {
       setCommandList(prev => [...prev, ...apiResult.data.commands]);
       setMoreCommandsCount(iteration);
     }
@@ -96,7 +107,6 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200" style={{ fontFamily: lang === 'fa' ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }}>
-       {/* Add the Toaster component here */}
        <Toaster 
          position="top-center" 
          reverseOrder={false}
@@ -104,7 +114,6 @@ function AppContent() {
            className: 'dark:bg-gray-700 dark:text-white',
          }}
        />
-       
        {isAboutModalOpen && <AboutModal lang={lang} onClose={() => setIsAboutModalOpen(false)} onLangChange={handleLangChange} />}
        
        <Header 
@@ -118,9 +127,8 @@ function AppContent() {
         <main className="container mx-auto px-4 py-8 md:py-12 flex-grow">
             <div className="max-w-2xl mx-auto">
                 <Form 
-                    mode={mode}
-                    setMode={setMode}
-                    onSubmit={handleSubmit}
+                    onSubmit={handleGenerate}
+                    onExplain={handleExplain}
                     isLoading={isLoading}
                     loadingMessage={loadingMessage}
                     lang={lang}
@@ -132,19 +140,17 @@ function AppContent() {
                     ))}
                 </div>
 
-                {mode === 'generate' && commandList.length > 0 && moreCommandsCount < 5 && !isLoading && (
+                {commandList.length > 0 && !isLoading && (
                     <div className="mt-6 text-center">
                         <button onClick={handleMoreCommands} disabled={isLoadingMore} className="w-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-4 py-2.5 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 disabled:bg-gray-400 flex items-center justify-center gap-2 min-h-[48px]">
-                            {isLoadingMore ? <><LoadingSpinner/> {loadingMessage || t.loadingMore}</> : <><PlusCircle size={18}/> {t.moreCommands}</>}
+                            {isLoadingMore ? <><LoadingSpinner/> {t.loadingMore}</> : <><PlusCircle size={18}/> {t.moreCommands}</>}
                         </button>
                     </div>
                 )}
                 
-                {/* Updated logic to handle mainResult correctly for explain/script */}
-                {mode === 'explain' && mainResult && <ExplanationCard explanation={mainResult} lang={lang} />}
-                {mode === 'script' && mainResult?.filename && <ScriptCard {...mainResult} lang={lang} />}
+                {explanation && <ExplanationCard explanation={explanation} lang={lang} />}
                 
-                {commandList.length > 0 && !isLoading && (
+                {(commandList.length > 0 || explanation) && !isLoading && (
                     <ErrorAnalysis {...formState} lang={lang} />
                 )}
             </div>
