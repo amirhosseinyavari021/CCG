@@ -9,7 +9,7 @@ import Form from './components/Form';
 import ErrorAnalysis from './components/ErrorAnalysis';
 import { GeneratedCommandCard, ExplanationCard } from './components/CommandCard';
 import AboutModal from './components/AboutModal';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, Github } from 'lucide-react'; // Github icon imported
 import LoadingSpinner from './components/common/LoadingSpinner';
 
 function AppContent() {
@@ -53,7 +53,6 @@ function AppContent() {
     document.documentElement.className = newTheme;
   };
 
-  // Helper to reset state before any API call
   const resetStateForNewRequest = () => {
     setCommandList([]);
     setExplanation(null);
@@ -157,6 +156,11 @@ function AppContent() {
         </main>
 
         <footer className="bg-white dark:bg-gray-900 py-4 text-center text-gray-500 dark:text-gray-400 text-xs border-t border-gray-200 dark:border-gray-800">
+             <div className="flex justify-center items-center gap-4 mb-2">
+                <a href="https://github.com/amirhosseinyavari021/AY-CMDGEN/" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                    <Github size={20} />
+                </a>
+             </div>
              <p>{t.footerLine1}</p>
              <p className="mt-1">{t.footerLine2}</p>
         </footer>
