@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { Toaster } from 'react-hot-toast'; // Import Toaster
 import { translations } from './constants/translations';
 import { callApi } from './api/apiService';
 
-// Import all the new, refactored components
 import Header from './components/Header';
 import Form from './components/Form';
 import ErrorAnalysis from './components/ErrorAnalysis';
@@ -18,12 +17,9 @@ function AppContent() {
   const [theme, setTheme] = useState('dark');
   const [mode, setMode] = useState('generate');
   
-  // This state holds the form data after submission, to be used by "More Commands"
   const [formState, setFormState] = useState({}); 
-  
-  // Results for different modes are handled separately now
-  const [mainResult, setMainResult] = useState(null); // For explain/script modes
-  const [commandList, setCommandList] = useState([]); // For generate mode
+  const [mainResult, setMainResult] = useState(null);
+  const [commandList, setCommandList] = useState([]);
   
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -33,76 +29,62 @@ function AppContent() {
 
   const t = translations[lang];
 
-  // Effect to set theme and language from localStorage on initial load
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'dark';
     setTheme(savedTheme);
-    document.documentElement.classList.toggle('dark', savedTheme === 'dark');
+    document.documentElement.className = savedTheme;
     
     const savedLang = localStorage.getItem('lang') || 'en';
     setLang(savedLang);
     document.body.dir = savedLang === 'fa' ? 'rtl' : 'ltr';
   }, []);
 
-  // Handler to change language
   const handleLangChange = (newLang) => {
     setLang(newLang);
     localStorage.setItem('lang', newLang);
     document.body.dir = newLang === 'fa' ? 'rtl' : 'ltr';
-    setIsAboutModalOpen(false); // Close modal on language change
+    setIsAboutModalOpen(false);
   };
 
-  // Handler to toggle theme
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
     localStorage.setItem('theme', newTheme);
-    document.documentElement.classList.toggle('dark', newTheme === 'dark');
+    document.documentElement.className = newTheme;
   };
   
-  // Main handler for form submission
   const handleSubmit = async (formData) => {
     setIsLoading(true);
     setLoadingMessage(t.connecting);
     setMainResult(null);
     setCommandList([]);
     setMoreCommandsCount(0);
-    setFormState(formData); // Save form state for "More Commands" feature
+    setFormState(formData);
 
     const apiResult = await callApi(
         { ...formData, lang, mode, iteration: 0 },
-        (stage) => {
-            if (stage === 'fetching') {
-                setLoadingMessage(t.fetching);
-            }
-        }
+        (stage) => { if (stage === 'fetching') setLoadingMessage(t.fetching); }
     );
     
     if (apiResult) {
       if (apiResult.type === 'generate') {
         setCommandList(apiResult.data.commands || []);
       } else {
-        setMainResult(apiResult);
+        // For explain and script modes
+        setMainResult(apiResult.data);
       }
     }
     setIsLoading(false);
     setLoadingMessage('');
   };
   
-  // Handler for the "More Commands" button
   const handleMoreCommands = async () => {
     setIsLoadingMore(true);
-    setLoadingMessage(t.connecting);
     const iteration = moreCommandsCount + 1;
     const existing = commandList.map(c => c.command);
 
     const apiResult = await callApi(
-        { ...formState, lang, mode: 'generate', iteration, existingCommands: existing },
-        (stage) => {
-            if (stage === 'fetching') {
-                setLoadingMessage(t.fetching);
-            }
-        }
+        { ...formState, lang, mode: 'generate', iteration, existingCommands: existing }
     );
     
     if (apiResult && apiResult.data.commands) {
@@ -110,11 +92,19 @@ function AppContent() {
       setMoreCommandsCount(iteration);
     }
     setIsLoadingMore(false);
-    setLoadingMessage('');
   };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200" style={{ fontFamily: lang === 'fa' ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }}>
+       {/* Add the Toaster component here */}
+       <Toaster 
+         position="top-center" 
+         reverseOrder={false}
+         toastOptions={{
+           className: 'dark:bg-gray-700 dark:text-white',
+         }}
+       />
+       
        {isAboutModalOpen && <AboutModal lang={lang} onClose={() => setIsAboutModalOpen(false)} onLangChange={handleLangChange} />}
        
        <Header 
@@ -150,8 +140,9 @@ function AppContent() {
                     </div>
                 )}
                 
-                {mainResult?.type === 'explain' && <ExplanationCard explanation={mainResult.data} lang={lang} />}
-                {mainResult?.type === 'script' && mainResult.data.filename && <ScriptCard {...mainResult.data} lang={lang} />}
+                {/* Updated logic to handle mainResult correctly for explain/script */}
+                {mode === 'explain' && mainResult && <ExplanationCard explanation={mainResult} lang={lang} />}
+                {mode === 'script' && mainResult?.filename && <ScriptCard {...mainResult} lang={lang} />}
                 
                 {commandList.length > 0 && !isLoading && (
                     <ErrorAnalysis {...formState} lang={lang} />
