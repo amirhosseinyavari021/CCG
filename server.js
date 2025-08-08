@@ -6,79 +6,63 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(express.json());
 
-// --- CORRECTED: Moved modelName to the top-level scope ---
 const modelName = 'openai/gpt-oss-20b:free';
 
 app.post('/api/proxy', async (req, res) => {
-  console.log('Received a request at /api/proxy');
-
   try {
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
-      console.error('CRITICAL: API_KEY is not configured on the server.');
-      return res.status(500).json({ error: { message: 'API Key not configured' } });
+      console.error('CRITICAL: API_KEY is not configured.');
+      return res.status(500).json({
+        error: { code: 'NO_API_KEY', message: 'The server API key is not configured.' }
+      });
     }
 
     const { messages } = req.body;
     if (!messages) {
-      console.error('Bad Request: No messages in payload.');
-      return res.status(400).json({ error: { message: 'Invalid request payload' } });
+      return res.status(400).json({
+        error: { code: 'INVALID_PAYLOAD', message: 'Request payload is missing "messages" field.' }
+      });
     }
 
     const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
-    
-    const payload = {
-      model: modelName, // Now it correctly references the variable from the outer scope
-      messages: messages,
-      stream: true,
-    };
+    const payload = { model: modelName, messages, stream: true };
 
-    console.log(`Sending request to OpenRouter with model: ${modelName}`);
-
-    const apiResponse = await axios.post(
-      openRouterUrl,
-      payload,
-      {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': 'https://cmdgen.onrender.com', 
-          'X-Title': 'CMDGEN',
-        },
-        responseType: 'stream'
-      }
-    );
-
-    console.log('Successfully connected to OpenRouter, streaming response.');
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-
-    apiResponse.data.pipe(res);
-
-    apiResponse.data.on('error', (err) => {
-      console.error('Stream pipe error during streaming:', err);
-      if (!res.headersSent) {
-        res.status(500).send('Stream error');
-      }
-      res.end();
+    const apiResponse = await axios.post(openRouterUrl, payload, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://cmdgen.onrender.com',
+        'X-Title': 'CMDGEN',
+      },
+      responseType: 'stream'
     });
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    apiResponse.data.pipe(res);
 
   } catch (error) {
     if (error.response) {
-      console.error('Proxy Error from OpenRouter:', error.response.status, error.response.data);
-      if (!res.headersSent) {
-        res.status(error.response.status).json({ error: error.response.data.error || { message: 'Error from OpenRouter' }});
-      }
+      const { status, data } = error.response;
+      console.error(`Error from OpenRouter: Status ${status}`, data);
+      const serverMessage = data?.error?.message || 'An unknown error from the AI provider.';
+      // ارسال ساختار خطای کامل به کلاینت
+      return res.status(status).json({
+        error: { code: `AI_PROVIDER_ERROR_${status}`, message: serverMessage }
+      });
+    } else if (error.request) {
+      console.error('Network Error: No response from OpenRouter.', error.message);
+      return res.status(500).json({
+        error: { code: 'NETWORK_ERROR', message: 'The server could not connect to the AI provider.' }
+      });
     } else {
       console.error('Generic Proxy Error:', error.message);
-      if (!res.headersSent) {
-        res.status(500).json({ error: { message: 'An internal server error occurred.' } });
-      }
+      return res.status(500).json({
+        error: { code: 'INTERNAL_SERVER_ERROR', message: 'An internal server error occurred.' }
+      });
     }
   }
 });
 
-// Serve static files from the React app
 app.use(express.static(path.join(__dirname, 'client/build')));
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'client/build/index.html'));
@@ -86,6 +70,5 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-  // Now this line will work correctly
   console.log(`Server running on port ${PORT} using model: ${modelName}`);
 });
