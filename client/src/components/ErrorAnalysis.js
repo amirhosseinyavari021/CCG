@@ -4,7 +4,7 @@ import { translations } from '../constants/translations';
 import { callApi } from '../api/apiService';
 import Card from './common/Card';
 import LoadingSpinner from './common/LoadingSpinner';
-import CommandDisplay from './common/CommandDisplay'; // Assuming CommandDisplay is in common
+import CommandDisplay from './common/CommandDisplay';
 import toast from 'react-hot-toast';
 
 const SolutionStep = ({ step, t, lang }) => {
@@ -35,6 +35,7 @@ const ErrorAnalysisCard = ({ analysis, lang }) => {
 
 const ErrorAnalysis = ({ lang, os, osVersion, cli }) => {
     const t = translations[lang];
+    const [commandInput, setCommandInput] = useState('');
     const [errorInput, setErrorInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [analysisResult, setAnalysisResult] = useState(null);
@@ -46,7 +47,7 @@ const ErrorAnalysis = ({ lang, os, osVersion, cli }) => {
         }
         setIsLoading(true);
         setAnalysisResult(null);
-        const result = await callApi({ mode: 'error', userInput: errorInput, os, osVersion, cli, lang });
+        const result = await callApi({ mode: 'error', command: commandInput, userInput: errorInput, os, osVersion, cli, lang });
         if (result) {
             setAnalysisResult(result.data);
         }
@@ -61,9 +62,15 @@ const ErrorAnalysis = ({ lang, os, osVersion, cli }) => {
                     <h3 className="mt-2 text-lg font-semibold text-gray-900 dark:text-white">{t.errorPromptTitle}</h3>
                     <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{t.errorPromptSubheader}</p>
                 </div>
-                <div className="mt-4 flex flex-col gap-2">
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.errorLabel} <span className="text-red-500">*</span></label>
-                    <textarea value={errorInput} onChange={(e) => setErrorInput(e.target.value)} placeholder={t.errorPlaceholder} className="w-full h-24 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-cyan-500 resize-none" />
+                <div className="mt-4 flex flex-col gap-4">
+                    <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.commandLabel}</label>
+                        <textarea value={commandInput} onChange={(e) => setCommandInput(e.target.value)} placeholder={t.commandPlaceholder} className="mt-1 w-full h-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-cyan-500 resize-none" />
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.errorLabel} <span className="text-red-500">*</span></label>
+                        <textarea value={errorInput} onChange={(e) => setErrorInput(e.target.value)} placeholder={t.errorPlaceholder} className="mt-1 w-full h-24 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-cyan-500 resize-none" />
+                    </div>
                 </div>
                 <button onClick={handleAnalyze} disabled={isLoading} className="mt-4 w-full bg-amber-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-amber-700 disabled:bg-gray-400 flex items-center justify-center min-h-[44px]">
                     {isLoading ? <LoadingSpinner /> : t.analyzeError}
