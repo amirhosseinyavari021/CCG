@@ -1,62 +1,99 @@
-const baseSystemPrompt = `
-You are CMDGEN, a world-class Senior DevOps Engineer. Your mission is to provide practical, safe, and correct solutions for the user's specified environment.
-- OS: {{os}}
-- Version: {{osVersion}}
-- Shell: {{cli}}
-- **CRITICAL: You MUST respond exclusively in the following language: {{language}}**
-`;
+import { getSystemPrompt } from './promptService';
+import { parseAndConstructData } from '../utils/responseParser';
+import toast from 'react-hot-toast';
+import { translations } from '../constants/translations';
 
-const buildBasePrompt = (os, osVersion, cli, lang) => {
-    const language = lang === 'fa' ? 'Persian (Farsi)' : 'English';
-    return baseSystemPrompt
-        .replace('{{os}}', os)
-        .replace('{{osVersion}}', osVersion)
-        .replace('{{cli}}', cli)
-        .replace('{{language}}', language);
+const sessionCache = new Map();
+
+// تابع کمکی جدید برای مدیریت و نمایش خطاها
+const handleError = (error, lang) => {
+    const t = translations[lang];
+    let message = t.errorDefault;
+
+    if (error.response) {
+        const status = error.response.status;
+        if (status === 401 || status === 403) {
+            message = t.errorAccessConfig;
+        } else if (status === 429) {
+            message = t.errorTooManyRequests;
+        } else if (status >= 500) {
+            message = t.errorProvider;
+        } else if (status >= 400) {
+            message = t.errorInput;
+        }
+    } else if (error.message.includes('Network')) {
+        message = t.errorNetwork;
+    }
+    
+    toast.error(message, { duration: 5000 });
 };
 
-export const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
-    const finalBasePrompt = buildBasePrompt(os, osVersion, cli, lang);
-    const language = lang === 'fa' ? 'Persian' : 'English';
-    const { existingCommands = [] } = options;
+export const callApi = async ({ mode, userInput, os, osVersion, cli, lang, iteration = 0, existingCommands = [], command = '' }, onUpdate) => {
+    const t = translations[lang];
+    const cacheKey = `${lang}-${mode}-${os}-${osVersion}-${cli}-${userInput}-${command}-${iteration}`;
 
-    switch (mode) {
-        case 'generate':
-            const existingCommandsPrompt = existingCommands.length > 0
-                ? (lang === 'fa'
-                    ? `\nشما قبلاً این دستورات را پیشنهاد داده‌اید: ${existingCommands.join(', ')}. لطفاً ۳ دستور جدید و متفاوت پیشنهاد دهید.`
-                    : `\nYou have already suggested: ${existingCommands.join(', ')}. Please provide 3 NEW and different commands.`)
-                : (lang === 'fa'
-                    ? ' لطفاً ۳ دستور خط فرمان مفید و کاربردی برای درخواست کاربر پیشنهاد بده.'
-                    : ' Please provide 3 useful and practical command-line suggestions for the user\'s request.');
+    if (sessionCache.has(cacheKey)) {
+        return sessionCache.get(cacheKey);
+    }
 
-            return `${finalBasePrompt}
-**MISSION:** For the user's request, provide 3 command-line suggestions. ${existingCommandsPrompt}
-**OUTPUT FORMAT:** You MUST output exactly 3 lines. Each line must use this exact format, separated by "|||":
-command|||explanation|||warning (leave the warning empty if there is none)
-Your entire response MUST adhere to this format. Do not add any introductory text.
-`;
+    const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, { existingCommands, command });
+    const payload = {
+        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userInput }],
+        stream: true
+    };
 
-        case 'explain':
-            return `${finalBasePrompt}
-**MISSION:** The user has provided a command or a script. Analyze it and provide a comprehensive, well-structured explanation in **${language}**.
-**OUTPUT FORMAT:** Your response must be a single block of text. Structure your explanation with clear headings (in ${language}) like:
-- **Purpose:** (A brief summary of what the command does)
-- **Breakdown:** (A detailed, part-by-part explanation)
-- **Practical Examples:** (1-2 examples of how to use it)
-- **Pro Tip:** (An advanced tip or safety warning)
-Do not add any text before or after this structured explanation.
-`;
-        
-        case 'error':
-             return `${finalBasePrompt}
-**MISSION:** Analyze the user's error message and provide a clear, actionable solution in ${language}.
-**OUTPUT FORMAT:** Output a single line using "|||" as separator with this structure:
-probable_cause|||simple_explanation|||solution_step_1|||solution_step_2
-If a solution is a command, prefix it with "CMD: ".
-`;
-        
-        default:
-            return finalBasePrompt;
+    try {
+        onUpdate?.('connecting');
+        const response = await fetch('/api/proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        onUpdate?.('fetching');
+
+        if (!response.ok) {
+            const error = new Error("Server responded with an error");
+            error.response = { status: response.status, data: await response.json().catch(() => ({})) };
+            throw error;
+        }
+
+        if (!response.body) {
+            throw new Error("Response body is missing.");
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let fullContent = '';
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            const dataLines = chunk.split('\n').filter(line => line.startsWith('data: '));
+            for (const line of dataLines) {
+                const jsonPart = line.substring(5).trim();
+                if (jsonPart && jsonPart !== "[DONE]") {
+                    try {
+                        const p = JSON.parse(jsonPart);
+                        fullContent += p.choices[0].delta.content || '';
+                    } catch {}
+                }
+            }
+        }
+
+        const finalData = parseAndConstructData(fullContent, mode, cli);
+        if (!finalData) {
+            toast.error(t.errorParse);
+            return null;
+        }
+
+        const result = { type: mode, data: finalData };
+        sessionCache.set(cacheKey, result);
+        return result;
+
+    } catch (err) {
+        handleError(err, lang);
+        return null;
     }
 };
