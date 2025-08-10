@@ -5,7 +5,7 @@ import { translations } from '../constants/translations';
 
 const sessionCache = new Map();
 
-// تابع کمکی جدید برای مدیریت و نمایش خطاها
+// تابع کمکی برای مدیریت و نمایش خطاها
 const handleError = (error, lang) => {
     const t = translations[lang];
     let message = t.errorDefault;
@@ -43,7 +43,6 @@ export const callApi = async ({ mode, userInput, os, osVersion, cli, lang, itera
     };
 
     try {
-        onUpdate?.('connecting');
         const response = await fetch('/api/proxy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
