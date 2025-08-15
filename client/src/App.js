@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { translations } from './constants/translations';
-import { callApi } from './api/apiService';
+import { callApi } from './api/promptService'; // Corrected import path
 
 import Header from './components/Header';
 import Form from './components/Form';
 import ErrorAnalysis from './components/ErrorAnalysis';
 import { GeneratedCommandCard, ExplanationCard } from './components/CommandCard';
 import AboutModal from './components/AboutModal';
-import { PlusCircle, Github } from 'lucide-react'; // Github icon imported
+import { PlusCircle, Github } from 'lucide-react';
 import LoadingSpinner from './components/common/LoadingSpinner';
 
 function AppContent() {
