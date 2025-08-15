@@ -51,10 +51,10 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang }) => {
                     {formErrors.userInput && <p className="text-red-500 text-xs mt-1">{formErrors.userInput}</p>}
                 </div>
                 <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <button onClick={() => validateAndSubmit(onSubmit)} disabled={isLoading} className="w-full bg-cyan-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-cyan-700 disabled:bg-gray-400 flex items-center justify-center min-h-[48px]">
+                    <button onClick={() => validateAndSubmit(onSubmit)} disabled={isLoading} className="w-full bg-cyan-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-cyan-700 disabled:bg-gray-400 flex items-center justify-center min-h-[48px] transition-colors">
                         {isLoading ? <LoadingSpinner/> : <><Wand2 size={18} /><span className="ml-2">{t.generate}</span></>}
                     </button>
-                    <button onClick={() => validateAndSubmit(onExplain)} disabled={isLoading} className="w-full bg-gray-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-gray-700 disabled:bg-gray-400 flex items-center justify-center min-h-[48px]">
+                    <button onClick={() => validateAndSubmit(onExplain)} disabled={isLoading} className="w-full bg-sky-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-sky-700 disabled:bg-gray-400 flex items-center justify-center min-h-[48px] transition-colors">
                         {isLoading ? <LoadingSpinner/> : <><Search size={18} /><span className="ml-2">{t.explain}</span></>}
                     </button>
                 </div>
