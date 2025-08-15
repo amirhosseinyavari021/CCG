@@ -1,4 +1,4 @@
-import { getSystemPrompt } from './promptService';
+import { getSystemPrompt } from './apiService'; // Corrected import path
 import { parseAndConstructData } from '../utils/responseParser';
 import toast from 'react-hot-toast';
 import { translations } from '../constants/translations';
