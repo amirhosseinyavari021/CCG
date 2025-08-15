@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ShieldAlert } from 'lucide-react';
 import { translations } from '../constants/translations';
-import { callApi } from '../api/apiService';
+import { callApi } from '../api/promptService'; // Corrected import path
 import Card from './common/Card';
 import LoadingSpinner from './common/LoadingSpinner';
 import CommandDisplay from './common/CommandDisplay';
