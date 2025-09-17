@@ -6,6 +6,22 @@ import Card from './common/Card';
 import CustomSelect from './common/CustomSelect';
 import LoadingSpinner from './common/LoadingSpinner';
 
+const CustomInput = ({ label, value, onChange, placeholder, error }) => (
+    <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
+            {label}&nbsp;<span className="text-red-500">*</span>
+        </label>
+        <input
+            type="text"
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            placeholder={placeholder}
+            className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500"
+        />
+        {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+    </div>
+);
+
 const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang }) => {
     const t = translations[lang];
     
@@ -15,36 +31,90 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang }) => {
     const [userInput, setUserInput] = useState('');
     const [formErrors, setFormErrors] = useState({});
 
+    const [customOsName, setCustomOsName] = useState('');
+    const [customOsVersion, setCustomOsVersion] = useState('');
+
     useEffect(() => {
-        setOsVersion(osDetails[os].versions[0]);
-        setCli(osDetails[os].clis[0]);
+        if (os !== 'other') {
+            setOsVersion(osDetails[os].versions[0]);
+            setCli(osDetails[os].clis[0]);
+            setCustomOsName('');
+            setCustomOsVersion('');
+        } else {
+            setCli(osDetails.other.clis[0]);
+            setOsVersion(''); // Clear version when switching to other
+        }
     }, [os]);
 
     const validateAndSubmit = (handler) => {
         const newErrors = {};
         if (!userInput.trim()) newErrors.userInput = t.fieldRequired;
-        if (!os) newErrors.os = t.fieldRequired;
-        if (!osVersion) newErrors.osVersion = t.fieldRequired;
+
+        let finalOs = os;
+        let finalOsVersion = osVersion;
+
+        if (os === 'other') {
+            if (!customOsName.trim()) newErrors.customOsName = t.fieldRequired;
+            if (!customOsVersion.trim()) newErrors.customOsVersion = t.fieldRequired;
+            finalOs = customOsName.trim();
+            finalOsVersion = customOsVersion.trim();
+        } else {
+            if (!os) newErrors.os = t.fieldRequired;
+            if (!osVersion) newErrors.osVersion = t.fieldRequired;
+        }
+        
         if (!cli) newErrors.cli = t.fieldRequired;
         
         setFormErrors(newErrors);
         
         if (Object.keys(newErrors).length === 0) {
-            handler({ os, osVersion, cli, userInput });
+            handler({ os: finalOs, osVersion: finalOsVersion, cli, userInput });
         }
     };
+    
+    const osOptions = [...Object.keys(osDetails).filter(k => k !== 'other'), 'other'];
 
     return (
         <div>
             <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 text-center">CMDGEN</h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-8 text-center text-md">Generate commands, or enter a command/script to get an explanation.</p>
+            <p className="text-gray-600 dark:text-gray-400 mb-8 text-center text-md">{t.generateSubheader}</p>
 
             <Card lang={lang}>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    <CustomSelect label={t.os} value={os} onChange={setOs} options={Object.keys(osDetails)} placeholder={t.os} lang={lang} error={formErrors.os} />
-                    <CustomSelect label={t.osVersion} value={osVersion} onChange={setOsVersion} options={osDetails[os]?.versions || []} placeholder={t.selectVersion} lang={lang} error={formErrors.osVersion} />
-                    <CustomSelect label={t.cli} value={cli} onChange={setCli} options={osDetails[os]?.clis || []} placeholder={t.selectCli} lang={lang} error={formErrors.cli} />
+                    <CustomSelect
+                        label={t.os}
+                        value={os}
+                        onChange={setOs}
+                        options={osOptions.map(opt => ({
+                            value: opt,
+                            label: opt === 'other' ? t.osOther : opt.charAt(0).toUpperCase() + opt.slice(1)
+                        }))}
+                        placeholder={t.os}
+                        lang={lang}
+                        error={formErrors.os}
+                        isObjectOptions={true}
+                    />
+
+                    {os !== 'other' ? (
+                        <CustomSelect label={t.osVersion} value={osVersion} onChange={setOsVersion} options={osDetails[os]?.versions || []} placeholder={t.selectVersion} lang={lang} error={formErrors.osVersion} />
+                    ) : (
+                       <>
+                            <CustomInput label={t.customOsLabel} value={customOsName} onChange={setCustomOsName} placeholder={t.customOsPlaceholder} error={formErrors.customOsName} />
+                            <CustomInput label={t.customOsVersionLabel} value={customOsVersion} onChange={setCustomOsVersion} placeholder={t.customOsVersionPlaceholder} error={formErrors.customOsVersion} />
+                       </>
+                    )}
+                    
+                    {/* The third column needs to be handled correctly in grid */}
+                    {os === 'other' ? null : <CustomSelect label={t.cli} value={cli} onChange={setCli} options={osDetails[os]?.clis || []} placeholder={t.selectCli} lang={lang} error={formErrors.cli} />}
                 </div>
+                 {/* CLI selector for 'other' needs to be in a new row or handled differently, placing it outside the 3-col grid for simplicity */}
+                 {os === 'other' && (
+                    <div className="mb-4">
+                        <CustomSelect label={t.cli} value={cli} onChange={setCli} options={osDetails[os]?.clis || []} placeholder={t.selectCli} lang={lang} error={formErrors.cli} />
+                    </div>
+                )}
+
+
                 <div className="flex flex-col gap-2">
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.questionLabel}</label>
                     <textarea value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder={t.questionPlaceholder} className="w-full h-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-cyan-500 resize-none" />
