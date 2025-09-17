@@ -1,12 +1,30 @@
 const express = require('express');
 const path = require('path');
 const axios = require('axios');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 app.set('trust proxy', 1);
 app.use(express.json());
 
 const modelName = 'openai/gpt-oss-20b:free';
+
+// Rate Limiter: 10 requests per minute per IP
+const limiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, 
+  standardHeaders: true,
+  legacyHeaders: false, 
+  message: {
+    error: {
+      code: 'TOO_MANY_REQUESTS',
+      message: 'You have sent too many requests in a short period. Please wait a moment before trying again.'
+    }
+  }
+});
+
+// Apply the rate limiting middleware to API calls only
+app.use('/api/', limiter);
 
 app.post('/api/proxy', async (req, res) => {
   try {
@@ -45,7 +63,6 @@ app.post('/api/proxy', async (req, res) => {
       const { status, data } = error.response;
       console.error(`Error from OpenRouter: Status ${status}`, data);
       const serverMessage = data?.error?.message || 'An unknown error from the AI provider.';
-      // ارسال ساختار خطای کامل به کلاینت
       return res.status(status).json({
         error: { code: `AI_PROVIDER_ERROR_${status}`, message: serverMessage }
       });
