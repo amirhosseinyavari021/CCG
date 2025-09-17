@@ -12,7 +12,7 @@ export const osDetails = {
     clis: ['Zsh', 'Bash']
   },
   other: {
-    versions: [], // No predefined versions for 'other'
-    clis: ['Bash', 'Zsh', 'PowerShell', 'CMD', 'Sh'] // A generic list of common shells
+    versions: [], // No predefined versions
+    clis: ['Bash', 'Zsh', 'PowerShell', 'CMD', 'Sh'] // Common shells
   }
 };
