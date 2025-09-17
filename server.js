@@ -12,9 +12,9 @@ const modelName = 'openai/gpt-oss-20b:free';
 // Rate Limiter: 10 requests per minute per IP
 const limiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 10, 
+  max: 10,
   standardHeaders: true,
-  legacyHeaders: false, 
+  legacyHeaders: false,
   message: {
     error: {
       code: 'TOO_MANY_REQUESTS',
@@ -23,7 +23,6 @@ const limiter = rateLimit({
   }
 });
 
-// Apply the rate limiting middleware to API calls only
 app.use('/api/', limiter);
 
 app.post('/api/proxy', async (req, res) => {
