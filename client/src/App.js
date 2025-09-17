@@ -1,16 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { translations } from './constants/translations';
-import { callApi } from './api/promptService'; // Corrected import path
+import { callApi } from './api/promptService';
 
 import Header from './components/Header';
 import Form from './components/Form';
-import ErrorAnalysis from './components/ErrorAnalysis';
 import { GeneratedCommandCard, ExplanationCard } from './components/CommandCard';
-import AboutModal from './components/AboutModal';
 import { PlusCircle, Github } from 'lucide-react';
 import LoadingSpinner from './components/common/LoadingSpinner';
+
+// Lazy load components that are not needed on initial render
+const AboutModal = lazy(() => import('./components/AboutModal'));
+const ErrorAnalysis = lazy(() => import('./components/ErrorAnalysis'));
+const MobileDrawer = lazy(() => import('./components/MobileDrawer'));
 
 function AppContent() {
   const [lang, setLang] = useState('en');
@@ -23,16 +26,18 @@ function AppContent() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [moreCommandsCount, setMoreCommandsCount] = useState(0);
+  
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   
   const [formState, setFormState] = useState({}); 
 
   const t = translations[lang];
 
   useEffect(() => {
+    // Theme is set in index.html, this just syncs the state
     const savedTheme = localStorage.getItem('theme') || 'dark';
     setTheme(savedTheme);
-    document.documentElement.className = savedTheme;
     
     const savedLang = localStorage.getItem('lang') || 'en';
     setLang(savedLang);
@@ -44,6 +49,7 @@ function AppContent() {
     localStorage.setItem('lang', newLang);
     document.body.dir = newLang === 'fa' ? 'rtl' : 'ltr';
     setIsAboutModalOpen(false);
+    setIsDrawerOpen(false);
   };
 
   const toggleTheme = () => {
@@ -113,14 +119,28 @@ function AppContent() {
            className: 'dark:bg-gray-700 dark:text-white',
          }}
        />
-       {isAboutModalOpen && <AboutModal lang={lang} onClose={() => setIsAboutModalOpen(false)} onLangChange={handleLangChange} />}
+       
+       <Suspense fallback={<div />}>
+          {isAboutModalOpen && <AboutModal lang={lang} onClose={() => setIsAboutModalOpen(false)} onLangChange={handleLangChange} />}
+          <MobileDrawer 
+            isOpen={isDrawerOpen} 
+            lang={lang}
+            onClose={() => setIsDrawerOpen(false)} 
+            onLangChange={handleLangChange}
+            onAboutClick={() => {
+              setIsAboutModalOpen(true);
+              setIsDrawerOpen(false);
+            }}
+          />
+       </Suspense>
        
        <Header 
          lang={lang} 
          theme={theme} 
-         onLangChange={handleLangChange} 
          onThemeChange={toggleTheme}
          onAboutClick={() => setIsAboutModalOpen(true)}
+         onMenuClick={() => setIsDrawerOpen(true)}
+         onLangChange={handleLangChange}
        />
 
         <main className="container mx-auto px-4 py-8 md:py-12 flex-grow">
@@ -141,7 +161,7 @@ function AppContent() {
 
                 {commandList.length > 0 && !isLoading && (
                     <div className="mt-6 text-center">
-                        <button onClick={handleMoreCommands} disabled={isLoadingMore} className="w-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-4 py-2.5 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 disabled:bg-gray-400 flex items-center justify-center gap-2 min-h-[48px]">
+                        <button onClick={handleMoreCommands} disabled={isLoadingMore} className="w-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-4 py-2.5 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 flex items-center justify-center gap-2 min-h-[48px] transition-colors">
                             {isLoadingMore ? <><LoadingSpinner/> {t.loadingMore}</> : <><PlusCircle size={18}/> {t.moreCommands}</>}
                         </button>
                     </div>
@@ -150,7 +170,9 @@ function AppContent() {
                 {explanation && <ExplanationCard explanation={explanation} lang={lang} />}
                 
                 {(commandList.length > 0 || explanation) && !isLoading && (
-                    <ErrorAnalysis {...formState} lang={lang} />
+                    <Suspense fallback={<div className="text-center mt-10"><LoadingSpinner /></div>}>
+                      <ErrorAnalysis {...formState} lang={lang} />
+                    </Suspense>
                 )}
             </div>
         </main>
