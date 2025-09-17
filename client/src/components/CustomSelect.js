@@ -4,7 +4,7 @@ import { ChevronDown } from 'lucide-react';
 const CustomSelect = ({ label, value, onChange, options, placeholder, lang, error, isObjectOptions = false }) => (
     <div className="flex flex-col gap-2">
         <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
-            {label}&nbsp;{label && <span className="text-red-500">*</span>}
+            {label}&nbsp;<span className="text-red-500">*</span>
         </label>
         <div className="relative">
             <select
