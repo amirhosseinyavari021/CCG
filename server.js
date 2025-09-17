@@ -23,6 +23,7 @@ const limiter = rateLimit({
   }
 });
 
+// Apply the rate limiting middleware to API calls only
 app.use('/api/', limiter);
 
 app.post('/api/proxy', async (req, res) => {
