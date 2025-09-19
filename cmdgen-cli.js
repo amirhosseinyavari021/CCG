@@ -34,8 +34,8 @@ const showBanner = () => {
                                                               |__/  |__/    |__/
     `;
     console.log('\x1b[36m%s\x1b[0m', banner);
-    console.log(`\n  \x1b[1mCMDGEN v${packageJson.version}\x1b[0m - Your Intelligent Command-Line Assistant`);
-    console.log('  Created by Amirhossein Yavari. Licensed under MIT.');
+    console.log(`\n  \x1b[1mAY-CMDGEN v${packageJson.version}\x1b[0m - Your Intelligent Command-Line Assistant`);
+    console.log(`  Created by Amirhossein Yavari. Licensed under ${packageJson.license}.`);
     console.log('  Type "cmdgen --help" for a list of commands.\n');
 };
 
@@ -60,7 +60,7 @@ const startServerInBackground = () => {
         stdio: 'ignore'
     });
     serverProcess.unref();
-    return new Promise(resolve => setTimeout(resolve, 2500));
+    return new Promise(resolve => setTimeout(resolve, 3000));
 };
 
 // --- Core API and Execution Functions ---
@@ -97,7 +97,7 @@ const callApi = async ({ mode, userInput, os, osVersion, cli, lang }) => {
         });
     } catch (err) {
         if (err.code === 'ECONNREFUSED') {
-            console.error("\n❌ Error: Could not connect to the CMDGEN server. It may have failed to start.");
+            console.error("\n❌ Error: Could not connect to the AY-CMDGEN server. It may have failed to start.");
         } else {
             console.error("\n❌ Error connecting to the server:", err.response ? err.response.data.error.message : err.message);
         }
@@ -112,7 +112,7 @@ const promptForExecution = (command) => {
     rl.question(`Execute the following command?\n\n  \x1b[36m${command}\x1b[0m\n\n(y/N): `, (answer) => {
         if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
             console.log('🚀 Executing command...');
-            exec(command, (error, stdout, stderr) => {
+            exec(command, { shell: process.env.SHELL }, (error, stdout, stderr) => {
                 if (error) console.error(`\n❌ Execution error:\n${error.message}`);
                 if (stderr) console.warn(`\n⚠️ Standard Error:\n${stderr}`);
                 if (stdout) console.log(`\n✅ Standard Output:\n${stdout}`);
@@ -178,7 +178,7 @@ const run = async () => {
         .option('lang', { describe: 'Set the response language (en, fa)', type: 'string', default: 'en' })
         .demandCommand(1, 'You must provide one of the main commands.')
         .help('h').alias('h', 'help')
-        .version('v', 'Show version number', `CMDGEN version: ${packageJson.version}`).alias('v', 'version')
+        .version('v', 'Show version number', `AY-CMDGEN version: ${packageJson.version}`).alias('v', 'version')
         .strict()
         .wrap(null)
         .check((argv) => {
