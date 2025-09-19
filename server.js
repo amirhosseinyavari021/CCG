@@ -1,13 +1,20 @@
 const express = require('express');
 const path = require('path');
-const axios = require('axios');
+const axios = require('axios/dist/node/axios.cjs'); // Explicit require for pkg compatibility
 const rateLimit = require('express-rate-limit');
+const fs = require('fs');
 
 const app = express();
 app.set('trust proxy', 1);
 app.use(express.json());
 
 const modelName = 'openai/gpt-oss-20b:free';
+
+// --- Error Logging ---
+const logError = (error) => {
+    const logMessage = `[${new Date().toISOString()}] ${error.stack || error}\n`;
+    fs.appendFileSync('server_error.log', logMessage);
+};
 
 // Rate Limiter
 const limiter = rateLimit({
@@ -16,10 +23,7 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: {
-    error: {
-      code: 'TOO_MANY_REQUESTS',
-      message: 'You have sent too many requests in a short period. Please wait a moment before trying again.'
-    }
+    error: { code: 'TOO_MANY_REQUESTS', message: 'You have sent too many requests...' }
   }
 });
 
@@ -34,17 +38,12 @@ app.post('/api/proxy', async (req, res) => {
   try {
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
-      console.error('CRITICAL: API_KEY is not configured.');
-      return res.status(500).json({
-        error: { code: 'NO_API_KEY', message: 'The server API key is not configured.' }
-      });
+      throw new Error('CRITICAL: API_KEY is not configured.');
     }
 
     const { messages } = req.body;
     if (!messages) {
-      return res.status(400).json({
-        error: { code: 'INVALID_PAYLOAD', message: 'Request payload is missing "messages" field.' }
-      });
+      return res.status(400).json({ error: { code: 'INVALID_PAYLOAD', message: 'Request payload is missing "messages" field.' } });
     }
 
     const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
@@ -63,40 +62,40 @@ app.post('/api/proxy', async (req, res) => {
     apiResponse.data.pipe(res);
 
   } catch (error) {
+    logError(error); // Log the error to a file
     if (error.response) {
       const { status, data } = error.response;
       const serverMessage = data?.error?.message || 'An unknown error from the AI provider.';
-      return res.status(status).json({
-        error: { code: `AI_PROVIDER_ERROR_${status}`, message: serverMessage }
-      });
+      return res.status(status).json({ error: { code: `AI_PROVIDER_ERROR_${status}`, message: serverMessage } });
     } else if (error.request) {
-      return res.status(500).json({
-        error: { code: 'NETWORK_ERROR', message: 'The server could not connect to the AI provider.' }
-      });
+      return res.status(500).json({ error: { code: 'NETWORK_ERROR', message: 'The server could not connect to the AI provider.' } });
     } else {
-      return res.status(500).json({
-        error: { code: 'INTERNAL_SERVER_ERROR', message: 'An internal server error occurred.' }
-      });
+      return res.status(500).json({ error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'An internal server error occurred.' } });
     }
   }
 });
 
 // Corrected Static File Serving for pkg
-const staticPath = process.pkg
-  ? path.join(path.dirname(process.execPath), 'client/build')
-  : path.join(__dirname, 'client/build');
-
+const staticPath = process.pkg ? path.join(path.dirname(process.execPath), 'client/build') : path.join(__dirname, 'client/build');
 app.use(express.static(staticPath));
-
 app.get('*', (req, res) => {
   res.sendFile(path.join(staticPath, 'index.html'));
 });
 
-// Server Start - Smart host binding
+// Server Start with robust error handling
 const PORT = process.env.PORT || 3001;
-// Render provides a `RENDER` env var. If it exists, bind to 0.0.0.0, otherwise bind to the safer 127.0.0.1 for the local CLI.
 const HOST = process.env.RENDER ? '0.0.0.0' : '127.0.0.1';
 
-app.listen(PORT, HOST, () => {
-  console.log(`Server running on http://${HOST}:${PORT}`);
+try {
+    app.listen(PORT, HOST, () => {
+        console.log(`Server running on http://${HOST}:${PORT}`);
+    });
+} catch (err) {
+    logError(err);
+    process.exit(1);
+}
+
+process.on('uncaughtException', (err) => {
+    logError(err);
+    process.exit(1);
 });
