@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/-bin/env node
 
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
@@ -24,13 +24,13 @@ const showBanner = () => {
      |__/     \\__/|________/|________/ \\______/  \\______/ |__/    |__/|________/        \\______/ |__/    |__/|_______/  \\______/ |________/|__/  \\__/
                                                                                                                                                  
                                                                                                                                                  
-                                                                /$$$$$$  /$$     /$$                                                              
-                                                               /$$__  $$|  $$   /$$/                                                              
-                                                              | $$  \\ $$ \\  $$ /$$/                                                               
-                                                              | $$$$$$$$  \\  $$$$/                                                                
-                                                              | $$__  $$   \\  $$/                                                                 
-                                                              | $$  | $$    | $$                                                                  
-                                                              | $$  | $$    | $$                                                                  
+                                                                /$$$$$$  /$$     /$$
+                                                               /$$__  $$|  $$   /$$/
+                                                              | $$  \\ $$ \\  $$ /$$/
+                                                              | $$$$$$$$  \\  $$$$/
+                                                              | $$__  $$   \\  $$/
+                                                              | $$  | $$    | $$
+                                                              | $$  | $$    | $$
                                                               |__/  |__/    |__/
     `;
     console.log('\x1b[36m%s\x1b[0m', banner);
@@ -41,7 +41,9 @@ const showBanner = () => {
 
 // --- Server Management (Robust Version) ---
 const serverPort = 3001;
-const serverCheckUrl = `http://localhost:${serverPort}/api/health`;
+// Use explicit IPv4 loopback address to avoid ambiguity with IPv6 (::1)
+const serverHost = '127.0.0.1';
+const serverCheckUrl = `http://${serverHost}:${serverPort}/api/health`;
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -74,7 +76,6 @@ const ensureServerIsRunning = async () => {
     }
 };
 
-
 // --- Core API and Execution Functions ---
 const callApi = async ({ mode, userInput, os, osVersion, cli, lang }) => {
     try {
@@ -87,7 +88,7 @@ const callApi = async ({ mode, userInput, os, osVersion, cli, lang }) => {
     const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, {});
     const payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userInput }] };
     try {
-        const proxyUrl = `http://localhost:${serverPort}/api/proxy`;
+        const proxyUrl = `http://${serverHost}:${serverPort}/api/proxy`;
         const response = await axios.post(proxyUrl, payload, { responseType: 'stream' });
         let fullContent = '';
         const decoder = new TextDecoder();
