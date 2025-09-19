@@ -82,7 +82,9 @@ app.post('/api/proxy', async (req, res) => {
 });
 
 // Corrected Static File Serving for pkg
-const staticPath = path.join(__dirname, 'client/build');
+const staticPath = process.pkg
+  ? path.join(path.dirname(process.execPath), 'client/build')
+  : path.join(__dirname, 'client/build');
 
 app.use(express.static(staticPath));
 
@@ -90,9 +92,10 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(staticPath, 'index.html'));
 });
 
-// Server Start, listening on 0.0.0.0 for Render and CLI compatibility
+// Server Start - Smart host binding
 const PORT = process.env.PORT || 3001;
-const HOST = '0.0.0.0';
+// Render provides a `RENDER` env var. If it exists, bind to 0.0.0.0, otherwise bind to the safer 127.0.0.1 for the local CLI.
+const HOST = process.env.RENDER ? '0.0.0.0' : '127.0.0.1';
 
 app.listen(PORT, HOST, () => {
   console.log(`Server running on http://${HOST}:${PORT}`);
