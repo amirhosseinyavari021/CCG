@@ -24,13 +24,13 @@ const showBanner = () => {
      |__/     \\__/|________/|________/ \\______/  \\______/ |__/    |__/|________/        \\______/ |__/    |__/|_______/  \\______/ |________/|__/  \\__/
                                                                                                                                                  
                                                                                                                                                  
-                                                                /$$$$$$  /$$     /$$                                                              
-                                                               /$$__  $$|  $$   /$$/                                                              
-                                                              | $$  \\ $$ \\  $$ /$$/                                                               
-                                                              | $$$$$$$$  \\  $$$$/                                                                
-                                                              | $$__  $$   \\  $$/                                                                 
-                                                              | $$  | $$    | $$                                                                  
-                                                              | $$  | $$    | $$                                                                  
+                                                                /$$$$$$  /$$     /$$
+                                                               /$$__  $$|  $$   /$$/
+                                                              | $$  \\ $$ \\  $$ /$$/
+                                                              | $$$$$$$$  \\  $$$$/
+                                                              | $$__  $$   \\  $$/
+                                                              | $$  | $$    | $$
+                                                              | $$  | $$    | $$
                                                               |__/  |__/    |__/
     `;
     console.log('\x1b[36m%s\x1b[0m', banner);
@@ -40,8 +40,8 @@ const showBanner = () => {
 };
 
 // --- Server Management (Robust Version) ---
-const serverPort = 3001;
-const serverHost = '127.0.0.1'; // Use explicit IPv4 loopback
+const serverPort = process.env.PORT || 3001; // Use 3001 for local CLI
+const serverHost = '127.0.0.1'; // Always connect to local server via IPv4
 const serverCheckUrl = `http://${serverHost}:${serverPort}/api/health`;
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
