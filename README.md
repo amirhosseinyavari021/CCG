@@ -1,108 +1,80 @@
-# CMDGEN - دستیار هوشمند خط فرمان شما
+# CMDGEN - Your Intelligent Command-Line Assistant
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-CMDGEN یک ابزار هوشمند است که به شما کمک می‌کند تا دستورات خط فرمان (CLI) را به سادگی تولید، تحلیل و اشکال‌زدایی کنید. این پروژه دارای دو نسخه **وب اپلیکیشن** و **ابزار خط فرمان (CLI)** مستقل است.
-
-✨ **ویژگی‌های کلیدی**
-- **تولید دستور:** نیاز خود را به زبان فارسی یا انگلیسی بنویسید و دستورات دقیق و کاربردی تحویل بگیرید.
-- **تحلیل دستور:** هر دستوری که برایتان نامفهوم است را وارد کنید تا CMDGEN آن را به زبان ساده برایتان توضیح دهد.
-- **اشکال‌زدایی:** پیام‌های خطا را وارد کنید تا علت احتمالی و راه‌حل‌های قدم‌به‌قدم را دریافت کنید.
-- **اجرای مستقیم:** در نسخه CLI، می‌توانید دستورات تولید شده را بلافاصله و با اجازه خودتان اجرا کنید.
-- **پشتیبانی دو زبانه:** رابط کاربری و پاسخ‌های هوش مصنوعی به دو زبان فارسی و انگلیسی در دسترس است.
+CMDGEN is a smart tool that helps you generate, analyze, and debug command-line (CLI) instructions with ease. This project features both a **Web Application** and a standalone **Command-Line Tool (CLI)**.
 
 ---
 
-### 🚀 شروع سریع
+### 🚀 Quick Install (Recommended Method)
 
-ساده‌ترین راه برای استفاده از CMDGEN، مراجعه به نسخه وب است. اما اگر می‌خواهید از قدرت کامل آن در ترمینال خود بهره‌مند شوید، نسخه CLI را نصب کنید.
+Open your terminal and run the command below. The script will automatically detect your OS, download the correct version, and install it.
 
-#### روش ۱: استفاده از نسخه وب
-بدون نیاز به نصب، مستقیماً از طریق مرورگر خود به آدرس زیر مراجعه کنید:
-- **[https://cmdgen.onrender.com](https://cmdgen.onrender.com)** (این لینک پس از استقرار فعال می‌شود)
-
-#### روش ۲: نصب ابزار خط فرمان (CLI)
-
-این روش به شما اجازه می‌دهد `cmdgen` را مانند هر دستور دیگری (مثل `git` یا `ls`) در ترمینال خود اجرا کنید.
-
-**۱. دانلود**
-- به صفحه **[Releases](https://github.com/amirhosseinyavari021/ay-cmdgen/releases)** پروژه بروید.
-- آخرین نسخه را پیدا کرده و فایل اجرایی مخصوص سیستم‌عامل خود را دانلود کنید:
-  - `cmdgen-linux` برای لینوکس
-  - `cmdgen-macos` برای مک
-  - `cmdgen-win.exe` برای ویندوز
-
-**۲. نصب**
-برای اینکه بتوانید از هر جایی در ترمینال به `cmdgen` دسترسی داشته باشید، مراحل زیر را انجام دهید:
-
-- **برای لینوکس و مک:**
-  1. ترمینال را باز کنید.
-  2. به فایلی که دانلود کرده‌اید، دسترسی اجرایی بدهید:
-     ```bash
-     chmod +x /path/to/downloaded/cmdgen-linux
-     ```
-  3. آن را به یک مسیر سراسری منتقل کنید:
-     ```bash
-     sudo mv /path/to/downloaded/cmdgen-linux /usr/local/bin/cmdgen
-     ```
-
-- **برای ویندوز:**
-  1. فایل `cmdgen-win.exe` را به یک پوشه دلخواه (مثلاً `C:\Program Files\cmdgen`) منتقل کنید.
-  2. نام فایل را به `cmdgen.exe` تغییر دهید.
-  3. آدرس آن پوشه را به متغیرهای محیطی سیستم (Environment Variables) در بخش `Path` اضافه کنید.
-
-**۳. استفاده**
-نصب تمام شد! ترمینال خود را باز کرده و امتحان کنید:
-
+**For Linux & macOS:**
 ```bash
-# نمایش راهنما
-cmdgen --help
-
-# تولید یک دستور برای فشرده‌سازی یک پوشه
-cmdgen g "compress my 'photos' folder into a file named photos.zip"
-
-# تحلیل یک دستور
-cmdgen a "curl -O [https://example.com/file.txt](https://example.com/file.txt)"
+curl -fsSL [https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.sh](https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.sh) | bash
 ```
+*(You might be asked for your admin (sudo) password to install `cmdgen` globally.)*
+
+**For Windows (in PowerShell as Administrator):**
+```powershell
+iwr [https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.ps1](https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.ps1) | iex
+```
+
+After the installation is complete, open a **new terminal window** and verify it by running `cmdgen --help`.
 
 ---
 
-### 👨‍💻 راهنمای توسعه‌دهندگان
+### ⚙️ Usage
 
-اگر می‌خواهید پروژه را از سورس کد اجرا کرده یا فایل‌های اجرایی را خودتان بسازید، این راهنما برای شماست.
+The default language is **English**. You can switch to Persian (Farsi) by adding the `--lang fa` flag to any command.
 
-**۱. پیش‌نیازها**
-- [Node.js](https://nodejs.org/) (نسخه 20.x)
-- [Git](https://git-scm.com/)
+- **Show the help menu:**
+  ```bash
+  cmdgen --help
+  ```
 
-**۲. نصب و راه‌اندازی**
-```bash
-# 1. کلون کردن پروژه
-git clone [https://github.com/amirhosseinyavari021/ay-cmdgen.git](https://github.com/amirhosseinyavari021/ay-cmdgen.git)
-cd ay-cmdgen
+- **Generate a new command:**
+  ```bash
+  # English request (default)
+  cmdgen g "how to find all files larger than 100MB"
 
-# 2. نصب تمام وابستگی‌ها
-npm install
+  # Persian request (using the language flag)
+  cmdgen g "چطور فایل‌های بزرگتر از ۱۰۰ مگابایت را پیدا کنم" --lang fa
+  ```
 
-# 3. ساخت نسخه وب (برای سرور)
-npm run build
+- **Analyze a command:**
+  ```bash
+  cmdgen a "tar -czvf archive.tar.gz /path/to/dir"
+  ```
 
-# 4. ایجاد فایل .env برای کلید API
-echo 'API_KEY="YOUR_OPENROUTER_API_KEY_HERE"' > .env
-
-# 5. اجرای سرور محلی
-npm start
-```
-
-**۳. ساخت فایل‌های اجرایی (Release)**
-برای ساخت فایل‌های اجرایی برای هر سه پلتفرم، دستور زیر را اجرا کنید:
-```bash
-npm run release
-```
-فایل‌های خروجی در پوشه `dist` ساخته می‌شوند.
+- **Debug an error:**
+  ```bash
+  cmdgen e "command not found: docker"
+  ```
 
 ---
 
-### 📜 لایسنس
+### 💻 Web Version
 
-این پروژه تحت لایسنس MIT منتشر شده است. برای جزئیات بیشتر به فایل [LICENSE](LICENSE) مراجعه کنید.
+If you prefer a graphical interface, you can use the web version without any installation:
+- **[https://cmdgen.onrender.com](https://cmdgen.onrender.com)**
+
+---
+
+### 👨‍💻 Developer's Guide
+
+If you want to contribute or build the executables yourself:
+
+1.  **Clone the project:** `git clone https://github.com/amirhosseinyavari021/ay-cmdgen.git`
+2.  **Install dependencies:** `cd ay-cmdgen && npm install`
+3.  **Build the executables:** `npm run release`
+    - The output files will be in the `dist` folder.
+
+To publish a new version, upload the generated executables from the `dist` folder to a new **Release** on GitHub. The installation script automatically fetches the latest release.
+
+---
+
+### 📜 License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
