@@ -40,7 +40,7 @@ const showBanner = () => {
 };
 
 // --- Server Management (Robust Version) ---
-const serverPort = process.env.PORT || 3001; // Use 3001 for local CLI
+const serverPort = 3001;
 const serverHost = '127.0.0.1'; // Always connect to local server via IPv4
 const serverCheckUrl = `http://${serverHost}:${serverPort}/api/health`;
 
