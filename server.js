@@ -92,8 +92,10 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(staticPath, 'index.html'));
 });
 
-// Server Start, listening on IPv4
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, '127.0.0.1', () => {
-  console.log(`Server running on http://127.0.0.1:${PORT}`);
+// Server Start, listening on 0.0.0.0 for Render compatibility
+const PORT = process.env.PORT || 10000; // Render provides the PORT env var
+const HOST = '0.0.0.0';
+
+app.listen(PORT, HOST, () => {
+  console.log(`Server running on http://${HOST}:${PORT}`);
 });
