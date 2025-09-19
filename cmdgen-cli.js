@@ -6,12 +6,11 @@ const axios = require('axios');
 const { spawn, exec } = require('child_process');
 const { TextDecoder } = require('util');
 const path = require('path');
-const { getSystemPrompt } = require('./client/src/api/apiService');
-const { parseAndConstructData } = require('./client/src/utils/responseParser');
+const { getSystemPrompt } = require('./apiService-cli.js'); // <--
+const { parseAndConstructData } = require('./responseParser-cli.js'); // <--
 const packageJson = require('./package.json');
 const readline = require('readline');
 
-// --- Banner and Info ---
 const showBanner = () => {
     const banner = `
       /$$      /$$ /$$$$$$$$ /$$         /$$$$$$   /$$$$$$  /$$      /$$ /$$$$$$$$        /$$$$$$  /$$      /$$ /$$$$$$$   /$$$$$$  /$$$$$$$$ /$$   /$$
