@@ -1,11 +1,11 @@
 # --- Configuration ---
 $GithubRepo = "amirhosseinyavari021/ay-cmdgen"
-$InstallDir = "$env:ProgramFiles\cmdgen"
+$InstallDir = "$env:ProgramFiles\AY-CMDGEN"
 $ExeName = "cmdgen.exe"
 $ReleaseAsset = "cmdgen-win.exe"
 
 # --- Main Logic ---
-Write-Host "Installing CMDGEN for Windows..." -ForegroundColor Cyan
+Write-Host "Installing AY-CMDGEN for Windows..." -ForegroundColor Cyan
 
 # 1. Get the latest release URL
 $LatestReleaseUrl = "https://github.com/$GithubRepo/releases/latest/download/$ReleaseAsset"
@@ -13,7 +13,7 @@ $DownloadPath = "$env:TEMP\$ReleaseAsset"
 
 Write-Host "Downloading the latest version from: $LatestReleaseUrl"
 try {
-    Invoke-WebRequest -Uri $LatestReleaseUrl -OutFile $DownloadPath
+    Invoke-WebRequest -Uri $LatestReleaseUrl -OutFile $DownloadPath -UseBasicParsing
 } catch {
     Write-Host "Error: Download failed. Please check your internet connection or the release page on GitHub." -ForegroundColor Red
     exit 1
@@ -43,5 +43,5 @@ try {
     exit 1
 }
 
-Write-Host "✅ CMDGEN was installed successfully!" -ForegroundColor Green
+Write-Host "✅ AY-CMDGEN was installed successfully!" -ForegroundColor Green
 Write-Host "Open a new terminal and try running: cmdgen --help"
