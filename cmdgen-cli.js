@@ -39,35 +39,51 @@ const showBanner = () => {
     console.log('  Type "cmdgen --help" for a list of commands.\n');
 };
 
-// --- Server Management ---
+// --- Server Management (Robust Version) ---
 const serverPort = 3001;
 const serverCheckUrl = `http://localhost:${serverPort}/api/health`;
 
-const isServerRunning = async () => {
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+const ensureServerIsRunning = async () => {
     try {
         await axios.get(serverCheckUrl, { timeout: 500 });
-        return true;
+        return true; // Server is already running
     } catch (error) {
-        return false;
+        // Server is not running, let's start it
+        console.log('⏳ No local server found. Starting server in the background...');
+        const serverPath = process.pkg ? path.join(path.dirname(process.execPath), 'server.js') : path.join(__dirname, 'server.js');
+        const serverProcess = spawn(process.execPath, [serverPath], {
+            detached: true,
+            stdio: 'ignore'
+        });
+        serverProcess.unref();
+
+        // Poll for the server to be ready
+        for (let i = 0; i < 10; i++) { // Try for 10 seconds
+            await delay(1000);
+            try {
+                await axios.get(serverCheckUrl, { timeout: 500 });
+                console.log('✅ Server started successfully.');
+                return true;
+            } catch (e) {
+                // Keep trying...
+            }
+        }
+        throw new Error("Could not connect to the AY-CMDGEN server. It may have failed to start.");
     }
 };
 
-const startServerInBackground = () => {
-    console.log('⏳ No local server found. Starting server in the background...');
-    const serverPath = process.pkg ? path.join(path.dirname(process.execPath), 'server.js') : path.join(__dirname, 'server.js');
-    const serverProcess = spawn(process.execPath, [serverPath], {
-        detached: true,
-        stdio: 'ignore'
-    });
-    serverProcess.unref();
-    return new Promise(resolve => setTimeout(resolve, 3000));
-};
 
 // --- Core API and Execution Functions ---
 const callApi = async ({ mode, userInput, os, osVersion, cli, lang }) => {
-    if (!await isServerRunning()) {
-        await startServerInBackground();
+    try {
+        await ensureServerIsRunning();
+    } catch (err) {
+        console.error(`\n❌ ${err.message}`);
+        return null;
     }
+    
     const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, {});
     const payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userInput }] };
     try {
@@ -96,11 +112,7 @@ const callApi = async ({ mode, userInput, os, osVersion, cli, lang }) => {
             response.data.on('error', (err) => reject(err));
         });
     } catch (err) {
-        if (err.code === 'ECONNREFUSED') {
-            console.error("\n❌ Error: Could not connect to the AY-CMDGEN server. It may have failed to start.");
-        } else {
-            console.error("\n❌ Error connecting to the server:", err.response ? err.response.data.error.message : err.message);
-        }
+        console.error("\n❌ Error communicating with the server:", err.response ? err.response.data.error.message : err.message);
         return null;
     }
 };
@@ -112,7 +124,7 @@ const promptForExecution = (command) => {
     rl.question(`Execute the following command?\n\n  \x1b[36m${command}\x1b[0m\n\n(y/N): `, (answer) => {
         if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
             console.log('🚀 Executing command...');
-            exec(command, { shell: process.env.SHELL }, (error, stdout, stderr) => {
+            exec(command, { shell: process.env.SHELL || true }, (error, stdout, stderr) => {
                 if (error) console.error(`\n❌ Execution error:\n${error.message}`);
                 if (stderr) console.warn(`\n⚠️ Standard Error:\n${stderr}`);
                 if (stdout) console.log(`\n✅ Standard Output:\n${stdout}`);
