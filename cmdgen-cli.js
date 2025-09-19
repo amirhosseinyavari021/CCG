@@ -2,7 +2,7 @@
 
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
-const axios = require('axios');
+const axios = require('axios/dist/node/axios.cjs'); // Explicit require for pkg compatibility
 const { spawn, exec } = require('child_process');
 const { TextDecoder } = require('util');
 const path = require('path');
