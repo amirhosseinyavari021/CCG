@@ -6,11 +6,12 @@ const axios = require('axios');
 const { spawn, exec } = require('child_process');
 const { TextDecoder } = require('util');
 const path = require('path');
-const { getSystemPrompt } = require('./apiService-cli.js'); // <--
-const { parseAndConstructData } = require('./responseParser-cli.js'); // <--
+const { getSystemPrompt } = require('./apiService-cli.js');
+const { parseAndConstructData } = require('./responseParser-cli.js');
 const packageJson = require('./package.json');
 const readline = require('readline');
 
+// --- Banner and Info ---
 const showBanner = () => {
     const banner = `
       /$$      /$$ /$$$$$$$$ /$$         /$$$$$$   /$$$$$$  /$$      /$$ /$$$$$$$$        /$$$$$$  /$$      /$$ /$$$$$$$   /$$$$$$  /$$$$$$$$ /$$   /$$
@@ -59,7 +60,7 @@ const startServerInBackground = () => {
         stdio: 'ignore'
     });
     serverProcess.unref();
-    return new Promise(resolve => setTimeout(resolve, 2500)); // Wait for the server to boot
+    return new Promise(resolve => setTimeout(resolve, 2500));
 };
 
 // --- Core API and Execution Functions ---
@@ -95,7 +96,11 @@ const callApi = async ({ mode, userInput, os, osVersion, cli, lang }) => {
             response.data.on('error', (err) => reject(err));
         });
     } catch (err) {
-        console.error("\n❌ Error connecting to the server:", err.response ? err.response.data.error.message : err.message);
+        if (err.code === 'ECONNREFUSED') {
+            console.error("\n❌ Error: Could not connect to the CMDGEN server. It may have failed to start.");
+        } else {
+            console.error("\n❌ Error connecting to the server:", err.response ? err.response.data.error.message : err.message);
+        }
         return null;
     }
 };
@@ -103,9 +108,8 @@ const callApi = async ({ mode, userInput, os, osVersion, cli, lang }) => {
 const promptForExecution = (command) => {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     console.log('\n');
-    const t = translations[argv.lang] || translations.en;
-    console.warn(`🚨 \x1b[33m${t.executionWarning}\x1b[0m`);
-    rl.question(`${t.executionPrompt}\n\n  \x1b[36m${command}\x1b[0m\n\n(y/N): `, (answer) => {
+    console.warn('🚨 \x1b[33mWARNING: Executing AI-generated commands can be dangerous. Always review the command carefully before running it.\x1b[0m');
+    rl.question(`Execute the following command?\n\n  \x1b[36m${command}\x1b[0m\n\n(y/N): `, (answer) => {
         if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
             console.log('🚀 Executing command...');
             exec(command, (error, stdout, stderr) => {
@@ -121,50 +125,63 @@ const promptForExecution = (command) => {
     });
 };
 
-// --- Yargs Command Parser ---
+// --- Yargs Command Parser (Corrected) ---
 const run = async () => {
     yargs(hideBin(process.argv))
         .scriptName("cmdgen")
         .usage('Usage: $0 <command> "[input]" [options]')
-        .command('generate <request>', 'Generate a command based on your request', {}, async (argv) => {
-            const result = await callApi({ mode: 'generate', userInput: argv.request, ...argv });
-            if (result && result.data.commands) {
-                result.data.commands.forEach((cmd, index) => {
-                    console.log(`\nSuggestion #${index + 1}:\n  \x1b[36m${cmd.command}\x1b[0m\n  └─ Explanation: ${cmd.explanation}`);
-                    if (cmd.warning) console.log(`     └─ \x1b[33mWarning: ${cmd.warning}\x1b[0m`);
-                });
-                if (result.data.commands.length > 0) promptForExecution(result.data.commands[0].command);
+        
+        .command(
+            ['generate <request>', 'g <request>'], 
+            'Generate a command based on your request', 
+            {}, 
+            async (argv) => {
+                const result = await callApi({ mode: 'generate', userInput: argv.request, ...argv });
+                if (result && result.data.commands) {
+                    result.data.commands.forEach((cmd, index) => {
+                        console.log(`\nSuggestion #${index + 1}:\n  \x1b[36m${cmd.command}\x1b[0m\n  └─ Explanation: ${cmd.explanation}`);
+                        if (cmd.warning) console.log(`     └─ \x1b[33mWarning: ${cmd.warning}\x1b[0m`);
+                    });
+                    if (result.data.commands.length > 0) promptForExecution(result.data.commands[0].command);
+                }
             }
-        })
-        .command('analyze <command>', 'Analyze and explain a command', {}, async (argv) => {
-            const result = await callApi({ mode: 'explain', userInput: argv.command, ...argv });
-            if (result) console.log(result.data.explanation);
-        })
-        .command('error <message>', 'Analyze an error message', {}, async (argv) => {
-            const userInput = `Error Message:\n${argv.message}` + (argv.context ? `\n\nContext:\n${argv.context}` : '');
-            const result = await callApi({ mode: 'error', userInput, ...argv });
-            if (result) {
-                console.log(`\nProbable Cause: ${result.data.cause}\n\nExplanation: ${result.data.explanation}\n\nSolution:`);
-                result.data.solution.forEach(step => console.log(`  - ${step}`));
+        )
+
+        .command(
+            ['analyze <command>', 'a <command>'], 
+            'Analyze and explain a command', 
+            {}, 
+            async (argv) => {
+                const result = await callApi({ mode: 'explain', userInput: argv.command, ...argv });
+                if (result) console.log(result.data.explanation);
             }
-        })
-        .alias('g', 'generate')
-        .alias('a', 'analyze')
-        .alias('e', 'error')
+        )
+
+        .command(
+            ['error <message>', 'e <message>'], 
+            'Analyze an error message', 
+            {}, 
+            async (argv) => {
+                const userInput = `Error Message:\n${argv.message}` + (argv.context ? `\n\nContext:\n${argv.context}` : '');
+                const result = await callApi({ mode: 'error', userInput, ...argv });
+                if (result) {
+                    console.log(`\nProbable Cause: ${result.data.cause}\n\nExplanation: ${result.data.explanation}\n\nSolution:`);
+                    result.data.solution.forEach(step => console.log(`  - ${step}`));
+                }
+            }
+        )
+        
         .option('context', { alias: 'c', describe: 'Provide additional context for error analysis', type: 'string' })
         .option('os', { describe: 'Target Operating System', type: 'string', default: 'linux' })
         .option('osVersion', { describe: 'Target OS Version', type: 'string', default: 'Ubuntu 24.04 LTS' })
         .option('shell', { describe: 'Target command-line shell', type: 'string', default: 'Bash' })
-        .option('lang', { 
-            describe: 'Set the response language (en, fa)', 
-            type: 'string', 
-            default: 'en' // <-- زبان پیش‌فرض به انگلیسی تغییر کرد
-        })
-        .demandCommand(1, 'You must provide one of the main commands: generate, analyze, or error.')
+        .option('lang', { describe: 'Set the response language (en, fa)', type: 'string', default: 'en' })
+        .demandCommand(1, 'You must provide one of the main commands.')
         .help('h').alias('h', 'help')
         .version('v', 'Show version number', `CMDGEN version: ${packageJson.version}`).alias('v', 'version')
-        .strict().wrap(null)
-        .check((argv, options) => {
+        .strict()
+        .wrap(null)
+        .check((argv) => {
             if (argv._.length === 0 && !argv.h && !argv.v) {
                 showBanner();
             }
