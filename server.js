@@ -25,7 +25,7 @@ const limiter = rateLimit({
 
 app.use('/api/', limiter);
 
-// Health check endpoint for the CLI to verify if the server is running
+// Health check endpoint
 app.get('/api/health', (req, res) => {
   res.status(200).send('OK');
 });
@@ -81,8 +81,7 @@ app.post('/api/proxy', async (req, res) => {
   }
 });
 
-// --- Static File Serving (Corrected for pkg) ---
-// This determines the correct path whether running from source or in a packaged executable
+// Corrected Static File Serving for pkg
 const staticPath = process.pkg
   ? path.join(path.dirname(process.execPath), 'client/build')
   : path.join(__dirname, 'client/build');
@@ -93,7 +92,7 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(staticPath, 'index.html'));
 });
 
-// --- Server Start ---
+// Server Start, listening on IPv4
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`Server running on http://127.0.0.1:${PORT}`);
