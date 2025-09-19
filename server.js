@@ -9,43 +9,60 @@ app.use(express.json());
 
 const modelName = 'openai/gpt-oss-20b:free';
 
-// --- Rate Limiter Configuration ---
+// Rate Limiter
 const limiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: { code: 'TOO_MANY_REQUESTS', message: 'You have sent too many requests...' } }
+  message: {
+    error: {
+      code: 'TOO_MANY_REQUESTS',
+      message: 'You have sent too many requests in a short period. Please wait a moment before trying again.'
+    }
+  }
 });
+
 app.use('/api/', limiter);
 
-// --- API Endpoints ---
-app.get('/api/health', (req, res) => res.status(200).send('OK'));
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).send('OK');
+});
 
 app.post('/api/proxy', async (req, res) => {
   try {
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
-      return res.status(500).json({ error: { code: 'NO_API_KEY', message: 'The server API key is not configured.' } });
+      console.error('CRITICAL: API_KEY is not configured.');
+      return res.status(500).json({
+        error: { code: 'NO_API_KEY', message: 'The server API key is not configured.' }
+      });
     }
+
     const { messages } = req.body;
     if (!messages) {
-      return res.status(400).json({ error: { code: 'INVALID_PAYLOAD', message: 'Request payload is missing "messages" field.' } });
+      return res.status(400).json({
+        error: { code: 'INVALID_PAYLOAD', message: 'Request payload is missing "messages" field.' }
+      });
     }
+
     const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
     const payload = { model: modelName, messages, stream: true };
+
     const apiResponse = await axios.post(openRouterUrl, payload, {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'HTTP-Referer': 'https://cmdgen.onrender.com',
-        'X-Title': 'CMDGEN',
+        'X-Title': 'AY-CMDGEN',
       },
       responseType: 'stream'
     });
+
     res.setHeader('Content-Type', 'text/event-stream');
     apiResponse.data.pipe(res);
+
   } catch (error) {
-    // Error handling logic
     if (error.response) {
       const { status, data } = error.response;
       console.error(`Error from OpenRouter: Status ${status}`, data);
@@ -67,15 +84,14 @@ app.post('/api/proxy', async (req, res) => {
   }
 });
 
-// --- Static File Serving (Corrected for pkg) ---
-// This determines the correct path whether running from source or in a packaged executable
+// Corrected Static File Serving for pkg
 const staticPath = process.pkg ? path.join(path.dirname(process.execPath), 'client/build') : path.join(__dirname, 'client/build');
 app.use(express.static(staticPath));
 app.get('*', (req, res) => {
   res.sendFile(path.join(staticPath, 'index.html'));
 });
 
-// --- Server Start ---
+// Server Start
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT} using model: ${modelName}`);
