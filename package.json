@@ -1,6 +1,6 @@
 {
-  "name": "cmdgen",
-  "version": "1.6.0",
+  "name": "ay-cmdgen",
+  "version": "1.2.0",
   "description": "Your Intelligent Command-Line Assistant",
   "license": "(MIT OR Apache-2.0)",
   "author": "Amirhossein Yavari",
@@ -10,7 +10,7 @@
   },
   "scripts": {
     "start": "node server.js",
-    "build": "cd client && npm install && REACT_APP_VERSION=$npm_package_version npm run build",
+    "build": "cd client && npm install && cross-env REACT_APP_VERSION=$npm_package_version npm run build",
     "pkg:linux": "pkg . --targets latest-linux-x64 --output dist/cmdgen-linux",
     "pkg:win": "pkg . --targets latest-win-x64 --output dist/cmdgen-win.exe",
     "pkg:macos": "pkg . --targets latest-macos-x64 --output dist/cmdgen-macos",
@@ -28,6 +28,7 @@
     "yargs": "^17.7.2"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "pkg": "^5.8.1"
   },
   "pkg": {
