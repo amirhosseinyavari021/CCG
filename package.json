@@ -32,7 +32,10 @@
   },
   "pkg": {
     "assets": [
-      "client/build/**/*"
+      "client/build/**/*",
+      "node_modules/axios/dist/**/*",
+      "apiService-cli.js",
+      "responseParser-cli.js"
     ]
   }
 }
