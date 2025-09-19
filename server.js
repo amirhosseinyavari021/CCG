@@ -82,9 +82,7 @@ app.post('/api/proxy', async (req, res) => {
 });
 
 // Corrected Static File Serving for pkg
-const staticPath = process.pkg
-  ? path.join(path.dirname(process.execPath), 'client/build')
-  : path.join(__dirname, 'client/build');
+const staticPath = path.join(__dirname, 'client/build');
 
 app.use(express.static(staticPath));
 
@@ -92,8 +90,8 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(staticPath, 'index.html'));
 });
 
-// Server Start, listening on 0.0.0.0 for Render compatibility
-const PORT = process.env.PORT || 10000; // Render provides the PORT env var
+// Server Start, listening on 0.0.0.0 for Render and CLI compatibility
+const PORT = process.env.PORT || 3001;
 const HOST = '0.0.0.0';
 
 app.listen(PORT, HOST, () => {
