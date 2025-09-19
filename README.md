@@ -1,68 +1,108 @@
-CMDGEN - Your Intelligent Command-Line Assistant
-CMDGEN is a smart web-based tool designed to help developers, system administrators, and new users work effortlessly with the command line. This project was created to simplify the complex processes of generating, explaining, and scripting terminal commands.
+# CMDGEN - دستیار هوشمند خط فرمان شما
 
-This project was created by Amirhossein Yavari, a young ITman and ITlover and ITlearner passionate about IT and building useful, practical tools.
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-✨ Key Features
-CMDGEN offers three core, powerful features to its users:
+CMDGEN یک ابزار هوشمند است که به شما کمک می‌کند تا دستورات خط فرمان (CLI) را به سادگی تولید، تحلیل و اشکال‌زدایی کنید. این پروژه دارای دو نسخه **وب اپلیکیشن** و **ابزار خط فرمان (CLI)** مستقل است.
 
-Generate Commands:
+✨ **ویژگی‌های کلیدی**
+- **تولید دستور:** نیاز خود را به زبان فارسی یا انگلیسی بنویسید و دستورات دقیق و کاربردی تحویل بگیرید.
+- **تحلیل دستور:** هر دستوری که برایتان نامفهوم است را وارد کنید تا CMDGEN آن را به زبان ساده برایتان توضیح دهد.
+- **اشکال‌زدایی:** پیام‌های خطا را وارد کنید تا علت احتمالی و راه‌حل‌های قدم‌به‌قدم را دریافت کنید.
+- **اجرای مستقیم:** در نسخه CLI، می‌توانید دستورات تولید شده را بلافاصله و با اجازه خودتان اجرا کنید.
+- **پشتیبانی دو زبانه:** رابط کاربری و پاسخ‌های هوش مصنوعی به دو زبان فارسی و انگلیسی در دسترس است.
 
-Describe your needs in plain English or Persian (e.g., "how to find and delete all log files larger than 100MB?").
+---
 
-CMDGEN understands your request and provides accurate, real-world command-line instructions with clear explanations.
+### 🚀 شروع سریع
 
-It also includes a feature to request more command variations for the same query.
+ساده‌ترین راه برای استفاده از CMDGEN، مراجعه به نسخه وب است. اما اگر می‌خواهید از قدرت کامل آن در ترمینال خود بهره‌مند شوید، نسخه CLI را نصب کنید.
 
-Explain Commands:
+#### روش ۱: استفاده از نسخه وب
+بدون نیاز به نصب، مستقیماً از طریق مرورگر خود به آدرس زیر مراجعه کنید:
+- **[https://cmdgen.onrender.com](https://cmdgen.onrender.com)** (این لینک پس از استقرار فعال می‌شود)
 
-Enter any command-line instruction that is unclear to you.
+#### روش ۲: نصب ابزار خط فرمان (CLI)
 
-CMDGEN breaks it down into smaller parts and explains each component in simple, easy-to-understand language.
+این روش به شما اجازه می‌دهد `cmdgen` را مانند هر دستور دیگری (مثل `git` یا `ls`) در ترمینال خود اجرا کنید.
 
-This feature is excellent for deeply learning commands and understanding their functionality.
+**۱. دانلود**
+- به صفحه **[Releases](https://github.com/amirhosseinyavari021/ay-cmdgen/releases)** پروژه بروید.
+- آخرین نسخه را پیدا کرده و فایل اجرایی مخصوص سیستم‌عامل خود را دانلود کنید:
+  - `cmdgen-linux` برای لینوکس
+  - `cmdgen-macos` برای مک
+  - `cmdgen-win.exe` برای ویندوز
 
-Create Scripts:
+**۲. نصب**
+برای اینکه بتوانید از هر جایی در ترمینال به `cmdgen` دسترسی داشته باشید، مراحل زیر را انجام دهید:
 
-Describe a task you want to automate (e.g., "write a script that backs up my database and compresses it").
+- **برای لینوکس و مک:**
+  1. ترمینال را باز کنید.
+  2. به فایلی که دانلود کرده‌اید، دسترسی اجرایی بدهید:
+     ```bash
+     chmod +x /path/to/downloaded/cmdgen-linux
+     ```
+  3. آن را به یک مسیر سراسری منتقل کنید:
+     ```bash
+     sudo mv /path/to/downloaded/cmdgen-linux /usr/local/bin/cmdgen
+     ```
 
-CMDGEN generates a complete, clean, and executable script (in sh, bat, or ps1 format) for you.
+- **برای ویندوز:**
+  1. فایل `cmdgen-win.exe` را به یک پوشه دلخواه (مثلاً `C:\Program Files\cmdgen`) منتقل کنید.
+  2. نام فایل را به `cmdgen.exe` تغییر دهید.
+  3. آدرس آن پوشه را به متغیرهای محیطی سیستم (Environment Variables) در بخش `Path` اضافه کنید.
 
-The generated scripts include error handling and prerequisite checks to ensure they run reliably.
+**۳. استفاده**
+نصب تمام شد! ترمینال خود را باز کرده و امتحان کنید:
 
-Error Analysis:
+```bash
+# نمایش راهنما
+cmdgen --help
 
-If you run a command and encounter an error, you can paste the error message into this section.
+# تولید یک دستور برای فشرده‌سازی یک پوشه
+cmdgen g "compress my 'photos' folder into a file named photos.zip"
 
-CMDGEN will explain the probable cause of the error and provide step-by-step solutions to fix it.
+# تحلیل یک دستور
+cmdgen a "curl -O [https://example.com/file.txt](https://example.com/file.txt)"
+```
 
-🚀 Technology Stack
-This project is built with a modern and efficient technology stack:
+---
 
-Frontend (Client):
+### 👨‍💻 راهنمای توسعه‌دهندگان
 
-React: For building a dynamic and modern user interface.
+اگر می‌خواهید پروژه را از سورس کد اجرا کرده یا فایل‌های اجرایی را خودتان بسازید، این راهنما برای شماست.
 
-Tailwind CSS: For rapid, responsive UI design.
+**۱. پیش‌نیازها**
+- [Node.js](https://nodejs.org/) (نسخه 20.x)
+- [Git](https://git-scm.com/)
 
-Lucide React: For beautiful and lightweight icons.
+**۲. نصب و راه‌اندازی**
+```bash
+# 1. کلون کردن پروژه
+git clone [https://github.com/amirhosseinyavari021/ay-cmdgen.git](https://github.com/amirhosseinyavari021/ay-cmdgen.git)
+cd ay-cmdgen
 
-Axios: For making API requests to the server.
+# 2. نصب تمام وابستگی‌ها
+npm install
 
-Framer Motion: For creating engaging animations.
+# 3. ساخت نسخه وب (برای سرور)
+npm run build
 
-Backend (Server):
+# 4. ایجاد فایل .env برای کلید API
+echo 'API_KEY="YOUR_OPENROUTER_API_KEY_HERE"' > .env
 
-Node.js: The server-side runtime environment.
+# 5. اجرای سرور محلی
+npm start
+```
 
-Express.js: The web framework for building the API.
+**۳. ساخت فایل‌های اجرایی (Release)**
+برای ساخت فایل‌های اجرایی برای هر سه پلتفرم، دستور زیر را اجرا کنید:
+```bash
+npm run release
+```
+فایل‌های خروجی در پوشه `dist` ساخته می‌شوند.
 
-Artificial Intelligence (AI):
+---
 
-The project connects to Large Language Models (LLMs) via a proxy server through OpenRouter.ai to generate intelligent and accurate responses.
+### 📜 لایسنس
 
-🌐 Bilingual Support
-CMDGEN fully supports both English and Persian (Farsi). The entire user interface and the AI-generated responses are tailored to the user's selected language.
-
-👨‍💻 About the Creator
-I'm Amirhossein Yavari, born in 2008, and I'm passionate about the IT world. I built CMDGEN with love and dedication to simplify the daily challenges of working with the command line for everyone, from beginners to experts.
+این پروژه تحت لایسنس MIT منتشر شده است. برای جزئیات بیشتر به فایل [LICENSE](LICENSE) مراجعه کنید.
