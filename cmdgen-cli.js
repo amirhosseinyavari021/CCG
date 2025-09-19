@@ -24,13 +24,13 @@ const showBanner = () => {
      |__/     \\__/|________/|________/ \\______/  \\______/ |__/    |__/|________/        \\______/ |__/    |__/|_______/  \\______/ |________/|__/  \\__/
                                                                                                                                                  
                                                                                                                                                  
-                                                                /$$$$$$  /$$     /$$
-                                                               /$$__  $$|  $$   /$$/
-                                                              | $$  \\ $$ \\  $$ /$$/
-                                                              | $$$$$$$$  \\  $$$$/
-                                                              | $$__  $$   \\  $$/
-                                                              | $$  | $$    | $$
-                                                              | $$  | $$    | $$
+                                                                /$$$$$$  /$$     /$$                                                              
+                                                               /$$__  $$|  $$   /$$/                                                              
+                                                              | $$  \\ $$ \\  $$ /$$/                                                               
+                                                              | $$$$$$$$  \\  $$$$/                                                                
+                                                              | $$__  $$   \\  $$/                                                                 
+                                                              | $$  | $$    | $$                                                                  
+                                                              | $$  | $$    | $$                                                                  
                                                               |__/  |__/    |__/
     `;
     console.log('\x1b[36m%s\x1b[0m', banner);
@@ -41,8 +41,7 @@ const showBanner = () => {
 
 // --- Server Management (Robust Version) ---
 const serverPort = 3001;
-// Use explicit IPv4 loopback address to avoid ambiguity with IPv6 (::1)
-const serverHost = '127.0.0.1';
+const serverHost = '127.0.0.1'; // Use explicit IPv4 loopback
 const serverCheckUrl = `http://${serverHost}:${serverPort}/api/health`;
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -50,9 +49,8 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const ensureServerIsRunning = async () => {
     try {
         await axios.get(serverCheckUrl, { timeout: 500 });
-        return true; // Server is already running
+        return true;
     } catch (error) {
-        // Server is not running, let's start it
         console.log('⏳ No local server found. Starting server in the background...');
         const serverPath = process.pkg ? path.join(path.dirname(process.execPath), 'server.js') : path.join(__dirname, 'server.js');
         const serverProcess = spawn(process.execPath, [serverPath], {
@@ -61,15 +59,14 @@ const ensureServerIsRunning = async () => {
         });
         serverProcess.unref();
 
-        // Poll for the server to be ready
-        for (let i = 0; i < 10; i++) { // Try for 10 seconds
+        for (let i = 0; i < 10; i++) { // Poll for 10 seconds
             await delay(1000);
             try {
                 await axios.get(serverCheckUrl, { timeout: 500 });
                 console.log('✅ Server started successfully.');
                 return true;
             } catch (e) {
-                // Keep trying...
+                // Keep trying
             }
         }
         throw new Error("Could not connect to the AY-CMDGEN server. It may have failed to start.");
