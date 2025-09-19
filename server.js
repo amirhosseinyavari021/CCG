@@ -25,7 +25,7 @@ const limiter = rateLimit({
 
 app.use('/api/', limiter);
 
-// Health check endpoint
+// Health check endpoint for the CLI to verify if the server is running
 app.get('/api/health', (req, res) => {
   res.status(200).send('OK');
 });
@@ -65,18 +65,15 @@ app.post('/api/proxy', async (req, res) => {
   } catch (error) {
     if (error.response) {
       const { status, data } = error.response;
-      console.error(`Error from OpenRouter: Status ${status}`, data);
       const serverMessage = data?.error?.message || 'An unknown error from the AI provider.';
       return res.status(status).json({
         error: { code: `AI_PROVIDER_ERROR_${status}`, message: serverMessage }
       });
     } else if (error.request) {
-      console.error('Network Error: No response from OpenRouter.', error.message);
       return res.status(500).json({
         error: { code: 'NETWORK_ERROR', message: 'The server could not connect to the AI provider.' }
       });
     } else {
-      console.error('Generic Proxy Error:', error.message);
       return res.status(500).json({
         error: { code: 'INTERNAL_SERVER_ERROR', message: 'An internal server error occurred.' }
       });
@@ -84,15 +81,20 @@ app.post('/api/proxy', async (req, res) => {
   }
 });
 
-// Corrected Static File Serving for pkg
-const staticPath = process.pkg ? path.join(path.dirname(process.execPath), 'client/build') : path.join(__dirname, 'client/build');
+// --- Static File Serving (Corrected for pkg) ---
+// This determines the correct path whether running from source or in a packaged executable
+const staticPath = process.pkg
+  ? path.join(path.dirname(process.execPath), 'client/build')
+  : path.join(__dirname, 'client/build');
+
 app.use(express.static(staticPath));
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(staticPath, 'index.html'));
 });
 
-// Server Start
+// --- Server Start ---
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT} using model: ${modelName}`);
+app.listen(PORT, '127.0.0.1', () => {
+  console.log(`Server running on http://127.0.0.1:${PORT}`);
 });
