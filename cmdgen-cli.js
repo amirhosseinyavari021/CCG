@@ -18,7 +18,7 @@ const { getSystemPrompt } = require('./apiService-cli.js');
 const { parseAndConstructData } = require('./responseParser-cli.js');
 const packageJson = require('./package.json');
 const readline = require('readline');
-const { app } = require('./server.js');
+// const { app } = require('./server.js'); // این خط دیگر لازم نیست
 
 // --- OS & System Info Detection (Final, Reliable Version without WMIC) ---
 const getSystemInfo = () => {
@@ -30,8 +30,6 @@ const getSystemInfo = () => {
     if (platform === 'win32') {
         detectedOS = 'windows';
         detectedVersion = os.release();
-        // This is a modern and reliable way to detect the shell.
-        // PowerShell sets this environment variable, but CMD does not.
         if (process.env.PSModulePath) {
             detectedShell = 'PowerShell';
         } else {
@@ -73,9 +71,10 @@ const showBanner = () => {
 };
 
 // --- Server Management ---
-const serverPort = 3003;
-const serverHost = '127.0.0.1';
-const serverUrl = `http://${serverHost}:${serverPort}`;
+// <<<<<<<<<<<<<<<<< START OF IMPORTANT CHANGE >>>>>>>>>>>>>>>>>
+// آدرس سرور را مستقیماً اینجا وارد می‌کنیم
+const serverUrl = 'https://ay-cmdgen-cli.onrender.com';
+// <<<<<<<<<<<<<<<<<< END OF IMPORTANT CHANGE >>>>>>>>>>>>>>>>>>
 
 // --- Core API ---
 const callApi = async ({ mode, userInput, os, osVersion, cli, lang, options = {} }) => {
@@ -168,8 +167,11 @@ const executeCommand = (command) => {
 const run = async () => {
     try {
         const { detectedOS, detectedVersion, detectedShell } = getSystemInfo();
-        let server = app.listen(serverPort, serverHost);
-        server.unref();
+        // <<<<<<<<<<<<<<<<< IMPORTANT CHANGE >>>>>>>>>>>>>>>>>
+        // این بخش دیگر لازم نیست چون سرور روی Render است
+        // let server = app.listen(serverPort, serverHost);
+        // server.unref();
+        // <<<<<<<<<<<<<<<<<< END OF IMPORTANT CHANGE >>>>>>>>>>>>>>>>>>
 
         const parser = yargs(hideBin(process.argv))
             .scriptName("cmdgen")
