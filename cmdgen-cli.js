@@ -1,11 +1,20 @@
-#!/usr-bin/env node
+#!/usr/bin/env node
+
+// --- DOTENV SETUP (MUST BE AT THE VERY TOP) ---
+const path = require('path');
+// This logic ensures the .env file is read from the correct location,
+// both in development and in the packaged executable.
+const envPath = process.pkg
+  ? path.join(path.dirname(process.execPath), '.env')
+  : path.join(__dirname, '.env');
+require('dotenv').config({ path: envPath });
+// --- END DOTENV SETUP ---
 
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
 const axios = require('axios/dist/node/axios.cjs');
 const { exec } = require('child_process');
 const { TextDecoder } = require('util');
-const path = require('path');
 const { getSystemPrompt } = require('./apiService-cli.js');
 const { parseAndConstructData } = require('./responseParser-cli.js');
 const packageJson = require('./package.json');
@@ -37,18 +46,6 @@ const serverUrl = `http://${serverHost}:${serverPort}`;
 
 // --- Core API and Execution Functions ---
 const callApi = async ({ mode, userInput, os, osVersion, cli, lang }) => {
-    // Dynamically load dotenv only when running in the packaged app
-    if (process.pkg) {
-        try {
-            require('dotenv').config({ path: path.join(path.dirname(process.execPath), '.env') });
-        } catch (e) {
-            console.error('\n❌ Error: Could not load the .env file. Make sure it exists next to the executable.');
-            return null;
-        }
-    } else {
-        require('dotenv').config();
-    }
-
     const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, {});
     const payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userInput }] };
     try {
@@ -76,14 +73,8 @@ const callApi = async ({ mode, userInput, os, osVersion, cli, lang }) => {
             response.data.on('error', (err) => reject(err));
         });
     } catch (err) {
-        let errorMessage = "An unknown error occurred.";
-        if (err.code === 'ECONNREFUSED') {
-            errorMessage = `Connection refused. Could not connect to the internal server at ${serverUrl}.`;
-        } else if (err.response && err.response.data && err.response.data.error && err.response.data.error.message) {
-            errorMessage = err.response.data.error.message;
-        } else if (err.message) {
-            errorMessage = err.message;
-        }
+        // This improved error handling will now show the actual message from the server.
+        const errorMessage = err.response?.data?.error?.message || err.message || "An unknown error occurred.";
         console.error(`\n❌ Error: ${errorMessage}`);
         return null;
     }
@@ -114,12 +105,9 @@ const promptForExecution = (command) => {
 
 // --- Yargs Command Parser ---
 const run = async () => {
-    // Only start server if it's a pkg executable
-    let server = null;
-    if (process.pkg) {
-        server = app.listen(serverPort, serverHost);
-        server.unref(); // Prevents server from keeping the app alive
-    }
+    const server = app.listen(serverPort, serverHost);
+    // unref() allows the program to exit even if the server is still listening.
+    server.unref();
 
     const parser = yargs(hideBin(process.argv))
         .scriptName("cmdgen")
@@ -172,19 +160,22 @@ const run = async () => {
         .version('v', 'Show version number', `AY-CMDGEN version: ${packageJson.version}`).alias('v', 'version')
         .strict()
         .wrap(null)
-        .exitProcess(false);
+        // This ensures the process will exit after the command handler finishes.
+        .exitProcess(true)
+        .fail((msg, err) => {
+            if (err) {
+                console.error("\n❌ An unexpected error occurred:", err.message);
+            } else {
+                console.error(`\n❌ Error: ${msg}`);
+                parser.showHelp();
+            }
+            process.exit(1);
+        });
 
-    try {
-        const argv = await parser.parse();
-        if (argv._.length === 0 && !argv.h && !argv.v) {
-            showBanner();
-        }
-    } catch (err) {
-        // Yargs will print its own error message.
-    } finally {
-        if (server) {
-            server.close();
-        }
+    const argv = await parser.argv;
+    // Show banner if no command is given.
+    if (argv._.length === 0 && !argv.h && !argv.v) {
+        showBanner();
     }
 };
 
