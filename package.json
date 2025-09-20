@@ -35,14 +35,11 @@
   "pkg": {
     "scripts": [
       "cmdgen-cli.js",
-      "server.js",
       "apiService-cli.js",
-      "responseParser-cli.js",
-      "node_modules/axios/dist/node/axios.cjs"
+      "responseParser-cli.js"
     ],
     "assets": [
-      "client/build/**/*",
-      "node_modules/axios/dist/**/*",
+      "node_modules/axios/dist/node/axios.cjs",
       "node_modules/dotenv/**/*"
     ]
   }
