@@ -13,13 +13,13 @@ Open your terminal and run the command below. The script will automatically dete
 
 **For Linux & macOS:**
 ```bash
-curl -fsSL [https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.sh](https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.sh) | bash
+curl -fsSL https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.sh | bash
 ```
 *(You might be asked for your admin (sudo) password to install `cmdgen` globally.)*
 
 **For Windows (in PowerShell as Administrator):**
 ```powershell
-iwr [https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.ps1](https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.ps1) | iex
+iwr https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.ps1 | iex
 ```
 
 After the installation is complete, open a **new terminal window** and verify it by running `cmdgen --help`.
