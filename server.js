@@ -1,6 +1,6 @@
 const express = require('express');
 const path = require('path');
-const axios = require('axios/dist/node/axios.cjs'); // Explicit require for pkg compatibility
+const axios = require('axios/dist/node/axios.cjs');
 const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 
@@ -10,13 +10,17 @@ app.use(express.json());
 
 const modelName = 'openai/gpt-oss-20b:free';
 
-// --- Error Logging ---
 const logError = (error) => {
-    const logMessage = `[${new Date().toISOString()}] ${error.stack || error}\n`;
-    fs.appendFileSync('server_error.log', logMessage);
+    try {
+        const logDir = process.pkg ? path.dirname(process.execPath) : __dirname;
+        const logFile = path.join(logDir, 'server_error.log');
+        const logMessage = `[${new Date().toISOString()}] ${error.stack || error}\n`;
+        fs.appendFileSync(logFile, logMessage);
+    } catch (e) {
+        console.error("Failed to write to log file:", e);
+    }
 };
 
-// Rate Limiter
 const limiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
@@ -29,7 +33,6 @@ const limiter = rateLimit({
 
 app.use('/api/', limiter);
 
-// Health check endpoint
 app.get('/api/health', (req, res) => {
   res.status(200).send('OK');
 });
@@ -62,7 +65,7 @@ app.post('/api/proxy', async (req, res) => {
     apiResponse.data.pipe(res);
 
   } catch (error) {
-    logError(error); // Log the error to a file
+    logError(error);
     if (error.response) {
       const { status, data } = error.response;
       const serverMessage = data?.error?.message || 'An unknown error from the AI provider.';
@@ -75,14 +78,15 @@ app.post('/api/proxy', async (req, res) => {
   }
 });
 
-// Corrected Static File Serving for pkg
-const staticPath = process.pkg ? path.join(path.dirname(process.execPath), 'client/build') : path.join(__dirname, 'client/build');
+const staticPath = process.pkg
+  ? path.join(path.dirname(process.execPath), 'client/build')
+  : path.join(__dirname, 'client/build');
+
 app.use(express.static(staticPath));
 app.get('*', (req, res) => {
   res.sendFile(path.join(staticPath, 'index.html'));
 });
 
-// Server Start with robust error handling
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.RENDER ? '0.0.0.0' : '127.0.0.1';
 
@@ -95,7 +99,7 @@ try {
     process.exit(1);
 }
 
-process.on('uncaughtException', (err) => {
-    logError(err);
+process.on('uncaughtException', (err, origin) => {
+    logError(`Caught exception: ${err}\nException origin: ${origin}`);
     process.exit(1);
 });
