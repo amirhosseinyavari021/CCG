@@ -42,10 +42,8 @@ app.get('/api/health', (req, res) => {
 
 app.post('/api/proxy', async (req, res) => {
   try {
-    // API Key check is now moved inside the handler to run after dotenv.
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
-      // This error will now be correctly thrown if the .env file is missing or empty.
       throw new Error('CRITICAL: API_KEY is not configured. Make sure a .env file with your API_KEY is next to the executable.');
     }
 
@@ -92,5 +90,9 @@ process.on('uncaughtException', (err, origin) => {
     process.exit(1);
 });
 
-// Export the app
-module.exports = { app };
+// --- Start the server ---
+const PORT = process.env.PORT || 3003;
+
+app.listen(PORT, () => {
+  console.log(`Server is running and listening on port ${PORT}`);
+});
