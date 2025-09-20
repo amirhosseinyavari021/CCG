@@ -1,7 +1,6 @@
-// server.js (Final Version)
 const express = require('express');
 const path = require('path');
-const axios = require('axios/dist/node/axios.cjs');
+const axios = require('axios/dist/node/axios.cjs'); // Explicit require for pkg compatibility
 const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 
@@ -11,6 +10,7 @@ app.use(express.json());
 
 const modelName = 'openai/gpt-oss-20b:free';
 
+// --- Error Logging ---
 const logError = (error) => {
     try {
         const logDir = process.pkg ? path.dirname(process.execPath) : __dirname;
@@ -22,24 +22,31 @@ const logError = (error) => {
     }
 };
 
+// Rate Limiter
 const limiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: { code: 'TOO_MANY_REQUESTS', message: 'You have sent too many requests...' } }
+  message: {
+    error: { code: 'TOO_MANY_REQUESTS', message: 'You have sent too many requests...' }
+  }
 });
 
 app.use('/api/', limiter);
 
-app.get('/api/health', (req, res) => res.status(200).send('OK'));
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).send('OK');
+});
 
 app.post('/api/proxy', async (req, res) => {
   try {
-    // API Key check is now moved inside the handler
+    // API Key check is now moved inside the handler to run after dotenv.
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
-      throw new Error('CRITICAL: API_KEY is not configured or could not be read from .env file.');
+      // This error will now be correctly thrown if the .env file is missing or empty.
+      throw new Error('CRITICAL: API_KEY is not configured. Make sure a .env file with your API_KEY is next to the executable.');
     }
 
     const { messages } = req.body;
@@ -70,13 +77,20 @@ app.post('/api/proxy', async (req, res) => {
   }
 });
 
+// Corrected Static File Serving for pkg
 const staticPath = path.join(__dirname, 'client/build');
+
 app.use(express.static(staticPath));
-app.get('*', (req, res) => res.sendFile(path.join(staticPath, 'index.html')));
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(staticPath, 'index.html'));
+});
+
 
 process.on('uncaughtException', (err, origin) => {
     logError(`Caught exception: ${err}\nException origin: ${origin}`);
     process.exit(1);
 });
 
+// Export the app
 module.exports = { app };
