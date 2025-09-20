@@ -173,10 +173,9 @@ const executeCommand = (command) => {
 // --- Yargs Command Parser ---
 const run = async () => {
     try {
+        const { detectedOS, detectedVersion, detectedShell } = getSystemInfo();
         let server = app.listen(serverPort, serverHost);
         server.unref();
-
-        const { detectedOS, detectedVersion, detectedShell } = getSystemInfo();
 
         const parser = yargs(hideBin(process.argv))
             .scriptName("cmdgen")
@@ -195,15 +194,15 @@ const run = async () => {
                         const result = await callApi({ ...argv, options: { existingCommands: existing }, mode: 'generate' });
                         if (result && result.data.commands && result.data.commands.length > 0) {
                             currentCommands.push(...result.data.commands);
-                            handleSuggestions(result.data.commands);
+                            handleSuggestions(result.data.commands, true);
                         } else {
                             console.log("\nCouldn't fetch more suggestions.");
                             process.exit(0);
                         }
                     };
                     
-                    const handleSuggestions = (newSuggestions) => {
-                        newSuggestions.forEach((cmd, index) => {
+                    const handleSuggestions = (newSuggestions, isMore = false) => {
+                        newSuggestions.forEach((cmd) => {
                             const displayIndex = currentCommands.findIndex(c => c.command === cmd.command) + 1;
                             console.log(`\nSuggestion #${displayIndex}:\n  \x1b[36m${cmd.command}\x1b[0m\n  └─ Explanation: ${cmd.explanation}`);
                             if (cmd.warning) console.log(`     └─ \x1b[33mWarning: ${cmd.warning}\x1b[0m`);
@@ -227,6 +226,9 @@ const run = async () => {
                     if (initialResult && initialResult.data.commands && initialResult.data.commands.length > 0) {
                         currentCommands = initialResult.data.commands;
                         handleSuggestions(currentCommands);
+                    } else {
+                        // Ensure the process exits even if there are no results.
+                        process.exit(0);
                     }
                 }
             )
@@ -254,7 +256,7 @@ const run = async () => {
             .version('v', `Show version number: ${packageJson.version}`).alias('v', 'version')
             .strict()
             .wrap(null)
-            .exitProcess(true)
+            .exitProcess(false) // Let the script handle the exit
             .fail((msg, err) => {
                 if (err) console.error("\n❌ An unexpected error occurred:", err.message);
                 else {
@@ -264,12 +266,13 @@ const run = async () => {
                 process.exit(1);
             });
             
-        const argv = await parser.argv;
+        const argv = await parser.parse();
         if (argv._.length === 0 && !argv.h && !argv.v) {
             showBanner();
+            process.exit(0);
         }
     } catch (error) {
-        console.error("A critical error occurred during startup:", error.message);
+        console.error("\n❌ A critical error occurred during startup:", error.message);
         process.exit(1);
     }
 };
