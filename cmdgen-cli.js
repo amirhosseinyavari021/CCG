@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr-bin/env node
 
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
@@ -37,11 +37,22 @@ const serverUrl = `http://${serverHost}:${serverPort}`;
 
 // --- Core API and Execution Functions ---
 const callApi = async ({ mode, userInput, os, osVersion, cli, lang }) => {
+    // Dynamically load dotenv only when running in the packaged app
+    if (process.pkg) {
+        try {
+            require('dotenv').config({ path: path.join(path.dirname(process.execPath), '.env') });
+        } catch (e) {
+            console.error('\n❌ Error: Could not load the .env file. Make sure it exists next to the executable.');
+            return null;
+        }
+    } else {
+        require('dotenv').config();
+    }
+
     const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, {});
     const payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userInput }] };
     try {
-        const proxyUrl = `${serverUrl}/api/proxy`;
-        const response = await axios.post(proxyUrl, payload, { responseType: 'stream' });
+        const response = await axios.post(`${serverUrl}/api/proxy`, payload, { responseType: 'stream' });
         let fullContent = '';
         const decoder = new TextDecoder();
         return new Promise((resolve, reject) => {
@@ -59,41 +70,43 @@ const callApi = async ({ mode, userInput, os, osVersion, cli, lang }) => {
             });
             response.data.on('end', () => {
                 const finalData = parseAndConstructData(fullContent, mode, cli);
-                if (!finalData) reject(new Error("Parsing failed"));
+                if (!finalData) reject(new Error("Parsing failed: The AI response was empty or malformed."));
                 else resolve({ type: mode, data: finalData });
             });
             response.data.on('error', (err) => reject(err));
         });
     } catch (err) {
+        let errorMessage = "An unknown error occurred.";
         if (err.code === 'ECONNREFUSED') {
-             console.error(`\n❌ Error: Connection refused. Could not connect to the internal server at ${serverUrl}.`);
-        } else {
-            console.error("\n❌ Error communicating with the server:", err.response ? err.response.data.error.message : err.message);
+            errorMessage = `Connection refused. Could not connect to the internal server at ${serverUrl}.`;
+        } else if (err.response && err.response.data && err.response.data.error && err.response.data.error.message) {
+            errorMessage = err.response.data.error.message;
+        } else if (err.message) {
+            errorMessage = err.message;
         }
+        console.error(`\n❌ Error: ${errorMessage}`);
         return null;
     }
 };
 
 const promptForExecution = (command) => {
-    // Wrap readline in a promise to allow awaiting it
     return new Promise((resolve) => {
         const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
         console.log('\n');
         console.warn('🚨 \x1b[33mWARNING: Executing AI-generated commands can be dangerous. Always review the command carefully before running it.\x1b[0m');
         rl.question(`Execute the following command?\n\n  \x1b[36m${command}\x1b[0m\n\n(y/N): `, (answer) => {
+            rl.close();
             if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
                 console.log('🚀 Executing command...');
                 exec(command, { shell: process.env.SHELL || true }, (error, stdout, stderr) => {
                     if (error) console.error(`\n❌ Execution error:\n${error.message}`);
                     if (stderr) console.warn(`\n⚠️ Standard Error:\n${stderr}`);
                     if (stdout) console.log(`\n✅ Standard Output:\n${stdout}`);
-                    rl.close();
-                    resolve(); // Resolve the promise after execution
+                    resolve();
                 });
             } else {
                 console.log('Execution cancelled.');
-                rl.close();
-                resolve(); // Resolve the promise on cancellation
+                resolve();
             }
         });
     });
@@ -101,7 +114,12 @@ const promptForExecution = (command) => {
 
 // --- Yargs Command Parser ---
 const run = async () => {
-    const server = app.listen(serverPort, serverHost);
+    // Only start server if it's a pkg executable
+    let server = null;
+    if (process.pkg) {
+        server = app.listen(serverPort, serverHost);
+        server.unref(); // Prevents server from keeping the app alive
+    }
 
     const parser = yargs(hideBin(process.argv))
         .scriptName("cmdgen")
@@ -113,18 +131,15 @@ const run = async () => {
             {}, 
             async (argv) => {
                 const result = await callApi({ mode: 'generate', userInput: argv.request, ...argv });
-                if (result && result.data.commands) {
+                if (result && result.data.commands && result.data.commands.length > 0) {
                     result.data.commands.forEach((cmd, index) => {
                         console.log(`\nSuggestion #${index + 1}:\n  \x1b[36m${cmd.command}\x1b[0m\n  └─ Explanation: ${cmd.explanation}`);
                         if (cmd.warning) console.log(`     └─ \x1b[33mWarning: ${cmd.warning}\x1b[0m`);
                     });
-                    if (result.data.commands.length > 0) {
-                        await promptForExecution(result.data.commands[0].command);
-                    }
+                    await promptForExecution(result.data.commands[0].command);
                 }
             }
         )
-        // ... (other commands) ...
         .command(
             ['analyze <command>', 'a <command>'], 
             'Analyze and explain a command', 
@@ -134,7 +149,6 @@ const run = async () => {
                 if (result) console.log(result.data.explanation);
             }
         )
-
         .command(
             ['error <message>', 'e <message>'], 
             'Analyze an error message', 
@@ -157,17 +171,21 @@ const run = async () => {
         .help('h').alias('h', 'help')
         .version('v', 'Show version number', `AY-CMDGEN version: ${packageJson.version}`).alias('v', 'version')
         .strict()
-        .wrap(null);
+        .wrap(null)
+        .exitProcess(false);
 
-    const argv = await parser.argv;
-
-    // Show banner if no command is given
-    if (argv._.length === 0 && !argv.h && !argv.v) {
-        showBanner();
+    try {
+        const argv = await parser.parse();
+        if (argv._.length === 0 && !argv.h && !argv.v) {
+            showBanner();
+        }
+    } catch (err) {
+        // Yargs will print its own error message.
+    } finally {
+        if (server) {
+            server.close();
+        }
     }
-
-    // Close the server to allow the process to exit
-    server.close();
 };
 
 run();
