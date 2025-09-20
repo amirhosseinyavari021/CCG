@@ -1,8 +1,11 @@
 const express = require('express');
 const path = require('path');
-const axios = require('axios/dist/node/axios.cjs'); // Explicit require for pkg compatibility
+const axios = require('axios/dist/node/axios.cjs');
 const rateLimit = require('express-rate-limit');
 const fs = require('fs');
+
+// --- Context Awareness: Check if running inside a pkg executable ---
+const isPkg = typeof process.pkg !== 'undefined';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -10,16 +13,20 @@ app.use(express.json());
 
 const modelName = 'openai/gpt-oss-20b:free';
 
-// --- Error Logging ---
+// --- Error Logging (Now context-aware) ---
 const logError = (error) => {
-    try {
-        const logDir = process.pkg ? path.dirname(process.execPath) : __dirname;
-        const logFile = path.join(logDir, 'server_error.log');
-        const logMessage = `[${new Date().toISOString()}] ${error.stack || error}\n`;
-        fs.appendFileSync(logFile, logMessage);
-    } catch (e) {
-        console.error("Fatal: Could not write to log file.", e);
+    // IMPORTANT: Only write to a log file if NOT running in the packaged CLI.
+    if (!isPkg) {
+        try {
+            const logDir = __dirname;
+            const logFile = path.join(logDir, 'server_error.log');
+            const logMessage = `[${new Date().toISOString()}] ${error.stack || error}\n`;
+            fs.appendFileSync(logFile, logMessage);
+        } catch (e) {
+            console.error("Fatal: Could not write to log file.", e);
+        }
     }
+    // If inside pkg, the error will be handled by the CLI's error handling.
 };
 
 // Rate Limiter
@@ -42,13 +49,9 @@ app.get('/api/health', (req, res) => {
 
 app.post('/api/proxy', async (req, res) => {
   try {
-    // <<<<<<<<<<<<<<<<< START OF IMPORTANT CHANGE >>>>>>>>>>>>>>>>>
-    // Change the variable name to match your setting in Render
-    const apiKey = process.env.CLI_API_KEY; 
-    // <<<<<<<<<<<<<<<<<< END OF IMPORTANT CHANGE >>>>>>>>>>>>>>>>>>
-
+    const apiKey = process.env.CLI_API_KEY || process.env.API_KEY;
     if (!apiKey) {
-      throw new Error('CRITICAL: API_KEY is not configured. Make sure a .env file with your API_KEY is next to the executable.');
+      throw new Error('CRITICAL: API_KEY is not configured on the server.');
     }
 
     const { messages } = req.body;
@@ -79,24 +82,26 @@ app.post('/api/proxy', async (req, res) => {
   }
 });
 
-// Corrected Static File Serving for pkg
-const staticPath = path.join(__dirname, 'client/build');
-
-app.use(express.static(staticPath));
-
-app.get('*', (req, res) => {
-  res.sendFile(path.join(staticPath, 'index.html'));
-});
-
+// Serve static files only if not in pkg
+if (!isPkg) {
+    const staticPath = path.join(__dirname, 'client/build');
+    app.use(express.static(staticPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(staticPath, 'index.html'));
+    });
+}
 
 process.on('uncaughtException', (err, origin) => {
     logError(`Caught exception: ${err}\nException origin: ${origin}`);
-    process.exit(1);
+    if (!isPkg) {
+        process.exit(1);
+    }
 });
 
-// --- Start the server ---
-const PORT = process.env.PORT || 3003;
-
-app.listen(PORT, () => {
-  console.log(`Server is running and listening on port ${PORT}`);
-});
+// --- Start the server (Only if not in pkg) ---
+if (!isPkg) {
+    const PORT = process.env.PORT || 3003;
+    app.listen(PORT, () => {
+      console.log(`Server is running and listening on port ${PORT}`);
+    });
+}
