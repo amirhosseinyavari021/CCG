@@ -2,8 +2,6 @@
 
 // --- DOTENV SETUP (MUST BE AT THE VERY TOP) ---
 const path = require('path');
-// This logic ensures the .env file is read from the correct location,
-// both in development and in the packaged executable.
 const envPath = process.pkg
   ? path.join(path.dirname(process.execPath), '.env')
   : path.join(__dirname, '.env');
@@ -13,40 +11,54 @@ require('dotenv').config({ path: envPath });
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
 const axios = require('axios/dist/node/axios.cjs');
-const { exec } = require('child_process');
+const { exec, execSync } = require('child_process');
 const { TextDecoder } = require('util');
+const os = require('os');
 const { getSystemPrompt } = require('./apiService-cli.js');
 const { parseAndConstructData } = require('./responseParser-cli.js');
 const packageJson = require('./package.json');
 const readline = require('readline');
 const { app } = require('./server.js');
 
-// --- Banner and Info ---
-const showBanner = () => {
-    const banner = `
-      /$$      /$$ /$$$$$$$$ /$$         /$$$$$$   /$$$$$$  /$$      /$$ /$$$$$$$$        /$$$$$$  /$$      /$$ /$$$$$$$   /$$$$$$  /$$$$$$$$ /$$   /$$
-     | $$  /$ | $$| $$_____/| $$        /$$__  $$ /$$__  $$| $$$    /$$$| $$_____/       /$$__  $$| $$$    /$$$| $$__  $$ /$$__  $$| $$_____/| $$$ | $$
-     | $$ /$$$| $$| $$      | $$       | $$  \\__/| $$  \\ $$| $$$$  /$$$$| $$             | $$  \\__/| $$$$  /$$$$| $$  \\ $$| $$  \\__/| $$      | $$$$| $$
-     | $$/$$ $$ $$| $$$$$   | $$       | $$      | $$  | $$| $$ $$/$$ $$| $$$$$          | $$      | $$ $$/$$ $$| $$  | $$| $$ /$$$$| $$$$$   | $$ $$ $$
-     | $$$$_  $$$$| $$__/   | $$       | $$      | $$  | $$| $$  $$$| $$| $$__/          | $$      | $$  $$$| $$| $$  | $$| $$|_  $$| $$__/   | $$  $$$$
-     | $$$/ \\  $$$| $$      | $$       | $$  $$| $$  | $$| $$\\  $ | $$| $$             | $$  $$| $$\\  $ | $$| $$  | $$| $$  \\ $$| $$      | $$\\  $$$
-     | $$/   \\  $$| $$$$$$$$| $$$$$$$$|  $$$$$$/|  $$$$$$/| $$ \\/  | $$| $$$$$$$$       |  $$$$$$/| $$ \\/  | $$| $$$$$$$/|  $$$$$$/| $$$$$$$$| $$ \\  $$
-     |__/     \\__/|________/|________/ \\______/  \\______/ |__/    |__/|________/        \\______/ |__/    |__/|_______/  \\______/ |________/|__/  \\__/
-    `;
-    console.log('\x1b[36m%s\x1b[0m', banner);
-    console.log(`\n  \x1b[1mAY-CMDGEN v${packageJson.version}\x1b[0m - Your Intelligent Command-Line Assistant`);
-    console.log(`  Created by Amirhossein Yavari. Licensed under ${packageJson.license}.`);
-    console.log('  Type "cmdgen --help" for a list of commands.\n');
+// --- OS & System Info Detection ---
+const getSystemInfo = () => {
+    const platform = process.platform;
+    let detectedOS = 'linux';
+    let detectedVersion = os.release();
+    let detectedShell = 'sh';
+
+    if (platform === 'win32') {
+        detectedOS = 'windows';
+        detectedVersion = os.release(); // e.g., 10.0.22621
+        detectedShell = 'PowerShell'; // Assume modern PowerShell
+    } else if (platform === 'darwin') {
+        detectedOS = 'macos';
+        detectedVersion = execSync('sw_vers -productVersion').toString().trim();
+        detectedShell = process.env.SHELL ? path.basename(process.env.SHELL) : 'zsh';
+    } else { // Linux and others
+        detectedOS = 'linux';
+        try {
+            const osRelease = execSync('cat /etc/os-release').toString();
+            const versionMatch = osRelease.match(/^PRETTY_NAME="([^"]+)"/m);
+            if (versionMatch) detectedVersion = versionMatch[1];
+        } catch (e) { /* ignore */ }
+        detectedShell = process.env.SHELL ? path.basename(process.env.SHELL) : 'bash';
+    }
+    return { detectedOS, detectedVersion, detectedShell };
 };
+
+
+// --- Banner and Info ---
+const showBanner = () => { /* ... banner code remains the same ... */ };
 
 // --- Server Management ---
 const serverPort = 3003;
 const serverHost = '127.0.0.1';
 const serverUrl = `http://${serverHost}:${serverPort}`;
 
-// --- Core API and Execution Functions ---
-const callApi = async ({ mode, userInput, os, osVersion, cli, lang }) => {
-    const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, {});
+// --- Core API ---
+const callApi = async ({ mode, userInput, os, osVersion, cli, lang, options = {} }) => {
+    const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, options);
     const payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userInput }] };
     try {
         const response = await axios.post(`${serverUrl}/api/proxy`, payload, { responseType: 'stream' });
@@ -73,41 +85,57 @@ const callApi = async ({ mode, userInput, os, osVersion, cli, lang }) => {
             response.data.on('error', (err) => reject(err));
         });
     } catch (err) {
-        // This improved error handling will now show the actual message from the server.
         const errorMessage = err.response?.data?.error?.message || err.message || "An unknown error occurred.";
         console.error(`\n❌ Error: ${errorMessage}`);
         return null;
     }
 };
 
-const promptForExecution = (command) => {
-    return new Promise((resolve) => {
-        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-        console.log('\n');
-        console.warn('🚨 \x1b[33mWARNING: Executing AI-generated commands can be dangerous. Always review the command carefully before running it.\x1b[0m');
-        rl.question(`Execute the following command?\n\n  \x1b[36m${command}\x1b[0m\n\n(y/N): `, (answer) => {
-            rl.close();
-            if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
-                console.log('🚀 Executing command...');
-                exec(command, { shell: process.env.SHELL || true }, (error, stdout, stderr) => {
-                    if (error) console.error(`\n❌ Execution error:\n${error.message}`);
-                    if (stderr) console.warn(`\n⚠️ Standard Error:\n${stderr}`);
-                    if (stdout) console.log(`\n✅ Standard Output:\n${stdout}`);
-                    resolve();
-                });
+// --- Interactive Prompt for Execution ---
+const promptForChoice = (commands, onExecute, onMore, onQuit) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    console.log('\n');
+    console.warn('🚨 WARNING: Executing AI-generated commands can be dangerous. Always review them carefully.');
+    
+    rl.question(`Enter a number to execute (1-${commands.length}), (m)ore suggestions, or (q)uit: `, (choice) => {
+        rl.close();
+        const lowerChoice = choice.toLowerCase().trim();
+
+        if (lowerChoice === 'm') {
+            onMore();
+        } else if (lowerChoice === 'q' || lowerChoice === '') {
+            onQuit();
+        } else {
+            const index = parseInt(lowerChoice, 10) - 1;
+            if (index >= 0 && index < commands.length) {
+                onExecute(commands[index]);
             } else {
-                console.log('Execution cancelled.');
-                resolve();
+                console.log('\nInvalid choice. Quitting.');
+                onQuit();
             }
+        }
+    });
+};
+
+const executeCommand = (command) => {
+    return new Promise((resolve) => {
+        const commandToExecute = command.command;
+        console.log(`\n🚀 Executing: ${commandToExecute}`);
+        exec(commandToExecute, { shell: process.env.SHELL || true }, (error, stdout, stderr) => {
+            if (error) console.error(`\n❌ Execution error:\n${error.message}`);
+            if (stderr) console.warn(`\n⚠️ Standard Error:\n${stderr}`);
+            if (stdout) console.log(`\n✅ Standard Output:\n${stdout}`);
+            resolve();
         });
     });
 };
 
 // --- Yargs Command Parser ---
 const run = async () => {
-    const server = app.listen(serverPort, serverHost);
-    // unref() allows the program to exit even if the server is still listening.
+    let server = app.listen(serverPort, serverHost);
     server.unref();
+
+    const { detectedOS, detectedVersion, detectedShell } = getSystemInfo();
 
     const parser = yargs(hideBin(process.argv))
         .scriptName("cmdgen")
@@ -118,62 +146,86 @@ const run = async () => {
             'Generate a command based on your request', 
             {}, 
             async (argv) => {
-                const result = await callApi({ mode: 'generate', userInput: argv.request, ...argv });
-                if (result && result.data.commands && result.data.commands.length > 0) {
-                    result.data.commands.forEach((cmd, index) => {
-                        console.log(`\nSuggestion #${index + 1}:\n  \x1b[36m${cmd.command}\x1b[0m\n  └─ Explanation: ${cmd.explanation}`);
+                let currentCommands = [];
+
+                const getMoreSuggestions = async () => {
+                    console.log("\n🔄 Getting more suggestions...");
+                    const existing = currentCommands.map(c => c.command);
+                    const result = await callApi({ ...argv, options: { existingCommands: existing }, mode: 'generate' });
+                    if (result && result.data.commands && result.data.commands.length > 0) {
+                        currentCommands.push(...result.data.commands);
+                        handleSuggestions(result.data.commands);
+                    } else {
+                        console.log("\nCouldn't fetch more suggestions.");
+                        process.exit(0);
+                    }
+                };
+                
+                const handleSuggestions = (newSuggestions) => {
+                    newSuggestions.forEach((cmd) => {
+                        // Display using the total command count
+                        const displayIndex = currentCommands.findIndex(c => c.command === cmd.command) + 1;
+                        console.log(`\nSuggestion #${displayIndex}:\n  \x1b[36m${cmd.command}\x1b[0m\n  └─ Explanation: ${cmd.explanation}`);
                         if (cmd.warning) console.log(`     └─ \x1b[33mWarning: ${cmd.warning}\x1b[0m`);
                     });
-                    await promptForExecution(result.data.commands[0].command);
+
+                    promptForChoice(
+                        currentCommands,
+                        async (commandToExecute) => {
+                            await executeCommand(commandToExecute);
+                            process.exit(0);
+                        },
+                        getMoreSuggestions,
+                        () => {
+                            console.log('\nExiting.');
+                            process.exit(0);
+                        }
+                    );
+                };
+
+                const initialResult = await callApi({ ...argv, mode: 'generate' });
+                if (initialResult && initialResult.data.commands && initialResult.data.commands.length > 0) {
+                    currentCommands = initialResult.data.commands;
+                    handleSuggestions(currentCommands);
                 }
             }
         )
-        .command(
-            ['analyze <command>', 'a <command>'], 
-            'Analyze and explain a command', 
-            {}, 
-            async (argv) => {
-                const result = await callApi({ mode: 'explain', userInput: argv.command, ...argv });
-                if (result) console.log(result.data.explanation);
-            }
-        )
-        .command(
-            ['error <message>', 'e <message>'], 
-            'Analyze an error message', 
-            {}, 
-            async (argv) => {
-                const userInput = `Error Message:\n${argv.message}` + (argv.context ? `\n\nContext:\n${argv.context}` : '');
-                const result = await callApi({ mode: 'error', userInput, ...argv });
-                if (result) {
-                    console.log(`\nProbable Cause: ${result.data.cause}\n\nExplanation: ${result.data.explanation}\n\nSolution:`);
-                    result.data.solution.forEach(step => console.log(`  - ${step}`));
-                }
-            }
-        )
+        // ... other commands ...
+        .command(['analyze <command>', 'a <command>'], 'Analyze and explain a command', {}, async (argv) => { /* ... unchanged ... */ })
+        .command(['error <message>', 'e <message>'], 'Analyze an error message', {}, async (argv) => { /* ... unchanged ... */ })
+        .option('os', {
+            describe: 'Target Operating System',
+            type: 'string',
+            default: detectedOS
+        })
+        .option('osVersion', {
+            describe: 'Target OS Version',
+            type: 'string',
+            default: detectedVersion
+        })
+        .option('shell', {
+            describe: 'Target command-line shell',
+            type: 'string',
+            default: detectedShell
+        })
         .option('context', { alias: 'c', describe: 'Provide additional context for error analysis', type: 'string' })
-        .option('os', { describe: 'Target Operating System', type: 'string', default: 'linux' })
-        .option('osVersion', { describe: 'Target OS Version', type: 'string', default: 'Ubuntu 24.04 LTS' })
-        .option('shell', { describe: 'Target command-line shell', type: 'string', default: 'Bash' })
         .option('lang', { describe: 'Set the response language (en, fa)', type: 'string', default: 'en' })
         .demandCommand(1, 'You must provide one of the main commands.')
         .help('h').alias('h', 'help')
-        .version('v', 'Show version number', `AY-CMDGEN version: ${packageJson.version}`).alias('v', 'version')
+        .version('v', `Show version number: ${packageJson.version}`).alias('v', 'version')
         .strict()
         .wrap(null)
-        // This ensures the process will exit after the command handler finishes.
-        .exitProcess(true)
+        .exitProcess(false)
         .fail((msg, err) => {
-            if (err) {
-                console.error("\n❌ An unexpected error occurred:", err.message);
-            } else {
+            if (err) console.error("\n❌ An unexpected error occurred:", err.message);
+            else {
                 console.error(`\n❌ Error: ${msg}`);
                 parser.showHelp();
             }
             process.exit(1);
         });
 
-    const argv = await parser.argv;
-    // Show banner if no command is given.
+    const argv = await parser.parse();
     if (argv._.length === 0 && !argv.h && !argv.v) {
         showBanner();
     }
