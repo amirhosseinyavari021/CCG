@@ -20,7 +20,7 @@ const packageJson = require('./package.json');
 const readline = require('readline');
 const { app } = require('./server.js');
 
-// --- OS & System Info Detection ---
+// --- OS & System Info Detection (Final, Reliable Version without WMIC) ---
 const getSystemInfo = () => {
     const platform = process.platform;
     let detectedOS = 'linux';
@@ -30,6 +30,8 @@ const getSystemInfo = () => {
     if (platform === 'win32') {
         detectedOS = 'windows';
         detectedVersion = os.release();
+        // This is a modern and reliable way to detect the shell.
+        // PowerShell sets this environment variable, but CMD does not.
         if (process.env.PSModulePath) {
             detectedShell = 'PowerShell';
         } else {
@@ -45,14 +47,30 @@ const getSystemInfo = () => {
             const osRelease = execSync('cat /etc/os-release').toString();
             const versionMatch = osRelease.match(/^PRETTY_NAME="([^"]+)"/m);
             if (versionMatch) detectedVersion = versionMatch[1];
-        } catch (e) { /* Fallback */ }
+        } catch (e) { /* Fallback to os.release() */ }
         detectedShell = process.env.SHELL ? path.basename(process.env.SHELL) : 'bash';
     }
     return { detectedOS, detectedVersion, detectedShell };
 };
 
+
 // --- Banner and Info ---
-const showBanner = () => { /* ... unchanged ... */ };
+const showBanner = () => {
+    const banner = `
+      /$$      /$$ /$$$$$$$$ /$$         /$$$$$$   /$$$$$$  /$$      /$$ /$$$$$$$$        /$$$$$$  /$$      /$$ /$$$$$$$   /$$$$$$  /$$$$$$$$ /$$   /$$
+     | $$  /$ | $$| $$_____/| $$        /$$__  $$ /$$__  $$| $$$    /$$$| $$_____/       /$$__  $$| $$$    /$$$| $$__  $$ /$$__  $$| $$_____/| $$$ | $$
+     | $$ /$$$| $$| $$      | $$       | $$  \\__/| $$  \\ $$| $$$$  /$$$$| $$             | $$  \\__/| $$$$  /$$$$| $$  \\ $$| $$  \\__/| $$      | $$$$| $$
+     | $$/$$ $$ $$| $$$$$   | $$       | $$      | $$  | $$| $$ $$/$$ $$| $$$$$          | $$      | $$ $$/$$ $$| $$  | $$| $$ /$$$$| $$$$$   | $$ $$ $$
+     | $$$$_  $$$$| $$__/   | $$       | $$      | $$  | $$| $$  $$$| $$| $$__/          | $$      | $$  $$$| $$| $$  | $$| $$|_  $$| $$__/   | $$  $$$$
+     | $$$/ \\  $$$| $$      | $$       | $$  $$| $$  | $$| $$\\  $ | $$| $$             | $$  $$| $$\\  $ | $$| $$  | $$| $$  \\ $$| $$      | $$\\  $$$
+     | $$/   \\  $$| $$$$$$$$| $$$$$$$$|  $$$$$$/|  $$$$$$/| $$ \\/  | $$| $$$$$$$$       |  $$$$$$/| $$ \\/  | $$| $$$$$$$/|  $$$$$$/| $$$$$$$$| $$ \\  $$
+     |__/     \\__/|________/|________/ \\______/  \\______/ |__/    |__/|________/        \\______/ |__/    |__/|_______/  \\______/ |________/|__/  \\__/
+    `;
+    console.log('\x1b[36m%s\x1b[0m', banner);
+    console.log(`\n  \x1b[1mAY-CMDGEN v${packageJson.version}\x1b[0m - Your Intelligent Command-Line Assistant`);
+    console.log(`  Created by Amirhossein Yavari. Licensed under ${packageJson.license}.`);
+    console.log('  Type "cmdgen --help" for a list of commands.\n');
+};
 
 // --- Server Management ---
 const serverPort = 3003;
@@ -74,7 +92,9 @@ const callApi = async ({ mode, userInput, os, osVersion, cli, lang, options = {}
                 for (const line of dataLines) {
                     const jsonPart = line.substring(5).trim();
                     if (jsonPart && jsonPart !== "[DONE]") {
-                        try { fullContent += JSON.parse(jsonPart).choices[0].delta.content || ''; } catch (e) {}
+                        try {
+                            fullContent += JSON.parse(jsonPart).choices[0].delta.content || '';
+                        } catch (e) {}
                     }
                 }
             });
@@ -93,10 +113,56 @@ const callApi = async ({ mode, userInput, os, osVersion, cli, lang, options = {}
 };
 
 // --- Interactive Prompt ---
-const promptForChoice = (commands, onExecute, onMore, onQuit) => { /* ... unchanged ... */ };
+const promptForChoice = (commands, onExecute, onMore, onQuit) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    console.log('\n');
+    console.warn('🚨 WARNING: Executing AI-generated commands can be dangerous. Always review them carefully.');
+    
+    rl.question(`Enter a number to execute (1-${commands.length}), (m)ore suggestions, or (q)uit: `, (choice) => {
+        rl.close();
+        const lowerChoice = choice.toLowerCase().trim();
+
+        if (lowerChoice === 'm') {
+            onMore();
+        } else if (lowerChoice === 'q' || lowerChoice === '') {
+            onQuit();
+        } else {
+            const index = parseInt(lowerChoice, 10) - 1;
+            if (index >= 0 && index < commands.length) {
+                onExecute(commands[index]);
+            } else {
+                console.log('\nInvalid choice. Quitting.');
+                onQuit();
+            }
+        }
+    });
+};
 
 // --- Smart Command Execution ---
-const executeCommand = (command) => { /* ... unchanged ... */ };
+const executeCommand = (command) => {
+    return new Promise((resolve) => {
+        const commandToExecute = command.command;
+        console.log(`\n🚀 Executing: ${commandToExecute}`);
+
+        const child = spawn(commandToExecute, [], {
+            stdio: 'inherit',
+            shell: true
+        });
+
+        child.on('close', (code) => {
+            if (code !== 0) {
+                console.error(`\n❌ Process exited with code ${code}`);
+            }
+            resolve();
+        });
+
+        child.on('error', (err) => {
+            console.error(`\n❌ Failed to start process:\n${err.message}`);
+            resolve();
+        });
+    });
+};
+
 
 // --- Yargs Command Parser ---
 const run = async () => {
@@ -119,7 +185,6 @@ const run = async () => {
                     const getMoreSuggestions = async () => {
                         console.log("\n🔄 Getting more suggestions...");
                         const existing = currentCommands.map(c => c.command);
-                        // --- FIX: Pass argv.request as userInput ---
                         const result = await callApi({ ...argv, userInput: argv.request, options: { existingCommands: existing }, mode: 'generate' });
                         if (result && result.data.commands && result.data.commands.length > 0) {
                             currentCommands.push(...result.data.commands);
@@ -130,11 +195,28 @@ const run = async () => {
                         }
                     };
                     
-                    const handleSuggestions = (newSuggestions) => { /* ... unchanged ... */ };
+                    const handleSuggestions = (newSuggestions) => {
+                        newSuggestions.forEach((cmd) => {
+                            const displayIndex = currentCommands.findIndex(c => c.command === cmd.command) + 1;
+                            console.log(`\nSuggestion #${displayIndex}:\n  \x1b[36m${cmd.command}\x1b[0m\n  └─ Explanation: ${cmd.explanation}`);
+                            if (cmd.warning) console.log(`     └─ \x1b[33mWarning: ${cmd.warning}\x1b[0m`);
+                        });
 
-                    // --- FIX: Pass argv.request as userInput ---
+                        promptForChoice(
+                            currentCommands,
+                            async (commandToExecute) => {
+                                await executeCommand(commandToExecute);
+                                process.exit(0);
+                            },
+                            getMoreSuggestions,
+                            () => {
+                                console.log('\nExiting.');
+                                process.exit(0);
+                            }
+                        );
+                    };
+
                     const initialResult = await callApi({ ...argv, userInput: argv.request, mode: 'generate' });
-                    
                     if (initialResult && initialResult.data.commands && initialResult.data.commands.length > 0) {
                         currentCommands = initialResult.data.commands;
                         handleSuggestions(currentCommands);
@@ -144,13 +226,11 @@ const run = async () => {
                 }
             )
             .command(['analyze <command>', 'a <command>'], 'Analyze and explain a command', {}, async (argv) => {
-                // --- FIX for analyze command ---
                 const result = await callApi({ ...argv, userInput: argv.command, mode: 'explain' });
                 if (result) console.log(result.data.explanation);
                 process.exit(0);
             })
             .command(['error <message>', 'e <message>'], 'Analyze an error message', {}, async (argv) => {
-                // --- FIX for error command ---
                 const userInput = `Error Message:\n${argv.message}` + (argv.context ? `\n\nContext:\n${argv.context}` : '');
                 const result = await callApi({ ...argv, userInput: userInput, mode: 'error' });
                 if (result) {
@@ -159,11 +239,37 @@ const run = async () => {
                 }
                 process.exit(0);
             })
-            .option('os', { default: detectedOS })
-            .option('osVersion', { default: detectedVersion })
-            .option('shell', { default: detectedShell })
-            // ... other options
-            .version('v', `Show version number: ${packageJson.version}`).alias('v', 'version');
+            .option('os', {
+                describe: 'Target Operating System',
+                type: 'string',
+                default: detectedOS
+            })
+            .option('osVersion', {
+                describe: 'Target OS Version',
+                type: 'string',
+                default: detectedVersion
+            })
+            .option('shell', {
+                describe: 'Target command-line shell',
+                type: 'string',
+                default: detectedShell
+            })
+            .option('context', { alias: 'c', describe: 'Provide additional context for error analysis', type: 'string' })
+            .option('lang', { describe: 'Set the response language (en, fa)', type: 'string', default: 'en' })
+            .demandCommand(1, 'You must provide one of the main commands.')
+            .help('h').alias('h', 'help')
+            .version('v', `Show version number: ${packageJson.version}`).alias('v', 'version')
+            .strict()
+            .wrap(null)
+            .exitProcess(false) 
+            .fail((msg, err) => {
+                if (err) console.error("\n❌ An unexpected error occurred:", err.message);
+                else {
+                    console.error(`\n❌ Error: ${msg}`);
+                    parser.showHelp();
+                }
+                process.exit(1);
+            });
             
         const argv = await parser.parse();
         if (argv._.length === 0 && !argv.h && !argv.v) {
