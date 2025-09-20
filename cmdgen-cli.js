@@ -1,15 +1,16 @@
-#!/usr/-bin/env node
+#!/usr/bin/env node
 
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
 const axios = require('axios/dist/node/axios.cjs');
-const { spawn, exec } = require('child_process');
+const { exec } = require('child_process');
 const { TextDecoder } = require('util');
 const path = require('path');
 const { getSystemPrompt } = require('./apiService-cli.js');
 const { parseAndConstructData } = require('./responseParser-cli.js');
 const packageJson = require('./package.json');
 const readline = require('readline');
+const { app } = require('./server.js'); // Import the app from server.js
 
 // --- Banner and Info ---
 const showBanner = () => {
@@ -22,16 +23,6 @@ const showBanner = () => {
      | $$$/ \\  $$$| $$      | $$       | $$  $$| $$  | $$| $$\\  $ | $$| $$             | $$  $$| $$\\  $ | $$| $$  | $$| $$  \\ $$| $$      | $$\\  $$$
      | $$/   \\  $$| $$$$$$$$| $$$$$$$$|  $$$$$$/|  $$$$$$/| $$ \\/  | $$| $$$$$$$$       |  $$$$$$/| $$ \\/  | $$| $$$$$$$/|  $$$$$$/| $$$$$$$$| $$ \\  $$
      |__/     \\__/|________/|________/ \\______/  \\______/ |__/    |__/|________/        \\______/ |__/    |__/|_______/  \\______/ |________/|__/  \\__/
-                                                                                                                                                 
-                                                                                                                                                 
-                                                                /$$$$$$  /$$     /$$
-                                                               /$$__  $$|  $$   /$$/
-                                                              | $$  \\ $$ \\  $$ /$$/
-                                                              | $$$$$$$$  \\  $$$$/
-                                                              | $$__  $$   \\  $$/
-                                                              | $$  | $$    | $$
-                                                              | $$  | $$    | $$
-                                                              |__/  |__/    |__/
     `;
     console.log('\x1b[36m%s\x1b[0m', banner);
     console.log(`\n  \x1b[1mAY-CMDGEN v${packageJson.version}\x1b[0m - Your Intelligent Command-Line Assistant`);
@@ -39,53 +30,19 @@ const showBanner = () => {
     console.log('  Type "cmdgen --help" for a list of commands.\n');
 };
 
-// --- Server Management (Robust Version) ---
-const serverPort = 3003; // <-- *** PORT CHANGED HERE ***
-const serverHost = '127.0.0.1'; // Always connect to local server via IPv4
-const serverCheckUrl = `http://${serverHost}:${serverPort}/api/health`;
+// --- Server Management (Integrated Version) ---
+const serverPort = 3003;
+const serverHost = '127.0.0.1';
+const serverUrl = `http://${serverHost}:${serverPort}`;
 
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-const ensureServerIsRunning = async () => {
-    try {
-        await axios.get(serverCheckUrl, { timeout: 500 });
-        return true;
-    } catch (error) {
-        console.log('⏳ No local server found. Starting server in the background...');
-        const serverPath = process.pkg ? path.join(path.dirname(process.execPath), 'server.js') : path.join(__dirname, 'server.js');
-        const serverProcess = spawn(process.execPath, [serverPath], {
-            detached: true,
-            stdio: 'ignore'
-        });
-        serverProcess.unref();
-
-        for (let i = 0; i < 10; i++) { // Poll for 10 seconds
-            await delay(1000);
-            try {
-                await axios.get(serverCheckUrl, { timeout: 500 });
-                console.log('✅ Server started successfully.');
-                return true;
-            } catch (e) {
-                // Keep trying
-            }
-        }
-        throw new Error("Could not connect to the AY-CMDGEN server. It may have failed to start.");
-    }
-};
+// The ensureServerIsRunning function is no longer needed and has been removed.
 
 // --- Core API and Execution Functions ---
 const callApi = async ({ mode, userInput, os, osVersion, cli, lang }) => {
-    try {
-        await ensureServerIsRunning();
-    } catch (err) {
-        console.error(`\n❌ ${err.message}`);
-        return null;
-    }
-    
     const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, {});
     const payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userInput }] };
     try {
-        const proxyUrl = `http://${serverHost}:${serverPort}/api/proxy`;
+        const proxyUrl = `${serverUrl}/api/proxy`;
         const response = await axios.post(proxyUrl, payload, { responseType: 'stream' });
         let fullContent = '';
         const decoder = new TextDecoder();
@@ -110,7 +67,12 @@ const callApi = async ({ mode, userInput, os, osVersion, cli, lang }) => {
             response.data.on('error', (err) => reject(err));
         });
     } catch (err) {
-        console.error("\n❌ Error communicating with the server:", err.response ? err.response.data.error.message : err.message);
+        // More robust error handling for connection refused
+        if (err.code === 'ECONNREFUSED') {
+             console.error(`\n❌ Error: Connection refused. Could not connect to the internal server at ${serverUrl}.`);
+        } else {
+            console.error("\n❌ Error communicating with the server:", err.response ? err.response.data.error.message : err.message);
+        }
         return null;
     }
 };
@@ -135,8 +97,14 @@ const promptForExecution = (command) => {
     });
 };
 
-// --- Yargs Command Parser (Corrected) ---
+// --- Yargs Command Parser ---
 const run = async () => {
+    // Start the server programmatically before parsing args
+    const server = app.listen(serverPort, serverHost, () => {
+        // This log is optional and can be removed if you don't want any startup message
+        // console.log(`Internal server is running on ${serverUrl}`);
+    });
+
     yargs(hideBin(process.argv))
         .scriptName("cmdgen")
         .usage('Usage: $0 <command> "[input]" [options]')
@@ -154,6 +122,7 @@ const run = async () => {
                     });
                     if (result.data.commands.length > 0) promptForExecution(result.data.commands[0].command);
                 }
+                server.close(); // Close the server after the command is done
             }
         )
 
@@ -164,6 +133,7 @@ const run = async () => {
             async (argv) => {
                 const result = await callApi({ mode: 'explain', userInput: argv.command, ...argv });
                 if (result) console.log(result.data.explanation);
+                server.close();
             }
         )
 
@@ -178,6 +148,7 @@ const run = async () => {
                     console.log(`\nProbable Cause: ${result.data.cause}\n\nExplanation: ${result.data.explanation}\n\nSolution:`);
                     result.data.solution.forEach(step => console.log(`  - ${step}`));
                 }
+                server.close();
             }
         )
         
@@ -194,8 +165,17 @@ const run = async () => {
         .check((argv) => {
             if (argv._.length === 0 && !argv.h && !argv.v) {
                 showBanner();
+                 // Keep server alive for banner display then close
+                setTimeout(() => server.close(), 200);
             }
             return true;
+        })
+        .fail((msg, err, yargs) => {
+            if (err) throw err;
+            console.error('❌', msg);
+            console.error('\nFor more help, run: cmdgen --help');
+            server.close();
+            process.exit(1);
         })
         .parse();
 };
