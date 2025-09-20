@@ -10,7 +10,7 @@ const { getSystemPrompt } = require('./apiService-cli.js');
 const { parseAndConstructData } = require('./responseParser-cli.js');
 const packageJson = require('./package.json');
 const readline = require('readline');
-const { app } = require('./server.js'); // Import the app from server.js
+const { app } = require('./server.js');
 
 // --- Banner and Info ---
 const showBanner = () => {
@@ -30,12 +30,10 @@ const showBanner = () => {
     console.log('  Type "cmdgen --help" for a list of commands.\n');
 };
 
-// --- Server Management (Integrated Version) ---
+// --- Server Management ---
 const serverPort = 3003;
 const serverHost = '127.0.0.1';
 const serverUrl = `http://${serverHost}:${serverPort}`;
-
-// The ensureServerIsRunning function is no longer needed and has been removed.
 
 // --- Core API and Execution Functions ---
 const callApi = async ({ mode, userInput, os, osVersion, cli, lang }) => {
@@ -67,7 +65,6 @@ const callApi = async ({ mode, userInput, os, osVersion, cli, lang }) => {
             response.data.on('error', (err) => reject(err));
         });
     } catch (err) {
-        // More robust error handling for connection refused
         if (err.code === 'ECONNREFUSED') {
              console.error(`\n❌ Error: Connection refused. Could not connect to the internal server at ${serverUrl}.`);
         } else {
@@ -78,34 +75,35 @@ const callApi = async ({ mode, userInput, os, osVersion, cli, lang }) => {
 };
 
 const promptForExecution = (command) => {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    console.log('\n');
-    console.warn('🚨 \x1b[33mWARNING: Executing AI-generated commands can be dangerous. Always review the command carefully before running it.\x1b[0m');
-    rl.question(`Execute the following command?\n\n  \x1b[36m${command}\x1b[0m\n\n(y/N): `, (answer) => {
-        if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
-            console.log('🚀 Executing command...');
-            exec(command, { shell: process.env.SHELL || true }, (error, stdout, stderr) => {
-                if (error) console.error(`\n❌ Execution error:\n${error.message}`);
-                if (stderr) console.warn(`\n⚠️ Standard Error:\n${stderr}`);
-                if (stdout) console.log(`\n✅ Standard Output:\n${stdout}`);
+    // Wrap readline in a promise to allow awaiting it
+    return new Promise((resolve) => {
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+        console.log('\n');
+        console.warn('🚨 \x1b[33mWARNING: Executing AI-generated commands can be dangerous. Always review the command carefully before running it.\x1b[0m');
+        rl.question(`Execute the following command?\n\n  \x1b[36m${command}\x1b[0m\n\n(y/N): `, (answer) => {
+            if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
+                console.log('🚀 Executing command...');
+                exec(command, { shell: process.env.SHELL || true }, (error, stdout, stderr) => {
+                    if (error) console.error(`\n❌ Execution error:\n${error.message}`);
+                    if (stderr) console.warn(`\n⚠️ Standard Error:\n${stderr}`);
+                    if (stdout) console.log(`\n✅ Standard Output:\n${stdout}`);
+                    rl.close();
+                    resolve(); // Resolve the promise after execution
+                });
+            } else {
+                console.log('Execution cancelled.');
                 rl.close();
-            });
-        } else {
-            console.log('Execution cancelled.');
-            rl.close();
-        }
+                resolve(); // Resolve the promise on cancellation
+            }
+        });
     });
 };
 
 // --- Yargs Command Parser ---
 const run = async () => {
-    // Start the server programmatically before parsing args
-    const server = app.listen(serverPort, serverHost, () => {
-        // This log is optional and can be removed if you don't want any startup message
-        // console.log(`Internal server is running on ${serverUrl}`);
-    });
+    const server = app.listen(serverPort, serverHost);
 
-    yargs(hideBin(process.argv))
+    const parser = yargs(hideBin(process.argv))
         .scriptName("cmdgen")
         .usage('Usage: $0 <command> "[input]" [options]')
         
@@ -120,12 +118,13 @@ const run = async () => {
                         console.log(`\nSuggestion #${index + 1}:\n  \x1b[36m${cmd.command}\x1b[0m\n  └─ Explanation: ${cmd.explanation}`);
                         if (cmd.warning) console.log(`     └─ \x1b[33mWarning: ${cmd.warning}\x1b[0m`);
                     });
-                    if (result.data.commands.length > 0) promptForExecution(result.data.commands[0].command);
+                    if (result.data.commands.length > 0) {
+                        await promptForExecution(result.data.commands[0].command);
+                    }
                 }
-                server.close(); // Close the server after the command is done
             }
         )
-
+        // ... (other commands) ...
         .command(
             ['analyze <command>', 'a <command>'], 
             'Analyze and explain a command', 
@@ -133,7 +132,6 @@ const run = async () => {
             async (argv) => {
                 const result = await callApi({ mode: 'explain', userInput: argv.command, ...argv });
                 if (result) console.log(result.data.explanation);
-                server.close();
             }
         )
 
@@ -148,10 +146,8 @@ const run = async () => {
                     console.log(`\nProbable Cause: ${result.data.cause}\n\nExplanation: ${result.data.explanation}\n\nSolution:`);
                     result.data.solution.forEach(step => console.log(`  - ${step}`));
                 }
-                server.close();
             }
         )
-        
         .option('context', { alias: 'c', describe: 'Provide additional context for error analysis', type: 'string' })
         .option('os', { describe: 'Target Operating System', type: 'string', default: 'linux' })
         .option('osVersion', { describe: 'Target OS Version', type: 'string', default: 'Ubuntu 24.04 LTS' })
@@ -161,23 +157,17 @@ const run = async () => {
         .help('h').alias('h', 'help')
         .version('v', 'Show version number', `AY-CMDGEN version: ${packageJson.version}`).alias('v', 'version')
         .strict()
-        .wrap(null)
-        .check((argv) => {
-            if (argv._.length === 0 && !argv.h && !argv.v) {
-                showBanner();
-                 // Keep server alive for banner display then close
-                setTimeout(() => server.close(), 200);
-            }
-            return true;
-        })
-        .fail((msg, err, yargs) => {
-            if (err) throw err;
-            console.error('❌', msg);
-            console.error('\nFor more help, run: cmdgen --help');
-            server.close();
-            process.exit(1);
-        })
-        .parse();
+        .wrap(null);
+
+    const argv = await parser.argv;
+
+    // Show banner if no command is given
+    if (argv._.length === 0 && !argv.h && !argv.v) {
+        showBanner();
+    }
+
+    // Close the server to allow the process to exit
+    server.close();
 };
 
 run();
