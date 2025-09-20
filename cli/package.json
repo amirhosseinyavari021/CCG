@@ -1,0 +1,14 @@
+{
+  "name": "ay-cmdgen-cli",
+  "version": "2.1.0",
+  "description": "Your Intelligent Command-Line Assistant - CLI",
+  "main": "cmdgen-cli.js",
+  "bin": {
+    "cmdgen": "./cmdgen-cli.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "dotenv": "^16.4.5",
+    "yargs": "^17.7.2"
+  }
+}
