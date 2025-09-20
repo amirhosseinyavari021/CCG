@@ -35,7 +35,7 @@ const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
 **GUIDELINES FOR COMMANDS:**
 - **Effectiveness:** Prioritize commands that are efficient and directly solve the user's problem.
 - **Clarity & Simplicity:** Commands should be easy to understand. Use common flags and avoid unnecessary complexity unless required.
-- **Relevance:** The commands must be perfectly tailored to the user's OS and Shell.
+- **Relevance:** The commands must be perfectly tailored to the user's OS and Shell. If the OS is Windows, provide PowerShell 7+ commands unless the user specifies CMD. For Linux/macOS, provide commands for the specified shell.
 **OUTPUT FORMAT:** You MUST output exactly 3 lines. Each line must use this exact format, separated by "|||":
 command|||short_explanation|||warning (leave empty if none)
 Your entire response MUST adhere to this format. Do not add any introductory text, numbering, or markdown.
