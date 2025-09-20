@@ -1,6 +1,7 @@
+// server.js (Final Version)
 const express = require('express');
 const path = require('path');
-const axios = require('axios/dist/node/axios.cjs'); // Explicit require for pkg compatibility
+const axios = require('axios/dist/node/axios.cjs');
 const rateLimit = require('express-rate-limit');
 const fs = require('fs');
 
@@ -10,7 +11,6 @@ app.use(express.json());
 
 const modelName = 'openai/gpt-oss-20b:free';
 
-// --- Error Logging ---
 const logError = (error) => {
     try {
         const logDir = process.pkg ? path.dirname(process.execPath) : __dirname;
@@ -22,29 +22,24 @@ const logError = (error) => {
     }
 };
 
-// Rate Limiter
 const limiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: {
-    error: { code: 'TOO_MANY_REQUESTS', message: 'You have sent too many requests...' }
-  }
+  message: { error: { code: 'TOO_MANY_REQUESTS', message: 'You have sent too many requests...' } }
 });
 
 app.use('/api/', limiter);
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.status(200).send('OK');
-});
+app.get('/api/health', (req, res) => res.status(200).send('OK'));
 
 app.post('/api/proxy', async (req, res) => {
   try {
+    // API Key check is now moved inside the handler
     const apiKey = process.env.API_KEY;
     if (!apiKey) {
-      throw new Error('CRITICAL: API_KEY is not configured.');
+      throw new Error('CRITICAL: API_KEY is not configured or could not be read from .env file.');
     }
 
     const { messages } = req.body;
@@ -68,33 +63,20 @@ app.post('/api/proxy', async (req, res) => {
     apiResponse.data.pipe(res);
 
   } catch (error) {
-    logError(error); // Log the error to a file
-    if (error.response) {
-      const { status, data } = error.response;
-      const serverMessage = data?.error?.message || 'An unknown error from the AI provider.';
-      return res.status(status).json({ error: { code: `AI_PROVIDER_ERROR_${status}`, message: serverMessage } });
-    } else if (error.request) {
-      return res.status(500).json({ error: { code: 'NETWORK_ERROR', message: 'The server could not connect to the AI provider.' } });
-    } else {
-      return res.status(500).json({ error: { code: 'INTERNAL_SERVER_ERROR', message: error.message || 'An internal server error occurred.' } });
-    }
+    logError(error);
+    const errorMessage = error.response?.data?.error?.message || error.message || 'An internal server error occurred.';
+    const statusCode = error.response?.status || 500;
+    res.status(statusCode).json({ error: { code: `SERVER_ERROR_${statusCode}`, message: errorMessage } });
   }
 });
 
-// Corrected Static File Serving for pkg
 const staticPath = path.join(__dirname, 'client/build');
-
 app.use(express.static(staticPath));
-
-app.get('*', (req, res) => {
-  res.sendFile(path.join(staticPath, 'index.html'));
-});
-
+app.get('*', (req, res) => res.sendFile(path.join(staticPath, 'index.html')));
 
 process.on('uncaughtException', (err, origin) => {
     logError(`Caught exception: ${err}\nException origin: ${origin}`);
     process.exit(1);
 });
 
-// Export the app instead of listening
-module.exports = { app, logError };
+module.exports = { app };
