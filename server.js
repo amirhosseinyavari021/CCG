@@ -42,7 +42,11 @@ app.get('/api/health', (req, res) => {
 
 app.post('/api/proxy', async (req, res) => {
   try {
-    const apiKey = process.env.API_KEY;
+    // <<<<<<<<<<<<<<<<< START OF IMPORTANT CHANGE >>>>>>>>>>>>>>>>>
+    // Change the variable name to match your setting in Render
+    const apiKey = process.env.CLI_API_KEY; 
+    // <<<<<<<<<<<<<<<<<< END OF IMPORTANT CHANGE >>>>>>>>>>>>>>>>>>
+
     if (!apiKey) {
       throw new Error('CRITICAL: API_KEY is not configured. Make sure a .env file with your API_KEY is next to the executable.');
     }
