@@ -1,8 +1,8 @@
-#!/usr/bin/env node
+#!/usr/-bin/env node
 
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
-const axios = require('axios/dist/node/axios.cjs'); // Explicit require for pkg compatibility
+const axios = require('axios/dist/node/axios.cjs');
 const { spawn, exec } = require('child_process');
 const { TextDecoder } = require('util');
 const path = require('path');
@@ -40,7 +40,7 @@ const showBanner = () => {
 };
 
 // --- Server Management (Robust Version) ---
-const serverPort = 3001;
+const serverPort = 3003; // <-- *** PORT CHANGED HERE ***
 const serverHost = '127.0.0.1'; // Always connect to local server via IPv4
 const serverCheckUrl = `http://${serverHost}:${serverPort}/api/health`;
 
