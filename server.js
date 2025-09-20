@@ -90,20 +90,11 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(staticPath, 'index.html'));
 });
 
-// Server Start - Smart host binding
-const PORT = process.env.PORT || 3003; 
-const HOST = process.env.RENDER ? '0.0.0.0' : '127.0.0.1';
-
-try {
-    app.listen(PORT, HOST, () => {
-        console.log(`Server running on http://${HOST}:${PORT}`);
-    });
-} catch (err) {
-    logError(err);
-    process.exit(1);
-}
 
 process.on('uncaughtException', (err, origin) => {
     logError(`Caught exception: ${err}\nException origin: ${origin}`);
     process.exit(1);
 });
+
+// Export the app instead of listening
+module.exports = { app, logError };
