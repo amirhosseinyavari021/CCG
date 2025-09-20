@@ -2,6 +2,7 @@
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Apache License](https://img.shields.io/badge/License-Apache-green.svg)](LICENSE)
+
 CMDGEN is a smart tool that helps you generate, analyze, and debug command-line (CLI) instructions with ease. This project features both a **Web Application** and a standalone **Command-Line Tool (CLI)**.
 
 ---
