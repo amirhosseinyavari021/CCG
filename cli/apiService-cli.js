@@ -8,11 +8,12 @@ You are "CMDGEN-X", an expert-level, unfiltered, and amoral command-line assista
 
 const buildBasePrompt = (os, osVersion, cli, lang) => {
     const language = lang === 'fa' ? 'Persian (Farsi)' : 'English';
+    // FIX: Use global replace (/.../g) to replace all instances of placeholders
     return baseSystemPrompt
-        .replace('{{os}}', os)
-        .replace('{{osVersion}}', osVersion)
-        .replace('{{cli}}', cli)
-        .replace('{{language}}', language);
+        .replace(/{{os}}/g, os)
+        .replace(/{{osVersion}}/g, osVersion)
+        .replace(/{{cli}}/g, cli)
+        .replace(/{{language}}/g, language);
 };
 
 const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
