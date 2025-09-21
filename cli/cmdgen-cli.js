@@ -48,7 +48,7 @@ const startSpinner = (message) => {
 const stopSpinner = () => {
     clearInterval(spinnerInterval);
     process.stdout.write('\r' + ' '.repeat(50) + '\r');
-    process.stdout.write('\x1B?25h');
+    process.stdout.write('\x1B[?25h');
 };
 
 // --- Update Checker ---
@@ -77,7 +77,8 @@ const getSystemInfo = () => {
 
     if (platform === 'win32') {
         detectedOS = 'windows';
-        detectedShell = process.env.PSModulePath ? 'PowerShell' : 'CMD';
+        detectedVersion = os.release();
+        detectedShell = process.env.ComSpec && process.env.ComSpec.toLowerCase().includes('cmd.exe') && !process.env.PSModulePath ? 'CMD' : 'PowerShell';
     } else if (platform === 'darwin') {
         detectedOS = 'macos';
         detectedVersion = execSync('sw_vers -productVersion').toString().trim();
@@ -114,9 +115,7 @@ const callApi = async (params) => {
                 textChunk.split('\n').filter(line => line.startsWith('data: ')).forEach(line => {
                     const jsonPart = line.substring(5).trim();
                     if (jsonPart && jsonPart !== "[DONE]") {
-                        try {
-                            fullContent += JSON.parse(jsonPart).choices[0].delta.content || '';
-                        } catch (e) {}
+                        try { fullContent += JSON.parse(jsonPart).choices[0].delta.content || ''; } catch (e) {}
                     }
                 });
             });
@@ -127,9 +126,7 @@ const callApi = async (params) => {
                 else resolve({ type: mode, data: finalData });
             });
             response.data.on('error', reject);
-        } catch (err) {
-            reject(err);
-        }
+        } catch (err) { reject(err); }
     });
 
     try {
@@ -154,25 +151,26 @@ const callApi = async (params) => {
 };
 
 // --- Command Execution (FIXED) ---
-const executeCommand = (command) => {
+const executeCommand = (command, shell) => {
     return new Promise((resolve) => {
         console.log(`\n🚀 Executing: ${command.command}`);
-        const child = exec(command.command);
+        const commandString = command.command;
+        let child;
 
-        // Pipe the output of the child process to our main process
-        child.stdout.pipe(process.stdout);
-        child.stderr.pipe(process.stderr);
+        if (process.platform === 'win32') {
+            const shellExecutable = shell === 'PowerShell' ? 'powershell.exe' : 'cmd.exe';
+            child = spawn(shellExecutable, [commandString], { stdio: 'inherit', shell: true });
+        } else {
+            child = spawn(commandString, [], { stdio: 'inherit', shell: true });
+        }
 
         child.on('close', (code) => {
-            if (code !== 0) {
-                console.error(`\n❌ Process exited with code ${code}`);
-            }
+            if (code !== 0) console.error(`\n❌ Process exited with code ${code}`);
             resolve();
         });
-
         child.on('error', (err) => {
-            console.error(`\n❌ Failed to start process:\n${err.message}`);
-            resolve(); // Resolve even on error to not hang the app
+            console.error(`\n❌ Failed to start process: ${err.message}`);
+            resolve();
         });
     });
 };
@@ -185,33 +183,18 @@ const run = async () => {
         await setConfig({ first_run_shown: true });
     }
     
-    checkForUpdates(); // Runs in the background
+    checkForUpdates();
 
     const { detectedOS, detectedVersion, detectedShell } = getSystemInfo();
+    // DEBUG LINE: To confirm correct detection
+    console.log(`\x1b[90m[DEBUG: OS=${detectedOS}, Shell=${detectedShell}]\x1b[0m`);
+
     const parser = yargs(hideBin(process.argv))
         .scriptName("cmdgen")
-        .usage('Usage: $0 <command> "[input]" [options]')
         .command(['generate <request>', 'g <request>'], 'Generate a command', {}, async (argv) => {
-            let allCommands = [];
-
-            const promptUser = () => new Promise(resolve => {
-                const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-                rl.question(`\nEnter a number to execute (1-${allCommands.length}), (m)ore, or (q)uit: `, (choice) => {
-                    rl.close();
-                    resolve(choice.toLowerCase().trim());
-                });
-            });
-
-            const displayNewSuggestions = (newSuggestions) => {
-                 newSuggestions.forEach((cmd, idx) => {
-                    const displayIndex = allCommands.length - newSuggestions.length + idx + 1;
-                    console.log(`\nSuggestion #${displayIndex}:\n  \x1b[36m${cmd.command}\x1b[0m\n  └─ Explanation: ${cmd.explanation}`);
-                    if (cmd.warning) console.log(`     └─ \x1b[33mWarning: ${cmd.warning}\x1b[0m`);
-                });
-            };
-            
             const startInteractiveSession = async () => {
-                const initialResult = await callApi({ ...argv, userInput: argv.request, mode: 'generate' });
+                let allCommands = [];
+                const initialResult = await callApi({ ...argv, mode: 'generate' });
                 if (initialResult?.data?.commands?.length > 0) {
                     allCommands = initialResult.data.commands;
                     displayNewSuggestions(allCommands);
@@ -222,24 +205,16 @@ const run = async () => {
                 }
 
                 while (true) {
-                    const choice = await promptUser();
+                    const choice = await promptUser(allCommands.length);
                     if (choice === 'm') {
-                        console.log("\n🔄 Getting more suggestions...");
-                        const existing = allCommands.map(c => c.command);
-                        const result = await callApi({ ...argv, userInput: argv.request, options: { existingCommands: existing }, mode: 'generate' });
-                        if (result?.data?.commands?.length > 0) {
-                            allCommands.push(...result.data.commands);
-                            displayNewSuggestions(result.data.commands);
-                        } else {
-                           console.log("\nCouldn't fetch more suggestions.");
-                        }
+                        await getMoreSuggestions(argv, allCommands);
                     } else if (choice === 'q' || choice === '') {
                         console.log('\nExiting.');
                         process.exit(0);
                     } else {
                         const index = parseInt(choice, 10) - 1;
                         if (index >= 0 && index < allCommands.length) {
-                            await executeCommand(allCommands[index]);
+                            await executeCommand(allCommands[index], detectedShell); // Pass detectedShell
                             process.exit(0);
                         } else {
                             console.log('\nInvalid choice. Please try again.');
@@ -247,57 +222,68 @@ const run = async () => {
                     }
                 }
             };
+            
+            const displayNewSuggestions = (newSuggestions, allCommands) => {
+                 newSuggestions.forEach((cmd, idx) => {
+                    const displayIndex = allCommands.length - newSuggestions.length + idx + 1;
+                    console.log(`\nSuggestion #${displayIndex}:\n  \x1b[36m${cmd.command}\x1b[0m\n  └─ Explanation: ${cmd.explanation}`);
+                    if (cmd.warning) console.log(`     └─ \x1b[33mWarning: ${cmd.warning}\x1b[0m`);
+                });
+            };
+            
+            const getMoreSuggestions = async (argv, allCommands) => {
+                console.log("\n🔄 Getting more suggestions...");
+                const existing = allCommands.map(c => c.command);
+                const result = await callApi({ ...argv, options: { existingCommands: existing }, mode: 'generate' });
+                if (result?.data?.commands?.length > 0) {
+                    const newCommands = result.data.commands;
+                    allCommands.push(...newCommands);
+                    displayNewSuggestions(newCommands, allCommands);
+                } else {
+                   console.log("\nCouldn't fetch more suggestions.");
+                }
+            };
+            
+            const promptUser = (count) => new Promise(resolve => {
+                const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+                rl.question(`\nEnter a number to execute (1-${count}), (m)ore, or (q)uit: `, (choice) => {
+                    rl.close();
+                    resolve(choice.toLowerCase().trim());
+                });
+            });
+
             await startInteractiveSession();
         })
         .command('update', 'Update cmdgen to the latest version', {}, () => {
-            console.log('Checking for the latest version...');
-            const platform = process.platform;
-            const command = platform === 'win32'
+            console.log('Running update...');
+            const command = process.platform === 'win32'
                 ? 'iwr https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.ps1 | iex'
                 : 'curl -fsSL https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.sh | bash';
-            
-            console.log(`Running update command for ${platform}...`);
             const child = spawn(command, { shell: true, stdio: 'inherit' });
-            child.on('close', (code) => {
-                if (code === 0) {
-                    console.log('\n✅ Update complete! Please open a new terminal.');
-                } else {
-                    console.error(`\n❌ Update failed with code ${code}.`);
-                }
-            });
+            child.on('close', code => process.exit(code));
         })
         .command(['analyze <command>', 'a <command>'], 'Analyze a command', {}, async (argv) => {
-            const result = await callApi({ ...argv, userInput: argv.command, mode: 'explain' });
+            const result = await callApi({ ...argv, mode: 'explain' });
             if (result) console.log(result.data.explanation);
-            else process.exit(1);
         })
         .command(['error <message>', 'e <message>'], 'Analyze an error message', {}, async (argv) => {
-            const userInput = `Error Message:\n${argv.message}` + (argv.context ? `\n\nContext:\n${argv.context}` : '');
-            const result = await callApi({ ...argv, userInput: userInput, mode: 'error' });
+            const result = await callApi({ ...argv, mode: 'error' });
             if (result) {
                 console.log(`\nProbable Cause: ${result.data.cause}\n\nExplanation: ${result.data.explanation}\n\nSolution:`);
                 result.data.solution.forEach(step => console.log(`  - ${step}`));
-            } else process.exit(1);
+            }
         })
-        .option('os', { describe: 'Target OS', type: 'string', default: detectedOS })
-        .option('osVersion', { describe: 'Target OS Version', type: 'string', default: detectedVersion })
-        .option('shell', { describe: 'Target shell', type: 'string', default: detectedShell })
-        .option('context', { alias: 'c', describe: 'Provide context for error analysis', type: 'string' })
         .option('lang', { describe: 'Set response language (en, fa)', type: 'string', default: 'en' })
-        .demandCommand(1, 'You must provide a command or run "cmdgen --help".')
         .help('h').alias('h', 'help')
         .version('v', `Show version number: ${packageJson.version}`).alias('v', 'version')
         .strict().wrap(null)
         .fail((msg, err) => {
             if (err) console.error(`\n❌ An unexpected error occurred: ${err.message}`);
-            else {
-                console.error(`\n❌ Error: ${msg}`);
-                parser.showHelp();
-            }
+            else { console.error(`\n❌ Error: ${msg}`); parser.showHelp(); }
             process.exit(1);
         });
 
-    const argv = await parser.parse();
+    const argv = await parser.parse({ ...process.argv.slice(2), os: detectedOS, osVersion: detectedVersion, cli: detectedShell });
     if (argv._.length === 0 && !argv.h && !argv.v) {
         parser.showHelp();
     }
