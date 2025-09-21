@@ -8,6 +8,10 @@ GITHUB_REPO="amirhosseinyavari021/ay-cmdgen"
 INSTALL_DIR="/usr/local/bin"
 CMD_NAME="cmdgen"
 
+# Define primary and fallback URLs (can be different if you have mirrors)
+PRIMARY_REPO_URL="https://github.com"
+FALLBACK_REPO_URL="https://github.com" # Example: could be a different mirror
+
 # --- Helper Functions ---
 echo_color() {
   printf '\033[%sm%s\033[0m\n' "$1" "$2"
@@ -40,16 +44,35 @@ case "$OS" in
     ;;
 esac
 
-# 2. Get the latest release URL
-LATEST_RELEASE_URL="https://github.com/$GITHUB_REPO/releases/latest/download/$TARGET"
+# 2. Attempt to download from primary and fallback URLs
+PRIMARY_RELEASE_URL="$PRIMARY_REPO_URL/$GITHUB_REPO/releases/latest/download/$TARGET"
+FALLBACK_RELEASE_URL="$FALLBACK_REPO_URL/$GITHUB_REPO/releases/latest/download/$TARGET"
 DOWNLOAD_PATH="/tmp/$TARGET"
 
-echo "Downloading the latest version from: $LATEST_RELEASE_URL"
+echo "Attempting to download from primary source: $PRIMARY_RELEASE_URL"
 if command -v curl >/dev/null 2>&1; then
-  curl -fsSL "$LATEST_RELEASE_URL" -o "$DOWNLOAD_PATH"
+  curl -fsSL "$PRIMARY_RELEASE_URL" -o "$DOWNLOAD_PATH"
 else
-  wget -q "$LATEST_RELEASE_URL" -O "$DOWNLOAD_PATH"
+  wget -q "$PRIMARY_RELEASE_URL" -O "$DOWNLOAD_PATH"
 fi
+
+# Check if the first download failed (the file won't exist or will be empty)
+if [ ! -s "$DOWNLOAD_PATH" ]; then
+    echo_color "33" "Primary download failed. Trying fallback source..."
+    echo "Attempting to download from fallback source: $FALLBACK_RELEASE_URL"
+    if command -v curl >/dev/null 2>&1; then
+      curl -fsSL "$FALLBACK_RELEASE_URL" -o "$DOWNLOAD_PATH"
+    else
+      wget -q "$FALLBACK_RELEASE_URL" -O "$DOWNLOAD_PATH"
+    fi
+fi
+
+# Final check if download was successful from any source
+if [ ! -s "$DOWNLOAD_PATH" ]; then
+    echo_color "31" "Error: Download failed from all available sources. Please check your internet connection or the GitHub releases page."
+    exit 1
+fi
+
 
 # 3. Install the binary
 echo "Installing to: $INSTALL_DIR/$CMD_NAME"
