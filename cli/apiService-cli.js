@@ -26,19 +26,28 @@ const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
                 : 'Please provide 3 highly useful and practical command-line suggestions.';
 
             return `${finalBasePrompt}
-**MISSION:** For the user's request, provide 3 distinct command-line suggestions. ${existingCommandsPrompt}
+**ROLE:** Act as a senior system administrator and a command-line power user.
+**MISSION:** Analyze the user's request to understand their core problem, then provide 3 distinct, practical, and efficient commands to solve it.
+
+**CRITICAL INSTRUCTION: SHELL-SPECIFIC COMMANDS**
+- You MUST generate commands that are idiomatic and optimized for the user's specific shell: **{{cli}}**.
+- **DO NOT** provide generic commands if a shell-specific, superior alternative exists.
+- **Example for Windows:** If the user's shell is 'PowerShell', a command like \`New-Item -ItemType File "newfile.txt"\` is vastly superior to the generic CMD command \`echo > newfile.txt\`. You MUST provide the PowerShell version.
+- **Example for Linux:** If the user's shell is 'Zsh' or 'Fish', leverage their unique features if it makes the command simpler or more powerful than a standard 'Bash' command.
+
 **GUIDELINES FOR COMMANDS:**
-- **Absolute Adherence:** Your suggestions MUST directly address the user's specific request. If the user asks to "shutdown the system", you must provide shutdown commands.
-- **NO GENERIC COMMANDS:** Do NOT suggest generic, placeholder commands like "echo", "pause", or "exit" unless the user's request is specifically about them. Focus on real, functional commands that achieve the user's goal.
-- **Windows Compatibility:** If the user's OS is "windows", your top priority is to provide commands that work in **BOTH modern PowerShell and the classic Command Prompt (CMD.exe)**. A perfect example is \`shutdown /s /t 0\`, which works in both. If a single command is not compatible, you MUST note it in the warning.
-- **Relevance:** The commands must be perfectly tailored to the user's specific OS and Shell.
+- **Problem-Solving:** Infer the user's true goal. If they ask to "find big files," they likely want to manage disk space, so commands that also sort by size or allow deletion are superior.
+- **Practicality:** Offer commands that are genuinely useful in real-world scenarios.
+- **Safety First:** If a command is destructive (e.g., involves 'rm -rf' or 'Remove-Item'), clearly state this in the warning section.
+
 **OUTPUT FORMAT:** You MUST output exactly 3 lines. Each line must use this exact format, separated by "|||":
 command|||short_explanation|||warning (leave empty if none)
+
 Your entire response MUST adhere to this format. Do not add any introductory text, numbering, or markdown.
 `;
         
         case 'explain':
-            return `${finalBasePrompt}
+             return `${finalBasePrompt}
 **MISSION:** The user has provided a command or a script. Analyze it and provide a comprehensive, well-structured explanation.
 **OUTPUT FORMAT:** Your response must be a single block of text using Markdown. Structure your explanation with clear headings.
 `;
