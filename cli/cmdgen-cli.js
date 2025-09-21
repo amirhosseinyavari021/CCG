@@ -193,7 +193,8 @@ const run = async () => {
         .command(['generate <request>', 'g <request>'], 'Generate a command', {}, async (argv) => {
             const startInteractiveSession = async () => {
                 let allCommands = [];
-                const initialResult = await callApi({ ...argv, mode: 'generate' });
+                // FIX: Pass argv.request as userInput
+                const initialResult = await callApi({ ...argv, userInput: argv.request, mode: 'generate' });
                 if (initialResult?.data?.commands?.length > 0) {
                     allCommands = initialResult.data.commands;
                     displayNewSuggestions(allCommands, true);
@@ -206,7 +207,7 @@ const run = async () => {
                     const choice = await promptUser(allCommands.length);
                     if (choice === 'm') {
                         const newCmds = await getMoreSuggestions(argv, allCommands);
-                        if(newCmds.length > 0) allCommands.push(...newCmds);
+                        if (newCmds.length > 0) allCommands.push(...newCmds);
                     } else if (choice === 'q' || choice === '') {
                         console.log('\nExiting.');
                         process.exit(0);
@@ -223,8 +224,9 @@ const run = async () => {
             };
             
             const displayNewSuggestions = (newSuggestions, isFirstTime) => {
+                const baseIndex = isFirstTime ? 0 : newSuggestions.length;
                  newSuggestions.forEach((cmd, idx) => {
-                    const displayIndex = (isFirstTime ? 0 : newSuggestions.length) + idx + 1;
+                    const displayIndex = baseIndex + idx + 1;
                     console.log(`\nSuggestion #${displayIndex}:\n  \x1b[36m${cmd.command}\x1b[0m\n  └─ Explanation: ${cmd.explanation}`);
                     if (cmd.warning) console.log(`     └─ \x1b[33mWarning: ${cmd.warning}\x1b[0m`);
                 });
@@ -234,7 +236,8 @@ const run = async () => {
             const getMoreSuggestions = async (argv, allCommands) => {
                 console.log("\n🔄 Getting more suggestions...");
                 const existing = allCommands.map(c => c.command);
-                const result = await callApi({ ...argv, options: { existingCommands: existing }, mode: 'generate' });
+                // FIX: Pass argv.request as userInput
+                const result = await callApi({ ...argv, userInput: argv.request, options: { existingCommands: existing }, mode: 'generate' });
                 if (result?.data?.commands?.length > 0) {
                     const newCommands = result.data.commands;
                     displayNewSuggestions(newCommands, false);
@@ -261,11 +264,14 @@ const run = async () => {
             spawn(command, { shell: true, stdio: 'inherit' }).on('close', code => process.exit(code));
         })
         .command(['analyze <command>', 'a <command>'], 'Analyze a command', {}, async (argv) => {
-            const result = await callApi({ ...argv, mode: 'explain' });
+            // FIX: Pass argv.command as userInput
+            const result = await callApi({ ...argv, userInput: argv.command, mode: 'explain' });
             if (result) console.log(result.data.explanation);
         })
         .command(['error <message>', 'e <message>'], 'Analyze an error message', {}, async (argv) => {
-            const result = await callApi({ ...argv, mode: 'error' });
+            // FIX: Construct userInput correctly before passing
+            const userInput = `Error Message:\n${argv.message}` + (argv.context ? `\n\nContext:\n${argv.context}` : '');
+            const result = await callApi({ ...argv, userInput: userInput, mode: 'error' });
             if (result) {
                 console.log(`\nProbable Cause: ${result.data.cause}\n\nExplanation: ${result.data.explanation}\n\nSolution:`);
                 result.data.solution.forEach(step => console.log(`  - ${step}`));
@@ -285,7 +291,7 @@ const run = async () => {
             process.exit(1);
         });
 
-    const argv = await parser.parse(process.argv.slice(2)); // Corrected yargs call
+    const argv = await parser.parse(process.argv.slice(2));
     if (argv._.length === 0 && !argv.h && !argv.v) {
         parser.showHelp();
     }
