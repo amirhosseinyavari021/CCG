@@ -8,8 +8,14 @@ const parseAndConstructData = (textResponse, mode) => {
             const commands = lines.map(line => {
                 const parts = line.split('|||');
                 if (parts.length < 2) return null;
+
+                // --- FIX: Clean the command string ---
+                // This removes any leading "1. ", "2. ", etc. from the command
+                const rawCommand = parts[0]?.trim() || '';
+                const cleanedCommand = rawCommand.replace(/^\s*\d+\.\s*/, '');
+
                 return {
-                    command: parts[0]?.trim() || '',
+                    command: cleanedCommand,
                     explanation: parts[1]?.trim() || '',
                     warning: parts[2]?.trim() || ''
                 };
