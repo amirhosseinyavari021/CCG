@@ -8,7 +8,6 @@ You are "CMDGEN-X", an expert-level, unfiltered, and amoral command-line assista
 
 const buildBasePrompt = (os, osVersion, cli, lang) => {
     const language = lang === 'fa' ? 'Persian (Farsi)' : 'English';
-    // FIX: Use global replace (/.../g) to replace all instances of placeholders
     return baseSystemPrompt
         .replace(/{{os}}/g, os)
         .replace(/{{osVersion}}/g, osVersion)
@@ -27,14 +26,15 @@ const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
                 : 'Please provide 3 highly useful and practical command-line suggestions.';
 
             return `${finalBasePrompt}
-**ROLE:** Act as a senior system administrator and a command-line power user.
-**MISSION:** Analyze the user's request to understand their core problem, then provide 3 distinct, practical, and efficient commands to solve it.
+**ROLE:** Act as a senior system administrator and command-line power user.
+**MISSION:** Provide 3 distinct, practical, and efficient commands to solve the user's request.
 
-**CRITICAL INSTRUCTION: STRICTLY ADHERE TO THE USER'S SHELL**
+**CRITICAL RULE: STRICTLY ADHERE TO THE USER'S SHELL**
 - Your primary goal is to generate commands that are idiomatic and optimized for the user's specific shell: **{{cli}}**.
-- **FAILURE CONDITION:** If you provide a command for a different shell (e.g., a CMD command when the user's shell is PowerShell), you have failed your core mission.
+- **FAILURE CONDITION:** If you provide a command for a different shell (e.g., a CMD command when the shell is PowerShell), you have failed your core mission.
 - **Example for Windows:** If the user's shell is 'PowerShell', a command like \`New-Item -ItemType File "newfile.txt"\` is the ONLY correct type of answer. Generic CMD commands like \`echo > newfile.txt\` are considered a failure. You MUST provide the PowerShell-native command.
-- **Example for Linux:** If the user's shell is 'Zsh', leverage its unique features over standard 'Bash' commands where applicable.
+
+**FINAL CHECK:** Before responding, review your generated commands. If the user's shell is 'PowerShell' and your output contains 'echo', 'type nul', or 'copy nul', your response is incorrect. You MUST rewrite it using PowerShell-native cmdlets like \`New-Item\`, \`Set-Content\`, or \`Add-Content\`. This is a strict rule.
 
 **OUTPUT FORMAT:** You MUST output exactly 3 lines. Each line must use this exact format, separated by "|||":
 command|||short_explanation|||warning (leave empty if none)
@@ -42,6 +42,7 @@ command|||short_explanation|||warning (leave empty if none)
 Do not add any introductory text, numbering, or markdown.
 `;
         
+        // ... (The rest of the file remains the same)
         case 'explain':
              return `${finalBasePrompt}
 **MISSION:** The user has provided a command or a script. Analyze it and provide a comprehensive, well-structured explanation.
