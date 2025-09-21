@@ -78,7 +78,7 @@ const getSystemInfo = () => {
     if (platform === 'win32') {
         detectedOS = 'windows';
         detectedVersion = os.release();
-        detectedShell = process.env.ComSpec && process.env.ComSpec.toLowerCase().includes('cmd.exe') && !process.env.PSModulePath ? 'CMD' : 'PowerShell';
+        detectedShell = process.env.PSModulePath ? 'PowerShell' : 'CMD';
     } else if (platform === 'darwin') {
         detectedOS = 'macos';
         detectedVersion = execSync('sw_vers -productVersion').toString().trim();
@@ -150,16 +150,16 @@ const callApi = async (params) => {
     }
 };
 
-// --- Command Execution (FIXED) ---
+// --- Command Execution ---
 const executeCommand = (command, shell) => {
     return new Promise((resolve) => {
         console.log(`\n🚀 Executing: ${command.command}`);
         const commandString = command.command;
         let child;
-
+        
         if (process.platform === 'win32') {
             const shellExecutable = shell === 'PowerShell' ? 'powershell.exe' : 'cmd.exe';
-            child = spawn(shellExecutable, [commandString], { stdio: 'inherit', shell: true });
+            child = spawn(shellExecutable, ['-Command', commandString], { stdio: 'inherit', shell: true });
         } else {
             child = spawn(commandString, [], { stdio: 'inherit', shell: true });
         }
@@ -186,7 +186,6 @@ const run = async () => {
     checkForUpdates();
 
     const { detectedOS, detectedVersion, detectedShell } = getSystemInfo();
-    // DEBUG LINE: To confirm correct detection
     console.log(`\x1b[90m[DEBUG: OS=${detectedOS}, Shell=${detectedShell}]\x1b[0m`);
 
     const parser = yargs(hideBin(process.argv))
@@ -197,8 +196,7 @@ const run = async () => {
                 const initialResult = await callApi({ ...argv, mode: 'generate' });
                 if (initialResult?.data?.commands?.length > 0) {
                     allCommands = initialResult.data.commands;
-                    displayNewSuggestions(allCommands);
-                    console.warn('\n🚨 WARNING: Executing AI-generated commands can be dangerous. Review them carefully.');
+                    displayNewSuggestions(allCommands, true);
                 } else {
                     console.log("\nNo suggestions could be generated for your request.");
                     process.exit(1);
@@ -207,14 +205,15 @@ const run = async () => {
                 while (true) {
                     const choice = await promptUser(allCommands.length);
                     if (choice === 'm') {
-                        await getMoreSuggestions(argv, allCommands);
+                        const newCmds = await getMoreSuggestions(argv, allCommands);
+                        if(newCmds.length > 0) allCommands.push(...newCmds);
                     } else if (choice === 'q' || choice === '') {
                         console.log('\nExiting.');
                         process.exit(0);
                     } else {
                         const index = parseInt(choice, 10) - 1;
                         if (index >= 0 && index < allCommands.length) {
-                            await executeCommand(allCommands[index], detectedShell); // Pass detectedShell
+                            await executeCommand(allCommands[index], detectedShell);
                             process.exit(0);
                         } else {
                             console.log('\nInvalid choice. Please try again.');
@@ -223,12 +222,13 @@ const run = async () => {
                 }
             };
             
-            const displayNewSuggestions = (newSuggestions, allCommands) => {
+            const displayNewSuggestions = (newSuggestions, isFirstTime) => {
                  newSuggestions.forEach((cmd, idx) => {
-                    const displayIndex = allCommands.length - newSuggestions.length + idx + 1;
+                    const displayIndex = (isFirstTime ? 0 : newSuggestions.length) + idx + 1;
                     console.log(`\nSuggestion #${displayIndex}:\n  \x1b[36m${cmd.command}\x1b[0m\n  └─ Explanation: ${cmd.explanation}`);
                     if (cmd.warning) console.log(`     └─ \x1b[33mWarning: ${cmd.warning}\x1b[0m`);
                 });
+                if(isFirstTime) console.warn('\n🚨 WARNING: Executing AI-generated commands can be dangerous. Review them carefully.');
             };
             
             const getMoreSuggestions = async (argv, allCommands) => {
@@ -237,10 +237,11 @@ const run = async () => {
                 const result = await callApi({ ...argv, options: { existingCommands: existing }, mode: 'generate' });
                 if (result?.data?.commands?.length > 0) {
                     const newCommands = result.data.commands;
-                    allCommands.push(...newCommands);
-                    displayNewSuggestions(newCommands, allCommands);
+                    displayNewSuggestions(newCommands, false);
+                    return newCommands;
                 } else {
                    console.log("\nCouldn't fetch more suggestions.");
+                   return [];
                 }
             };
             
@@ -251,16 +252,13 @@ const run = async () => {
                     resolve(choice.toLowerCase().trim());
                 });
             });
-
             await startInteractiveSession();
         })
         .command('update', 'Update cmdgen to the latest version', {}, () => {
-            console.log('Running update...');
             const command = process.platform === 'win32'
                 ? 'iwr https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.ps1 | iex'
                 : 'curl -fsSL https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.sh | bash';
-            const child = spawn(command, { shell: true, stdio: 'inherit' });
-            child.on('close', code => process.exit(code));
+            spawn(command, { shell: true, stdio: 'inherit' }).on('close', code => process.exit(code));
         })
         .command(['analyze <command>', 'a <command>'], 'Analyze a command', {}, async (argv) => {
             const result = await callApi({ ...argv, mode: 'explain' });
@@ -273,7 +271,11 @@ const run = async () => {
                 result.data.solution.forEach(step => console.log(`  - ${step}`));
             }
         })
+        .option('os', { describe: 'Target OS', type: 'string', default: detectedOS })
+        .option('osVersion', { describe: 'Target OS Version', type: 'string', default: detectedVersion })
+        .option('shell', { describe: 'Target shell', type: 'string', default: detectedShell })
         .option('lang', { describe: 'Set response language (en, fa)', type: 'string', default: 'en' })
+        .demandCommand(1, 'You must provide a command or run "cmdgen --help".')
         .help('h').alias('h', 'help')
         .version('v', `Show version number: ${packageJson.version}`).alias('v', 'version')
         .strict().wrap(null)
@@ -283,7 +285,7 @@ const run = async () => {
             process.exit(1);
         });
 
-    const argv = await parser.parse({ ...process.argv.slice(2), os: detectedOS, osVersion: detectedVersion, cli: detectedShell });
+    const argv = await parser.parse(process.argv.slice(2)); // Corrected yargs call
     if (argv._.length === 0 && !argv.h && !argv.v) {
         parser.showHelp();
     }
