@@ -24,7 +24,6 @@ async function getConfig() {
     if (await fs.pathExists(configFile)) {
         return fs.readJson(configFile);
     }
-    // Default config for first run
     const defaultConfig = { first_run_shown: false, last_update_check: 0 };
     await fs.writeJson(configFile, defaultConfig);
     return defaultConfig;
@@ -40,7 +39,7 @@ let spinnerInterval;
 const startSpinner = (message) => {
     const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
     let i = 0;
-    process.stdout.write('\x1B[?25l');
+    process.stdout.write('\x1B[?25l'); // Hide cursor
     spinnerInterval = setInterval(() => {
         process.stdout.write(`\r${frames[i++ % frames.length]} ${message}`);
     }, 80);
@@ -48,18 +47,15 @@ const startSpinner = (message) => {
 
 const stopSpinner = () => {
     clearInterval(spinnerInterval);
-    process.stdout.write('\r' + ' '.repeat(50) + '\r');
-    process.stdout.write('\x1B[?25h');
+    process.stdout.write('\r' + ' '.repeat(50) + '\r'); // Clear the line
+    process.stdout.write('\x1B[?25h'); // Show cursor
 };
 
 // --- Update Checker ---
 async function checkForUpdates() {
     const config = await getConfig();
     const now = Date.now();
-    // Check for updates once every 24 hours
-    if (now - config.last_update_check < 24 * 60 * 60 * 1000) {
-        return;
-    }
+    if (now - config.last_update_check < 24 * 60 * 60 * 1000) return;
 
     try {
         const response = await axios.get('https://api.github.com/repos/amirhosseinyavari021/ay-cmdgen/releases/latest', { timeout: 2000 });
@@ -71,28 +67,22 @@ async function checkForUpdates() {
             console.log(`   Run \x1b[36mcmdgen update\x1b[0m to get the latest version.\n`);
         }
         await setConfig({ last_update_check: now });
-    } catch (error) {
-        // Ignore errors, e.g., if offline
-    }
+    } catch (error) { /* Ignore errors */ }
 }
 
-// --- OS & System Info Detection ---
+// --- OS & System Info ---
 const getSystemInfo = () => {
     const platform = process.platform;
-    let detectedOS = 'linux';
-    let detectedVersion = os.release();
-    let detectedShell = 'sh';
+    let detectedOS = 'linux', detectedVersion = os.release(), detectedShell = 'sh';
 
     if (platform === 'win32') {
         detectedOS = 'windows';
-        detectedVersion = os.release();
         detectedShell = process.env.PSModulePath ? 'PowerShell' : 'CMD';
     } else if (platform === 'darwin') {
         detectedOS = 'macos';
         detectedVersion = execSync('sw_vers -productVersion').toString().trim();
         detectedShell = process.env.SHELL ? path.basename(process.env.SHELL) : 'zsh';
     } else { // Linux
-        detectedOS = 'linux';
         try {
             const osRelease = execSync('cat /etc/os-release').toString();
             const versionMatch = osRelease.match(/^PRETTY_NAME="([^"]+)"/m);
@@ -104,9 +94,63 @@ const getSystemInfo = () => {
 };
 
 // --- API Call Logic ---
+const primaryServerUrl = 'https://ay-cmdgen-cli.onrender.com';
+const fallbackServerUrl = 'https://cmdgen.onrender.com';
+
 const callApi = async (params) => {
-    // ... (This function remains the same as the previous corrected version)
-    // ... (تابع فراخوانی API مانند نسخه اصلاح شده قبلی باقی می‌ماند)
+    const { mode, userInput, os, osVersion, cli, lang, options = {} } = params;
+    const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, options);
+    const payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userInput }] };
+
+    const attemptRequest = (url) => new Promise(async (resolve, reject) => {
+        try {
+            const response = await axios.post(`${url}/api/proxy`, payload, { responseType: 'stream', timeout: 60000 });
+            stopSpinner();
+            startSpinner('Generating response...');
+            let fullContent = '';
+            const decoder = new TextDecoder();
+            response.data.on('data', chunk => {
+                const textChunk = decoder.decode(chunk, { stream: true });
+                textChunk.split('\n').filter(line => line.startsWith('data: ')).forEach(line => {
+                    const jsonPart = line.substring(5).trim();
+                    if (jsonPart && jsonPart !== "[DONE]") {
+                        try {
+                            fullContent += JSON.parse(jsonPart).choices[0].delta.content || '';
+                        } catch (e) {}
+                    }
+                });
+            });
+            response.data.on('end', () => {
+                stopSpinner();
+                const finalData = parseAndConstructData(fullContent, mode, cli);
+                if (!finalData) reject(new Error("Parsing failed"));
+                else resolve({ type: mode, data: finalData });
+            });
+            response.data.on('error', reject);
+        } catch (err) {
+            reject(err);
+        }
+    });
+
+    try {
+        startSpinner('Connecting to primary server...');
+        return await attemptRequest(primaryServerUrl);
+    } catch (primaryError) {
+        stopSpinner();
+        console.warn(`\n⚠️  Primary server failed. Trying fallback...`);
+        startSpinner('Connecting to fallback server...');
+        try {
+            return await attemptRequest(fallbackServerUrl);
+        } catch (fallbackError) {
+            stopSpinner();
+            const err = fallbackError || primaryError;
+            if (err.code === 'ECONNABORTED') console.error(`\n❌ Error: Both servers timed out.`);
+            else if (err.response) console.error(`\n❌ Error: Server responded with status ${err.response.status}.`);
+            else if (err.request) console.error(`\n❌ Error: Could not connect to any server.`);
+            else console.error(`\n❌ Error: ${err.message || "An unknown error occurred."}`);
+            return null;
+        }
+    }
 };
 
 // --- Command Execution ---
@@ -133,15 +177,13 @@ const run = async () => {
         await setConfig({ first_run_shown: true });
     }
     
-    // Check for updates in the background, don't wait for it
-    checkForUpdates();
+    checkForUpdates(); // Runs in the background
 
     const { detectedOS, detectedVersion, detectedShell } = getSystemInfo();
     const parser = yargs(hideBin(process.argv))
         .scriptName("cmdgen")
         .usage('Usage: $0 <command> "[input]" [options]')
         .command(['generate <request>', 'g <request>'], 'Generate a command', {}, async (argv) => {
-            
             let allCommands = [];
 
             const promptUser = () => new Promise(resolve => {
@@ -159,22 +201,7 @@ const run = async () => {
                     if (cmd.warning) console.log(`     └─ \x1b[33mWarning: ${cmd.warning}\x1b[0m`);
                 });
             };
-
-            const getMoreSuggestions = async () => {
-                console.log("\n🔄 Getting more suggestions...");
-                const existing = allCommands.map(c => c.command);
-                const result = await callApi({ ...argv, userInput: argv.request, options: { existingCommands: existing }, mode: 'generate' });
-                if (result?.data?.commands?.length > 0) {
-                    allCommands.push(...result.data.commands);
-                    displayNewSuggestions(result.data.commands);
-                    return true;
-                } else {
-                    console.log("\nCouldn't fetch more suggestions.");
-                    return false;
-                }
-            };
             
-            // --- Main Interactive Loop ---
             const startInteractiveSession = async () => {
                 const initialResult = await callApi({ ...argv, userInput: argv.request, mode: 'generate' });
                 if (initialResult?.data?.commands?.length > 0) {
@@ -189,8 +216,15 @@ const run = async () => {
                 while (true) {
                     const choice = await promptUser();
                     if (choice === 'm') {
-                        const success = await getMoreSuggestions();
-                        if (!success) break;
+                        console.log("\n🔄 Getting more suggestions...");
+                        const existing = allCommands.map(c => c.command);
+                        const result = await callApi({ ...argv, userInput: argv.request, options: { existingCommands: existing }, mode: 'generate' });
+                        if (result?.data?.commands?.length > 0) {
+                            allCommands.push(...result.data.commands);
+                            displayNewSuggestions(result.data.commands);
+                        } else {
+                           console.log("\nCouldn't fetch more suggestions.");
+                        }
                     } else if (choice === 'q' || choice === '') {
                         console.log('\nExiting.');
                         process.exit(0);
@@ -205,50 +239,56 @@ const run = async () => {
                     }
                 }
             };
-
             await startInteractiveSession();
         })
-        .command('update', 'Update cmdgen to the latest version', {}, async () => {
+        .command('update', 'Update cmdgen to the latest version', {}, () => {
             console.log('Checking for the latest version...');
             const platform = process.platform;
-            let updateCommand;
-
-            if (platform === 'win32') {
-                updateCommand = 'iwr https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.ps1 | iex';
-                console.log('Running update for Windows. Please wait...');
-            } else {
-                updateCommand = 'curl -fsSL https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.sh | bash';
-                console.log('Running update for Linux/macOS. Please wait...');
-            }
+            const command = platform === 'win32'
+                ? 'iwr https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.ps1 | iex'
+                : 'curl -fsSL https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.sh | bash';
             
-            exec(updateCommand, (error, stdout, stderr) => {
-                if (error) {
-                    console.error(`\n❌ Update failed: ${error.message}`);
-                    return;
-                }
-                if (stderr) {
-                    console.error(`\n❌ Update error: ${stderr}`);
-                    return;
-                }
+            console.log(`Running update command for ${platform}...`);
+            exec(command, (error, stdout, stderr) => {
+                if (error) return console.error(`\n❌ Update failed: ${error.message}`);
+                if (stderr) return console.error(`\n❌ Update error: ${stderr}`);
                 console.log(stdout);
-                console.log('\n✅ Update complete! Please open a new terminal to use the new version.');
+                console.log('\n✅ Update complete! Please open a new terminal.');
             });
         })
-        // ... Other commands like 'analyze' and 'error' remain the same
+        .command(['analyze <command>', 'a <command>'], 'Analyze a command', {}, async (argv) => {
+            const result = await callApi({ ...argv, userInput: argv.command, mode: 'explain' });
+            if (result) console.log(result.data.explanation);
+            else process.exit(1);
+        })
+        .command(['error <message>', 'e <message>'], 'Analyze an error message', {}, async (argv) => {
+            const userInput = `Error Message:\n${argv.message}` + (argv.context ? `\n\nContext:\n${argv.context}` : '');
+            const result = await callApi({ ...argv, userInput: userInput, mode: 'error' });
+            if (result) {
+                console.log(`\nProbable Cause: ${result.data.cause}\n\nExplanation: ${result.data.explanation}\n\nSolution:`);
+                result.data.solution.forEach(step => console.log(`  - ${step}`));
+            } else process.exit(1);
+        })
         .option('os', { describe: 'Target OS', type: 'string', default: detectedOS })
-        // ... Other options
+        .option('osVersion', { describe: 'Target OS Version', type: 'string', default: detectedVersion })
+        .option('shell', { describe: 'Target shell', type: 'string', default: detectedShell })
+        .option('context', { alias: 'c', describe: 'Provide context for error analysis', type: 'string' })
+        .option('lang', { describe: 'Set response language (en, fa)', type: 'string', default: 'en' })
+        .demandCommand(1, 'You must provide a command or run "cmdgen --help".')
         .help('h').alias('h', 'help')
         .version('v', `Show version number: ${packageJson.version}`).alias('v', 'version')
         .strict().wrap(null)
         .fail((msg, err) => {
-            console.error(err ? `\n❌ An unexpected error occurred: ${err.message}` : `\n❌ Error: ${msg}`);
-            if (!err) parser.showHelp();
+            if (err) console.error(`\n❌ An unexpected error occurred: ${err.message}`);
+            else {
+                console.error(`\n❌ Error: ${msg}`);
+                parser.showHelp();
+            }
             process.exit(1);
         });
 
     const argv = await parser.parse();
     if (argv._.length === 0 && !argv.h && !argv.v) {
-        // No command was run, show help
         parser.showHelp();
     }
 };
