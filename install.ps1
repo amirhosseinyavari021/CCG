@@ -4,19 +4,27 @@ $InstallDir = "$env:ProgramFiles\AY-CMDGEN"
 $ExeName = "cmdgen.exe"
 $ReleaseAsset = "cmdgen-win.exe"
 
+# Define primary and fallback URLs
+$PrimaryReleaseUrl = "https://github.com/$GithubRepo/releases/latest/download/$ReleaseAsset"
+$FallbackReleaseUrl = "https://github.com/$GithubRepo/releases/latest/download/$ReleaseAsset" # Example: could be a different mirror
+$DownloadPath = "$env:TEMP\$ReleaseAsset"
+
 # --- Main Logic ---
 Write-Host "Installing AY-CMDGEN for Windows..." -ForegroundColor Cyan
 
-# 1. Get the latest release URL
-$LatestReleaseUrl = "https://github.com/$GithubRepo/releases/latest/download/$ReleaseAsset"
-$DownloadPath = "$env:TEMP\$ReleaseAsset"
-
-Write-Host "Downloading the latest version from: $LatestReleaseUrl"
+# 1. Attempt to download the latest release with fallback logic
 try {
-    Invoke-WebRequest -Uri $LatestReleaseUrl -OutFile $DownloadPath -UseBasicParsing
+    Write-Host "Attempting to download from primary source: $PrimaryReleaseUrl"
+    Invoke-WebRequest -Uri $PrimaryReleaseUrl -OutFile $DownloadPath -UseBasicParsing -ErrorAction Stop
 } catch {
-    Write-Host "Error: Download failed. Please check your internet connection or the release page on GitHub." -ForegroundColor Red
-    exit 1
+    Write-Host "Primary download failed. Trying fallback source..." -ForegroundColor Yellow
+    try {
+        Write-Host "Attempting to download from fallback source: $FallbackReleaseUrl"
+        Invoke-WebRequest -Uri $FallbackReleaseUrl -OutFile $DownloadPath -UseBasicParsing -ErrorAction Stop
+    } catch {
+        Write-Host "Error: Download failed from all available sources. Please check your internet connection or the GitHub releases page." -ForegroundColor Red
+        exit 1
+    }
 }
 
 # 2. Create installation directory
