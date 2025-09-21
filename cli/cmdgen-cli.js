@@ -150,7 +150,7 @@ const callApi = async (params) => {
     }
 };
 
-// --- Command Execution ---
+// --- Command Execution (FIXED) ---
 const executeCommand = (command, shell) => {
     return new Promise((resolve) => {
         console.log(`\n🚀 Executing: ${command.command}`);
@@ -158,9 +158,12 @@ const executeCommand = (command, shell) => {
         let child;
         
         if (process.platform === 'win32') {
-            const shellExecutable = shell === 'PowerShell' ? 'powershell.exe' : 'cmd.exe';
-            child = spawn(shellExecutable, ['-Command', commandString], { stdio: 'inherit', shell: true });
-        } else {
+            if (shell === 'PowerShell') {
+                child = spawn('powershell.exe', ['-NoProfile', '-Command', commandString], { stdio: 'inherit' });
+            } else { // CMD
+                child = spawn('cmd.exe', ['/C', commandString], { stdio: 'inherit' });
+            }
+        } else { // Linux/macOS
             child = spawn(commandString, [], { stdio: 'inherit', shell: true });
         }
 
@@ -193,11 +196,10 @@ const run = async () => {
         .command(['generate <request>', 'g <request>'], 'Generate a command', {}, async (argv) => {
             const startInteractiveSession = async () => {
                 let allCommands = [];
-                // FIX: Pass argv.request as userInput
                 const initialResult = await callApi({ ...argv, userInput: argv.request, mode: 'generate' });
                 if (initialResult?.data?.commands?.length > 0) {
                     allCommands = initialResult.data.commands;
-                    displayNewSuggestions(allCommands, true);
+                    displayNewSuggestions(allCommands, allCommands, true);
                 } else {
                     console.log("\nNo suggestions could be generated for your request.");
                     process.exit(1);
@@ -207,7 +209,7 @@ const run = async () => {
                     const choice = await promptUser(allCommands.length);
                     if (choice === 'm') {
                         const newCmds = await getMoreSuggestions(argv, allCommands);
-                        if (newCmds.length > 0) allCommands.push(...newCmds);
+                        if(newCmds.length > 0) allCommands.push(...newCmds);
                     } else if (choice === 'q' || choice === '') {
                         console.log('\nExiting.');
                         process.exit(0);
@@ -223,10 +225,9 @@ const run = async () => {
                 }
             };
             
-            const displayNewSuggestions = (newSuggestions, isFirstTime) => {
-                const baseIndex = isFirstTime ? 0 : newSuggestions.length;
+            const displayNewSuggestions = (newSuggestions, allCommands, isFirstTime) => {
                  newSuggestions.forEach((cmd, idx) => {
-                    const displayIndex = baseIndex + idx + 1;
+                    const displayIndex = allCommands.length - newSuggestions.length + idx + 1;
                     console.log(`\nSuggestion #${displayIndex}:\n  \x1b[36m${cmd.command}\x1b[0m\n  └─ Explanation: ${cmd.explanation}`);
                     if (cmd.warning) console.log(`     └─ \x1b[33mWarning: ${cmd.warning}\x1b[0m`);
                 });
@@ -236,11 +237,10 @@ const run = async () => {
             const getMoreSuggestions = async (argv, allCommands) => {
                 console.log("\n🔄 Getting more suggestions...");
                 const existing = allCommands.map(c => c.command);
-                // FIX: Pass argv.request as userInput
                 const result = await callApi({ ...argv, userInput: argv.request, options: { existingCommands: existing }, mode: 'generate' });
                 if (result?.data?.commands?.length > 0) {
                     const newCommands = result.data.commands;
-                    displayNewSuggestions(newCommands, false);
+                    displayNewSuggestions(newCommands, allCommands, false);
                     return newCommands;
                 } else {
                    console.log("\nCouldn't fetch more suggestions.");
@@ -264,12 +264,10 @@ const run = async () => {
             spawn(command, { shell: true, stdio: 'inherit' }).on('close', code => process.exit(code));
         })
         .command(['analyze <command>', 'a <command>'], 'Analyze a command', {}, async (argv) => {
-            // FIX: Pass argv.command as userInput
             const result = await callApi({ ...argv, userInput: argv.command, mode: 'explain' });
             if (result) console.log(result.data.explanation);
         })
         .command(['error <message>', 'e <message>'], 'Analyze an error message', {}, async (argv) => {
-            // FIX: Construct userInput correctly before passing
             const userInput = `Error Message:\n${argv.message}` + (argv.context ? `\n\nContext:\n${argv.context}` : '');
             const result = await callApi({ ...argv, userInput: userInput, mode: 'error' });
             if (result) {
