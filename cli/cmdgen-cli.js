@@ -3,7 +3,7 @@
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
 const axios = require('axios/dist/node/axios.cjs');
-const { spawn, execSync, exec } = require('child_process');
+const { exec, execSync, spawn } = require('child_process');
 const { TextDecoder } = require('util');
 const os = require('os');
 const path = require('path');
@@ -39,7 +39,7 @@ let spinnerInterval;
 const startSpinner = (message) => {
     const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
     let i = 0;
-    process.stdout.write('\x1B[?25l'); // Hide cursor
+    process.stdout.write('\x1B[?25l');
     spinnerInterval = setInterval(() => {
         process.stdout.write(`\r${frames[i++ % frames.length]} ${message}`);
     }, 80);
@@ -47,8 +47,8 @@ const startSpinner = (message) => {
 
 const stopSpinner = () => {
     clearInterval(spinnerInterval);
-    process.stdout.write('\r' + ' '.repeat(50) + '\r'); // Clear the line
-    process.stdout.write('\x1B[?25h'); // Show cursor
+    process.stdout.write('\r' + ' '.repeat(50) + '\r');
+    process.stdout.write('\x1B?25h');
 };
 
 // --- Update Checker ---
@@ -153,18 +153,26 @@ const callApi = async (params) => {
     }
 };
 
-// --- Command Execution ---
+// --- Command Execution (FIXED) ---
 const executeCommand = (command) => {
     return new Promise((resolve) => {
         console.log(`\n🚀 Executing: ${command.command}`);
-        const child = spawn(command.command, [], { stdio: 'inherit', shell: true });
+        const child = exec(command.command);
+
+        // Pipe the output of the child process to our main process
+        child.stdout.pipe(process.stdout);
+        child.stderr.pipe(process.stderr);
+
         child.on('close', (code) => {
-            if (code !== 0) console.error(`\n❌ Process exited with code ${code}`);
+            if (code !== 0) {
+                console.error(`\n❌ Process exited with code ${code}`);
+            }
             resolve();
         });
+
         child.on('error', (err) => {
             console.error(`\n❌ Failed to start process:\n${err.message}`);
-            resolve();
+            resolve(); // Resolve even on error to not hang the app
         });
     });
 };
@@ -249,11 +257,13 @@ const run = async () => {
                 : 'curl -fsSL https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.sh | bash';
             
             console.log(`Running update command for ${platform}...`);
-            exec(command, (error, stdout, stderr) => {
-                if (error) return console.error(`\n❌ Update failed: ${error.message}`);
-                if (stderr) return console.error(`\n❌ Update error: ${stderr}`);
-                console.log(stdout);
-                console.log('\n✅ Update complete! Please open a new terminal.');
+            const child = spawn(command, { shell: true, stdio: 'inherit' });
+            child.on('close', (code) => {
+                if (code === 0) {
+                    console.log('\n✅ Update complete! Please open a new terminal.');
+                } else {
+                    console.error(`\n❌ Update failed with code ${code}.`);
+                }
             });
         })
         .command(['analyze <command>', 'a <command>'], 'Analyze a command', {}, async (argv) => {
