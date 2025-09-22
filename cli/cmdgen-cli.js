@@ -99,7 +99,6 @@ const showWelcomeBanner = () => {
 
 const gracefulExit = () => {
     console.log(chalk.green(`\n🙏  Thank you for using cmdgen!  `));
-    console.log(chalk.yellow(`⭐  If you enjoy this tool, don’t forget to share it with others.`));
     process.exit(0);
 };
 
@@ -267,7 +266,7 @@ const executeCommand = (command, shell) => {
         const commandString = command.command;
         let child;
         if (process.platform === 'win32') {
-            if (shell.toLowerCase() === 'powershell') {
+            if (shell && shell.toLowerCase() === 'powershell') {
                 child = spawn('powershell.exe', ['-NoProfile', '-Command', commandString], { stdio: 'inherit' });
             } else {
                 child = spawn('cmd.exe', ['/C', commandString], { stdio: 'inherit' });
@@ -291,8 +290,14 @@ const run = async () => {
     const args = hideBin(process.argv);
     
     // Make the main command case-insensitive
-    if (args.length > 0 && !args[0].startsWith('-')) {
-        args[0] = args[0].toLowerCase();
+    const command = args[0]?.toLowerCase();
+
+    const needsConfig = !['config', 'update', undefined, '--help', '-h', '--version', '-v'].includes(command);
+
+    if (needsConfig && (!config.os || !config.shell)) {
+        console.log(chalk.yellow('Welcome to CMDGEN! Let\'s get you set up first.'));
+        config = await runSetupWizard();
+        console.log(chalk.cyan('\nSetup complete! Now running your original command...'));
     }
 
     const parser = yargs(args)
@@ -458,19 +463,8 @@ const run = async () => {
         process.exit(0);
     }
     
-    // --- ROBUST LOGIC TO TRIGGER SETUP OR COMMANDS ---
-    const command = argv._[0];
-    const needsConfig = !['config', 'update', undefined].includes(command);
-
-    if (needsConfig && (!config.os || !config.shell)) {
-        console.log(chalk.yellow('Welcome to CMDGEN! You need to configure it before first use.'));
-        await runSetupWizard();
-        console.log(chalk.cyan('\nSetup complete. Please run your command again.'));
-        process.exit(0);
-    }
-    
     const today = new Date().toISOString().slice(0, 10);
-    if (config.lastRunDate !== today) {
+    if (!config.lastRunDate) {
         showWelcomeBanner();
         await setConfig({ lastRunDate: today });
     }
@@ -479,13 +473,14 @@ const run = async () => {
         await checkForUpdates();
     }
 
-    if (!command) {
+    if (!command && args.length === 0) {
         showHelp(config);
     }
 };
 
 run().catch(err => {
+    stopSpinner(); // Ensure spinner stops on any catastrophic failure
     console.error(chalk.red(`\nA critical error occurred: ${err.message}`));
-    console.error(err);
+    console.error(err.stack);
     process.exit(1);
 });
