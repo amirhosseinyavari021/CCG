@@ -301,7 +301,6 @@ const run = async () => {
         .option('h', { alias: 'help', type: 'boolean', description: 'Show this help menu' })
         .option('v', { alias: 'version', type: 'boolean', description: 'Show version number' })
         .command(['generate <request>', 'g <request>'], 'Generate a single command', {}, async (argv) => {
-            // This command logic is now self-contained
             const startInteractiveSession = async () => {
                 let allCommands = [];
                 const initialResult = await callApi({ ...argv, userInput: argv.request, mode: 'generate', cli: argv.shell });
@@ -318,7 +317,7 @@ const run = async () => {
                     if (choice.type === 'execute') {
                         await executeCommand(allCommands[choice.index], argv.shell);
                         gracefulExit();
-                        return; // Exit the session
+                        return;
                     } else if (choice.type === 'more') {
                         const newCmds = await getMoreSuggestions(argv, allCommands);
                         if(newCmds.length > 0) {
@@ -329,9 +328,8 @@ const run = async () => {
                         }
                     } else if (choice.type === 'quit') {
                         gracefulExit();
-                        return; // Exit the session
+                        return;
                     }
-                    // if choice.type is 'reprompt', the loop continues
                 }
             };
             const displayNewSuggestions = (newSuggestions, allCommands, isFirstTime) => {
@@ -461,19 +459,17 @@ const run = async () => {
         process.exit(0);
     }
     
-    // Show daily welcome banner if it's a new day
     const today = new Date().toISOString().slice(0, 10);
     if (config.lastRunDate !== today) {
         showWelcomeBanner();
         await setConfig({ lastRunDate: today });
     }
     
-    // If config is missing, and a command that needs it is run, force setup.
+    // If config is missing, force setup for any command that needs it.
+    const command = argv._[0];
+    const allowedCommandsWithoutConfig = ['config', 'update', undefined]; 
     if (!config.os || !config.shell) {
-        const command = argv._[0];
-        // Allow these commands to run without config
-        const allowedCommands = ['config', 'update', undefined]; 
-        if (!allowedCommands.includes(command)) {
+        if (!allowedCommandsWithoutConfig.includes(command)) {
             console.log(chalk.yellow('Welcome to CMDGEN! You need to configure it before first use.'));
             await runSetupWizard();
             console.log(chalk.cyan('\nSetup complete. Please run your command again.'));
@@ -481,16 +477,19 @@ const run = async () => {
         }
     }
     
-    await checkForUpdates();
+    // We only check for updates if a command is actually going to be run
+    if(command){
+        await checkForUpdates();
+    }
 
     // If no command was provided (e.g., just `cmdgen`), show help.
-    if (argv._.length === 0) {
+    if (!command) {
         showHelp(config);
     }
 };
 
 run().catch(err => {
     console.error(chalk.red(`\nA critical error occurred: ${err.message}`));
-    console.error(err); // Log full error for debugging
+    console.error(err);
     process.exit(1);
 });
