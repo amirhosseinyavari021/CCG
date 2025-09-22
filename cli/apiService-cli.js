@@ -21,13 +21,14 @@ const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
 
     // --- NEW: Shell-specific instruction block ---
     let shellInstructions = "";
-    if (cli.toLowerCase() === 'powershell') {
+    // *** FIX IS HERE: Added a check to ensure 'cli' is not undefined before calling toLowerCase() ***
+    if (cli && cli.toLowerCase() === 'powershell') {
         shellInstructions = `
 **SHELL NUANCE: POWERSHELL**
 - You MUST use modern, PowerShell-native cmdlets (e.g., \`Remove-Item\`, \`Get-Content\`, \`New-Item\`).
 - **FAILURE CONDITION:** If your output contains legacy aliases or CMD commands like 'del', 'rmdir', 'erase', 'copy', 'move', 'dir', 'cls', or 'type', you have FAILED. Rewrite the command using the proper PowerShell cmdlet. For deleting files, the only correct answer is \`Remove-Item\`. This is a strict, non-negotiable rule.
 `;
-    } else if (cli.toLowerCase() === 'cmd') {
+    } else if (cli && cli.toLowerCase() === 'cmd') {
         shellInstructions = `
 **SHELL NUANCE: CMD (Command Prompt)**
 - You MUST use traditional Windows CMD commands (e.g., \`del\`, \`rmdir\`, \`copy\`, \`move\`, \`dir\`, \`cls\`, \`type\`).
@@ -54,7 +55,7 @@ Do not add any introductory text, numbering, or markdown.
 `;
         
         case 'script':
-            const shellType = cli.toLowerCase().includes('powershell') ? 'PowerShell (.ps1)' : 'Shell Script (.sh)';
+            const shellType = cli && cli.toLowerCase().includes('powershell') ? 'PowerShell (.ps1)' : 'Shell Script (.sh)';
             return `${finalBasePrompt}
 **ROLE:** Act as an expert script developer.
 **MISSION:** The user has described a multi-step task. Your goal is to generate a complete, executable script that automates this task.
