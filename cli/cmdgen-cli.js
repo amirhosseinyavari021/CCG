@@ -53,7 +53,7 @@ async function addToHistory(commandItem) {
 }
 
 // --- UI & UX Functions ---
-const showHelp = (config) => {
+const showHelp = (config = {}) => {
     const osDefault = chalk.yellow(config.os || 'not set');
     const shellDefault = chalk.yellow(config.shell || 'not set');
 
@@ -145,7 +145,6 @@ const runSetupWizard = async () => {
     const newConfig = { 'os': os, 'shell': shell, 'osVersion': '' };
     await setConfig(newConfig);
     console.log(chalk.green(`\n✅ Configuration saved successfully: OS=${os}, Shell=${shell}`));
-    console.log('You can now use CMDGEN!');
     return newConfig;
 };
 
@@ -302,10 +301,7 @@ const run = async () => {
         .option('h', { alias: 'help', type: 'boolean', description: 'Show this help menu' })
         .option('v', { alias: 'version', type: 'boolean', description: 'Show version number' })
         .command(['generate <request>', 'g <request>'], 'Generate a single command', {}, async (argv) => {
-            if (!argv.os || !argv.shell) {
-                console.log(chalk.red('Default OS/Shell not configured. Please run `cmdgen config` first.'));
-                process.exit(1);
-            }
+            // This command logic is now self-contained
             const startInteractiveSession = async () => {
                 let allCommands = [];
                 const initialResult = await callApi({ ...argv, userInput: argv.request, mode: 'generate', cli: argv.shell });
@@ -322,19 +318,20 @@ const run = async () => {
                     if (choice.type === 'execute') {
                         await executeCommand(allCommands[choice.index], argv.shell);
                         gracefulExit();
-                        break;
+                        return; // Exit the session
                     } else if (choice.type === 'more') {
                         const newCmds = await getMoreSuggestions(argv, allCommands);
                         if(newCmds.length > 0) {
                             newCmds.forEach(cmd => addToHistory(cmd));
                             allCommands.push(...newCmds);
+                        } else {
+                             console.log(chalk.yellow("Couldn't fetch more suggestions."));
                         }
-                        else console.log(chalk.yellow("Couldn't fetch more suggestions."));
                     } else if (choice.type === 'quit') {
                         gracefulExit();
-                        break;
+                        return; // Exit the session
                     }
-                    // If choice.type is 'reprompt', the loop will continue naturally
+                    // if choice.type is 'reprompt', the loop continues
                 }
             };
             const displayNewSuggestions = (newSuggestions, allCommands, isFirstTime) => {
@@ -385,10 +382,6 @@ const run = async () => {
             await startInteractiveSession();
         })
         .command(['script <request>', 's <request>'], 'Generate a full script', {}, async (argv) => {
-            if (!argv.os || !argv.shell) {
-                console.log(chalk.red('Default OS/Shell not configured. Please run `cmdgen config` first.'));
-                process.exit(1);
-            }
             const result = await callApi({ ...argv, userInput: argv.request, mode: 'script', cli: argv.shell });
             if (result) {
                 console.log(chalk.cyan.bold('\n--- Generated Script ---'));
@@ -399,7 +392,7 @@ const run = async () => {
             }
             gracefulExit();
         })
-        .command('history', 'Show recently generated commands and scripts', {}, async () => {
+        .command('history', 'Show recently generated commands and scripts', {}, async (argv) => {
             const config = await getConfig();
             const history = config.history || [];
             if (history.length === 0) {
@@ -432,19 +425,11 @@ const run = async () => {
             }
         })
         .command(['analyze <command>', 'a <command>'], 'Understand what a command does', {}, async (argv) => {
-            if (!argv.os || !argv.shell) {
-                console.log(chalk.red('Default OS/Shell not configured. Please run `cmdgen config` first.'));
-                process.exit(1);
-            }
             const result = await callApi({ ...argv, userInput: argv.command, mode: 'explain', cli: argv.shell });
             if (result) console.log(result.data.explanation);
             gracefulExit();
         })
         .command(['error <message>', 'e <message>'], 'Help with an error message', {}, async (argv) => {
-            if (!argv.os || !argv.shell) {
-                console.log(chalk.red('Default OS/Shell not configured. Please run `cmdgen config` first.'));
-                process.exit(1);
-            }
             const userInput = `Error Message:\n${argv.message}` + (argv.context ? `\n\nContext:\n${argv.context}` : '');
             const result = await callApi({ ...argv, userInput: userInput, mode: 'error', cli: argv.shell });
             if (result) {
@@ -464,6 +449,7 @@ const run = async () => {
             process.exit(1);
         });
 
+    // --- LOGIC TO TRIGGER SETUP OR COMMANDS ---
     const argv = await parser.argv;
 
     if (argv.help) {
@@ -475,25 +461,29 @@ const run = async () => {
         process.exit(0);
     }
     
+    // Show daily welcome banner if it's a new day
     const today = new Date().toISOString().slice(0, 10);
     if (config.lastRunDate !== today) {
         showWelcomeBanner();
         await setConfig({ lastRunDate: today });
     }
     
+    // If config is missing, and a command that needs it is run, force setup.
     if (!config.os || !config.shell) {
-        if (args.length === 0 || (argv._.length > 0 && !['config', 'update'].includes(argv._[0]))) {
+        const command = argv._[0];
+        // Allow these commands to run without config
+        const allowedCommands = ['config', 'update', undefined]; 
+        if (!allowedCommands.includes(command)) {
             console.log(chalk.yellow('Welcome to CMDGEN! You need to configure it before first use.'));
-            config = await runSetupWizard();
-            if (argv._.length > 0) {
-                 console.log(chalk.cyan('\nSetup complete. Please run your command again.'));
-                 process.exit(0);
-            }
+            await runSetupWizard();
+            console.log(chalk.cyan('\nSetup complete. Please run your command again.'));
+            process.exit(0);
         }
     }
     
-    checkForUpdates();
+    await checkForUpdates();
 
+    // If no command was provided (e.g., just `cmdgen`), show help.
     if (argv._.length === 0) {
         showHelp(config);
     }
@@ -501,6 +491,6 @@ const run = async () => {
 
 run().catch(err => {
     console.error(chalk.red(`\nA critical error occurred: ${err.message}`));
-    console.error(err);
+    console.error(err); // Log full error for debugging
     process.exit(1);
 });
