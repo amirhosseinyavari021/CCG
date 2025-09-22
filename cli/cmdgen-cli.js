@@ -23,13 +23,75 @@ async function getConfig() {
     if (await fs.pathExists(configFile)) {
         return fs.readJson(configFile);
     }
-    return { first_run_shown: false, last_update_check: 0 };
+    return {};
 }
 
 async function setConfig(newConfig) {
     const currentConfig = await getConfig();
     await fs.writeJson(configFile, { ...currentConfig, ...newConfig });
 }
+
+// --- UI & UX Functions ---
+
+const showWelcomeBanner = () => {
+    console.log(`
+█░█░█ █▀▀ █░░ █▀▀ █▀█ █▀▄▀█ █▀▀   ▀█▀ █▀█   ▄▀█ █▄█ ▄▄ █▀▀ █▀▄▀█ █▀▄ █▀▀ █▀▀ █▄░█
+▀▄▀▄▀ ██▄ █▄▄ █▄▄ █▄█ █░▀░█ ██▄   ░█░ █▄█   █▀█ ░█░ ░░ █▄▄ █░▀░█ █▄▀ █▄█ ██▄ █░▀█
+
+Welcome to AY-CMDGEN!
+Made with ❤ by Amirhossein Yavari
+
+Not sure where to start? Try one of these:
+  cmdgen generate "list all files larger than 100MB"
+  cmdgen analyze "tar -czvf archive.tar.gz /path/to/dir"
+  cmdgen error "command not found: docker"
+
+For more details, run: cmdgen --help
+`);
+};
+
+const showHelp = (config) => {
+    const osDefault = config.os || 'not set';
+    const shellDefault = config.shell || 'not set';
+
+    console.log(`
+
+█▀▀ █▀▄▀█ █▀▄ █▀▀ █▀▀ █▄░█
+█▄▄ █░▀░█ █▄▀ █▄█ ██▄ █░▀█
+
+cmdgen - Your AI-powered command generator
+
+Usage:
+  cmdgen <command> [options]
+
+Examples:
+  cmdgen generate "list all files in Linux"
+  cmdgen analyze "ping -t 8.8.8.8"
+  cmdgen error "Permission denied"
+
+Commands:
+  generate <request>    Create a command for you            [alias: g]
+  analyze <command>     Understand what a command does      [alias: a]
+  error <message>       Help with an error message          [alias: e]
+  config                Change default OS and Shell
+  update                Update cmdgen to the latest version
+
+Options:
+  --os                  Target OS (e.g., windows, linux)  [default: "${osDefault}"]
+  --shell               Target shell (e.g., PowerShell, bash) [default: "${shellDefault}"]
+  --lang                Response language (en, fa)          [default: "en"]
+  -h, --help            Show this help menu
+  -v, --version         Show version number
+`);
+};
+
+const gracefulExit = () => {
+    console.log(`
+🙏  Thank you for using cmdgen!  
+⭐  If you enjoy this tool, don’t forget to share it with others.
+`);
+    process.exit(0);
+};
 
 // --- Interactive Setup Wizard ---
 const runSetupWizard = async () => {
@@ -72,19 +134,15 @@ const runSetupWizard = async () => {
         process.exit(1);
     }
 
-    const newConfig = {
-        'os': os,
-        'shell': shell,
-        'osVersion': ''
-    };
-
+    const newConfig = { 'os': os, 'shell': shell, 'osVersion': '' };
     await setConfig(newConfig);
     console.log(`\n✅ Configuration saved successfully: OS=${os}, Shell=${shell}`);
     console.log('You can now use CMDGEN!');
     return newConfig;
 };
 
-// --- UX IMPROVEMENT: SPINNER ---
+// --- Core App Logic ---
+// ... (Spinner, Update Checker, API Call, and Command Execution functions remain the same)
 let spinnerInterval;
 const startSpinner = (message) => {
     const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
@@ -101,26 +159,22 @@ const stopSpinner = () => {
     process.stdout.write('\x1B[?25h');
 };
 
-// --- Update Checker ---
 async function checkForUpdates() {
     const config = await getConfig();
     const now = Date.now();
     if (now - (config.last_update_check || 0) < 24 * 60 * 60 * 1000) return;
-
     try {
         const response = await axios.get('https://api.github.com/repos/amirhosseinyavari021/ay-cmdgen/releases/latest', { timeout: 2000 });
         const latestVersion = response.data.tag_name.replace('v', '');
         const currentVersion = packageJson.version;
-
         if (semver.gt(latestVersion, currentVersion)) {
             console.log(`\n\x1b[32m💡 New version available! (${currentVersion} -> ${latestVersion})\x1b[0m`);
             console.log(`   Run \x1b[36mcmdgen update\x1b[0m to get the latest version.\n`);
         }
         await setConfig({ last_update_check: now });
-    } catch (error) { /* Ignore errors */ }
+    } catch (error) {}
 }
 
-// --- API Call Logic ---
 const primaryServerUrl = 'https://ay-cmdgen-cli.onrender.com';
 const fallbackServerUrl = 'https://cmdgen.onrender.com';
 
@@ -128,7 +182,6 @@ const callApi = async (params) => {
     const { mode, userInput, os, osVersion, cli, lang, options = {} } = params;
     const systemPrompt = getSystemPrompt(mode, os, osVersion || 'N/A', cli, lang, options);
     const payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userInput }] };
-
     const attemptRequest = (url) => new Promise(async (resolve, reject) => {
         try {
             const response = await axios.post(`${url}/api/proxy`, payload, { responseType: 'stream', timeout: 60000 });
@@ -154,7 +207,6 @@ const callApi = async (params) => {
             response.data.on('error', reject);
         } catch (err) { reject(err); }
     });
-
     try {
         startSpinner('Connecting to primary server...');
         return await attemptRequest(primaryServerUrl);
@@ -176,23 +228,20 @@ const callApi = async (params) => {
     }
 };
 
-// --- Command Execution ---
 const executeCommand = (command, shell) => {
     return new Promise((resolve) => {
         console.log(`\n🚀 Executing: ${command.command}`);
         const commandString = command.command;
         let child;
-        
         if (process.platform === 'win32') {
             if (shell.toLowerCase() === 'powershell') {
                 child = spawn('powershell.exe', ['-NoProfile', '-Command', commandString], { stdio: 'inherit' });
-            } else { // CMD
+            } else {
                 child = spawn('cmd.exe', ['/C', commandString], { stdio: 'inherit' });
             }
-        } else { // Linux/macOS
+        } else {
             child = spawn(commandString, [], { stdio: 'inherit', shell: true });
         }
-
         child.on('close', (code) => {
             if (code !== 0) console.error(`\n❌ Process exited with code ${code}`);
             resolve();
@@ -208,9 +257,16 @@ const executeCommand = (command, shell) => {
 const run = async () => {
     let config = await getConfig();
 
+    // Check for daily welcome message
+    const today = new Date().toISOString().slice(0, 10);
+    if (config.lastRunDate !== today) {
+        showWelcomeBanner();
+        await setConfig({ ...config, lastRunDate: today });
+    }
+
     const args = process.argv.slice(2);
     if (!config.os || !config.shell) {
-        if (args.length > 0 && args[0] !== 'config' && args[0] !== 'update' && args[0] !== '--help' && args[0] !== '-h' && args[0] !== '--version' && args[0] !== '-v') {
+        if (args.length > 0 && args[0] !== 'config' && args[0] !== 'update' && !args.includes('--help') && !args.includes('-h') && !args.includes('--version') && !args.includes('-v')) {
              console.log('Welcome to CMDGEN!');
              config = await runSetupWizard();
         }
@@ -220,7 +276,10 @@ const run = async () => {
 
     const parser = yargs(hideBin(process.argv))
         .scriptName("cmdgen")
-        .command(['generate <request>', 'g <request>'], 'Generate a command', {}, async (argv) => {
+        .help(false) // Disable default help
+        .version(false) // Disable default version
+        .command(['generate <request>', 'g <request>'], 'Create a command for you', {}, async (argv) => {
+            // (Command logic for 'generate')
             if (!argv.os || !argv.shell) {
                 console.log('Default OS/Shell not configured. Please run `cmdgen config` first.');
                 process.exit(1);
@@ -235,27 +294,24 @@ const run = async () => {
                     console.log("\nNo suggestions could be generated for your request.");
                     process.exit(1);
                 }
-
                 while (true) {
                     const choice = await promptUser(allCommands.length);
                     if (choice === 'm') {
                         const newCmds = await getMoreSuggestions(argv, allCommands);
                         if(newCmds.length > 0) allCommands.push(...newCmds);
                     } else if (choice === 'q' || choice === '') {
-                        console.log('\nExiting.');
-                        process.exit(0);
+                        gracefulExit();
                     } else {
                         const index = parseInt(choice, 10) - 1;
                         if (index >= 0 && index < allCommands.length) {
                             await executeCommand(allCommands[index], argv.shell);
-                            process.exit(0);
+                            gracefulExit();
                         } else {
                             console.log('\nInvalid choice. Please try again.');
                         }
                     }
                 }
             };
-            
             const displayNewSuggestions = (newSuggestions, allCommands, isFirstTime) => {
                  newSuggestions.forEach((cmd, idx) => {
                     const displayIndex = allCommands.length - newSuggestions.length + idx + 1;
@@ -264,7 +320,6 @@ const run = async () => {
                 });
                 if(isFirstTime) console.warn('\n🚨 WARNING: Executing AI-generated commands can be dangerous. Review them carefully.');
             };
-            
             const getMoreSuggestions = async (argv, allCommands) => {
                 console.log("\n🔄 Getting more suggestions...");
                 const existing = allCommands.map(c => c.command);
@@ -278,7 +333,6 @@ const run = async () => {
                    return [];
                 }
             };
-            
             const promptUser = (count) => new Promise(resolve => {
                 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
                 rl.question(`\nEnter a number to execute (1-${count}), (m)ore, or (q)uit: `, (choice) => {
@@ -298,15 +352,16 @@ const run = async () => {
                 spawn(command, { stdio: 'inherit', shell: true }).on('close', code => process.exit(code));
             }
         })
-        .command(['analyze <command>', 'a <command>'], 'Analyze a command', {}, async (argv) => {
+        .command(['analyze <command>', 'a <command>'], 'Understand what a command does', {}, async (argv) => {
             if (!argv.os || !argv.shell) {
                 console.log('Default OS/Shell not configured. Please run `cmdgen config` first.');
                 process.exit(1);
             }
             const result = await callApi({ ...argv, userInput: argv.command, mode: 'explain', cli: argv.shell });
             if (result) console.log(result.data.explanation);
+            gracefulExit();
         })
-        .command(['error <message>', 'e <message>'], 'Analyze an error message', {}, async (argv) => {
+        .command(['error <message>', 'e <message>'], 'Help with an error message', {}, async (argv) => {
             if (!argv.os || !argv.shell) {
                 console.log('Default OS/Shell not configured. Please run `cmdgen config` first.');
                 process.exit(1);
@@ -317,34 +372,39 @@ const run = async () => {
                 console.log(`\nProbable Cause: ${result.data.cause}\n\nExplanation: ${result.data.explanation}\n\nSolution:`);
                 result.data.solution.forEach(step => console.log(`  - ${step}`));
             }
+            gracefulExit();
         })
         .option('os', { describe: 'Target OS', type: 'string', default: config.os })
-        .option('osVersion', { describe: 'Target OS Version', type: 'string', default: config.osVersion })
         .option('shell', { describe: 'Target shell', type: 'string', default: config.shell })
-        .option('lang', { describe: 'Set response language (en, fa)', type: 'string', default: 'en' })
-        .demandCommand(1, 'You must provide a command or run "cmdgen --help".')
-        .help('h').alias('h', 'help')
-        .version('v', `Show version number: ${packageJson.version}`).alias('v', 'version')
-        .strict().wrap(null)
-        .fail((msg, err, yargs) => {
-            if (err) {
-                 console.error(`\n❌ An unexpected error occurred: ${err.message}`);
-            } else {
-                 console.error(`\n❌ Error: ${msg}`);
-                 yargs.showHelp();
-            }
+        .option('lang', { describe: 'Response language', type: 'string', default: 'en' })
+        .strict()
+        .fail((msg, err) => {
+            console.error(`\n❌ Error: ${msg || err.message}`);
             process.exit(1);
         });
 
-    const argv = parser.parse(process.argv.slice(2));
+    const argv = parser.parse(args);
 
-    // If no command is given and no config exists, show the wizard
-    if (args.length === 0 && (!config.os || !config.shell)) {
-        await runSetupWizard();
+    if (argv.help || argv.h) {
+        showHelp(config);
+        process.exit(0);
+    }
+    if (argv.version || argv.v) {
+        console.log(packageJson.version);
+        process.exit(0);
+    }
+    
+    // If no command is given, show help (unless it's the very first run)
+    if (args.length === 0) {
+        if (!config.os || !config.shell) {
+            await runSetupWizard();
+        } else {
+            showHelp(config);
+        }
     }
 };
 
 run().catch(err => {
-    console.error(`A critical error occurred: ${err.message}`);
+    console.error(`\nA critical error occurred: ${err.message}`);
     process.exit(1);
 });
