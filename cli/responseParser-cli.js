@@ -9,10 +9,12 @@ const parseAndConstructData = (textResponse, mode) => {
                 const parts = line.split('|||');
                 if (parts.length < 2) return null;
 
-                // --- FIX: Clean the command string ---
-                // This removes any leading "1. ", "2. ", etc. from the command
                 const rawCommand = parts[0]?.trim() || '';
                 const cleanedCommand = rawCommand.replace(/^\s*\d+\.\s*/, '');
+
+                if (!cleanedCommand) {
+                    return null;
+                }
 
                 return {
                     command: cleanedCommand,
@@ -23,7 +25,9 @@ const parseAndConstructData = (textResponse, mode) => {
             return { commands };
         }
 
-        if (mode === 'explain') {
+        // *** FIX IS HERE ***
+        // Script and Explain modes both treat the entire response as the main content.
+        if (mode === 'explain' || mode === 'script') {
             return { explanation: trimmedResponse };
         }
         
