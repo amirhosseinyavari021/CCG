@@ -385,14 +385,21 @@ const run = async () => {
             });
             await startInteractiveSession();
         })
-        .command(['script <request>', 's'], 'Generate a full script', {}, async (argv) => {
+      .command(['script <request>', 's'], 'Generate a full script', {}, async (argv) => {
             const result = await callApi({ ...argv, userInput: argv.request, mode: 'script', cli: argv.shell });
             if (result) {
                 console.log(chalk.cyan.bold('\n--- Generated Script ---'));
                 console.log(chalk.green(result.data.explanation));
                 const scriptItem = { command: result.data.explanation, explanation: `Script for: "${argv.request}"`, warning: '' };
                 addToHistory(scriptItem);
-                console.log(chalk.yellow('\nTip: Copy the code above and save it to a file (e.g., script.sh) to run it.'));
+                const shellType = argv.shell.toLowerCase();
+                let fileExtension = '.sh'; // Default
+                if (shellType.includes('powershell')) {
+                    fileExtension = '.ps1';
+                } else if (shellType === 'cmd') {
+                    fileExtension = '.bat';
+                }
+                console.log(chalk.yellow(`\nTip: Copy the code above and save it to a file (e.g., script${fileExtension}) to run it.`));
             }
             gracefulExit();
         })
