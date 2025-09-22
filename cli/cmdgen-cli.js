@@ -23,9 +23,17 @@ const MAX_HISTORY = 20;
 async function getConfig() {
     await fs.ensureDir(configDir);
     if (await fs.pathExists(configFile)) {
-        const config = await fs.readJson(configFile);
-        if (!config.history) config.history = [];
-        return config;
+        try {
+            // *** FIX FOR CORRUPTED CONFIG ***
+            // Try to read the file, if it fails, it's corrupted.
+            const config = await fs.readJson(configFile);
+            if (!config.history) config.history = [];
+            return config;
+        } catch (error) {
+            console.error(chalk.yellow('Warning: Configuration file was corrupted and has been reset.'));
+            await fs.remove(configFile); // Delete the corrupted file
+            return { history: [] }; // Return a fresh config
+        }
     }
     return { history: [] };
 }
