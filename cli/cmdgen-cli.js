@@ -33,31 +33,13 @@ async function setConfig(newConfig) {
 
 // --- UI & UX Functions ---
 
-const showWelcomeBanner = () => {
-    console.log(`
-█░█░█ █▀▀ █░░ █▀▀ █▀█ █▀▄▀█ █▀▀   ▀█▀ █▀█   ▄▀█ █▄█ ▄▄ █▀▀ █▀▄▀█ █▀▄ █▀▀ █▀▀ █▄░█
-▀▄▀▄▀ ██▄ █▄▄ █▄▄ █▄█ █░▀░█ ██▄   ░█░ █▄█   █▀█ ░█░ ░░ █▄▄ █░▀░█ █▄▀ █▄█ ██▄ █░▀█
-
-Welcome to AY-CMDGEN!
-Made with ❤ by Amirhossein Yavari
-
-Not sure where to start? Try one of these:
-  cmdgen generate "list all files larger than 100MB"
-  cmdgen analyze "tar -czvf archive.tar.gz /path/to/dir"
-  cmdgen error "command not found: docker"
-
-For more details, run: cmdgen --help
-`);
-};
-
 const showHelp = (config) => {
     const osDefault = config.os || 'not set';
     const shellDefault = config.shell || 'not set';
 
     console.log(`
-
-█▀▀ █▀▄▀█ █▀▄ █▀▀ █▀▀ █▄░█
-█▄▄ █░▀░█ █▄▀ █▄█ ██▄ █░▀█
+█▀▀ █▄█ █▀▄ █▀▀ █▄█ █▄░█
+█▄▄ ░█░ █▄▀ ██▄ ░█░ █░▀█
 
 cmdgen - Your AI-powered command generator
 
@@ -82,6 +64,23 @@ Options:
   --lang                Response language (en, fa)          [default: "en"]
   -h, --help            Show this help menu
   -v, --version         Show version number
+`);
+};
+
+const showWelcomeBanner = () => {
+    console.log(`
+█░█░█ █▀▀ █░░ █▀▀ █▀█ █▀▄▀█ █▀▀   ▀█▀ █▀█   ▄▀█ █▄█ ▄▄ █▀▀ █▀▄▀█ █▀▄ █▀▀ █▀▀ █▄░█
+▀▄▀▄▀ ██▄ █▄▄ █▄▄ █▄█ █░▀░█ ██▄   ░█░ █▄█   █▀█ ░█░ ░░ █▄▄ █░▀░█ █▄▀ █▄█ ██▄ █░▀█
+
+Welcome to AY-CMDGEN!
+Made with ❤ by Amirhossein Yavari
+
+Not sure where to start? Try one of these:
+  cmdgen generate "list all files larger than 100MB"
+  cmdgen analyze "tar -czvf archive.tar.gz /path/to/dir"
+  cmdgen error "command not found: docker"
+
+For more details, run: cmdgen --help
 `);
 };
 
@@ -142,7 +141,6 @@ const runSetupWizard = async () => {
 };
 
 // --- Core App Logic ---
-// ... (Spinner, Update Checker, API Call, and Command Execution functions remain the same)
 let spinnerInterval;
 const startSpinner = (message) => {
     const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
@@ -257,7 +255,6 @@ const executeCommand = (command, shell) => {
 const run = async () => {
     let config = await getConfig();
 
-    // Check for daily welcome message
     const today = new Date().toISOString().slice(0, 10);
     if (config.lastRunDate !== today) {
         showWelcomeBanner();
@@ -276,10 +273,9 @@ const run = async () => {
 
     const parser = yargs(hideBin(process.argv))
         .scriptName("cmdgen")
-        .help(false) // Disable default help
-        .version(false) // Disable default version
+        .help(false)
+        .version(false)
         .command(['generate <request>', 'g <request>'], 'Create a command for you', {}, async (argv) => {
-            // (Command logic for 'generate')
             if (!argv.os || !argv.shell) {
                 console.log('Default OS/Shell not configured. Please run `cmdgen config` first.');
                 process.exit(1);
@@ -377,6 +373,8 @@ const run = async () => {
         .option('os', { describe: 'Target OS', type: 'string', default: config.os })
         .option('shell', { describe: 'Target shell', type: 'string', default: config.shell })
         .option('lang', { describe: 'Response language', type: 'string', default: 'en' })
+        .option('h', { alias: 'help', type: 'boolean', description: 'Show this help menu' })
+        .option('v', { alias: 'version', type: 'boolean', description: 'Show version number' })
         .strict()
         .fail((msg, err) => {
             console.error(`\n❌ Error: ${msg || err.message}`);
@@ -394,12 +392,9 @@ const run = async () => {
         process.exit(0);
     }
     
-    // If no command is given, show help (unless it's the very first run)
     if (args.length === 0) {
         if (!config.os || !config.shell) {
             await runSetupWizard();
-        } else {
-            showHelp(config);
         }
     }
 };
