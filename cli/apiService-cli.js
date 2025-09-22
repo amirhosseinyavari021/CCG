@@ -22,7 +22,8 @@ const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
 **GOLDEN RULES (NON-NEGOTIABLE FOR ALL SHELLS):**
 1.  **SYNTAX IS SACRED:** The command MUST be syntactically perfect and runnable without modification. No typos, no mashed-together operators (e.g., 'Statuseq' is a CRITICAL FAILURE).
 2.  **SIMPLICITY AND EFFICIENCY:** Always provide the most direct, modern, and efficient solution.
-3.  **SECURITY:** If a command is destructive (e.g., \`rm\`, \`Remove-Item\`), you MUST include a warning.
+3.  **NO BACKTICKS:** Do NOT wrap commands in backticks (\`\`\`).
+4.  **SECURITY:** If a command is destructive (e.g., \`rm\`, \`Remove-Item\`), you MUST include a warning.
 `;
 
     let shellInstructions = "";
@@ -53,10 +54,13 @@ const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
 
     switch (mode) {
         case 'generate':
+            const existingCommandsPrompt = existingCommands.length > 0
+                ? `\nYou have already suggested: ${existingCommands.join(', ')}. Please provide 3 NEW and different commands.`
+                : 'Please provide 3 highly useful and practical command-line suggestions.';
             return `${finalBasePrompt}
 ${goldenRules}
 ${shellInstructions}
-**MISSION:** Provide 3 distinct, practical, and **syntactically PERFECT** commands. Double-check your output for syntax errors before responding.
+**MISSION:** Provide 3 distinct, practical, and **syntactically PERFECT** commands. Double-check your output for syntax errors.
 **OUTPUT FORMAT:** You MUST output exactly 3 lines using this exact format:
 command|||short_explanation|||warning (if any)
 `;
@@ -80,7 +84,7 @@ ${shellInstructions}
 ${goldenRules}
 **MISSION:** Analyze the user's error message. Provide a probable cause, a simple explanation, and a sequence of concrete solution steps.
 **OUTPUT FORMAT:** You MUST output a single line with the actual analysis, separated by "|||". DO NOT output the placeholder words 'probable_cause' or 'solution_step_1'.
-**CORRECT EXAMPLE:** The 'git' command is not found|||This means Git is not installed or its location isn't in the system's PATH variable.|||CMD: winget install Git.Git|||Open a new terminal to allow the PATH changes to take effect.
+**CORRECT EXAMPLE:** PowerShell Execution Policy Restriction|||This error means security settings are preventing scripts from running.|||CMD: Get-ExecutionPolicy -Scope CurrentUser|||CMD: Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
 `;
         
         default:
