@@ -18,18 +18,34 @@ const packageJson = require('./package.json');
 // --- Config and State Management ---
 const configDir = path.join(os.homedir(), '.cmdgen');
 const configFile = path.join(configDir, 'config.json');
+const MAX_HISTORY = 20;
 
 async function getConfig() {
     await fs.ensureDir(configDir);
     if (await fs.pathExists(configFile)) {
-        return fs.readJson(configFile);
+        const config = await fs.readJson(configFile);
+        // Ensure history array exists
+        if (!config.history) config.history = [];
+        return config;
     }
-    return {};
+    return { history: [] };
 }
 
 async function setConfig(newConfig) {
     const currentConfig = await getConfig();
     await fs.writeJson(configFile, { ...currentConfig, ...newConfig });
+}
+
+async function addToHistory(commandItem) {
+    const config = await getConfig();
+    const history = config.history || [];
+    // Avoid adding duplicates
+    if (history.some(item => item.command === commandItem.command)) return;
+    history.unshift(commandItem); // Add to the beginning
+    if (history.length > MAX_HISTORY) {
+        history.pop(); // Remove the oldest item
+    }
+    await setConfig({ history });
 }
 
 // --- UI & UX Functions ---
@@ -47,18 +63,19 @@ const showHelp = (config) => {
     console.log('  cmdgen <command> [options]\n');
     console.log(chalk.bold('Examples:'));
     console.log(chalk.gray('  cmdgen generate "list all files in Linux"'));
-    console.log(chalk.gray('  cmdgen analyze "ping -t 8.8.8.8"'));
-    console.log(chalk.gray('  cmdgen error "Permission denied"\n'));
+    console.log(chalk.gray('  cmdgen script "backup all .log files into a zip"'));
+    console.log(chalk.gray('  cmdgen history\n'));
     console.log(chalk.bold('Commands:'));
-    console.log(`  ${chalk.green('generate <request>')}    Create a command for you            [alias: g]`);
+    console.log(`  ${chalk.green('generate <request>')}    Generate a single command           [alias: g]`);
+    console.log(`  ${chalk.green('script <request>')}      Generate a full script              [alias: s]`);
     console.log(`  ${chalk.green('analyze <command>')}     Understand what a command does      [alias: a]`);
     console.log(`  ${chalk.green('error <message>')}       Help with an error message          [alias: e]`);
+    console.log(`  ${chalk.green('history')}               Show recently generated commands`);
     console.log(`  ${chalk.green('config <action>')}       Manage saved settings (show, set, wizard)`);
     console.log(`  ${chalk.green('update')}                Update cmdgen to the latest version\n`);
     console.log(chalk.bold('Options:'));
     console.log(`  --os                  Target OS (e.g., windows, linux)  [default: ${osDefault}]`);
     console.log(`  --shell               Target shell (e.g., PowerShell, bash) [default: ${shellDefault}]`);
-    console.log(`  --lang                Response language (en, fa)          [default: "en"]`);
     console.log(`  -h, --help            Show this help menu`);
     console.log(`  -v, --version         Show version number`);
 };
@@ -72,8 +89,8 @@ const showWelcomeBanner = () => {
     console.log(chalk.gray('Made with ❤ by Amirhossein Yavari\n'));
     console.log('Not sure where to start? Try one of these:');
     console.log(chalk.yellow('  cmdgen generate "list all files larger than 100MB"'));
-    console.log(chalk.yellow('  cmdgen analyze "tar -czvf archive.tar.gz /path/to/dir"'));
-    console.log(chalk.yellow('  cmdgen error "command not found: docker"\n'));
+    console.log(chalk.yellow('  cmdgen script "create a folder and three files inside it"'));
+    console.log(chalk.yellow('  cmdgen history\n'));
     console.log('For more details, run: cmdgen --help');
 };
 
@@ -135,7 +152,7 @@ const handleConfigCommand = async (action, key, value) => {
     if (action === 'show') {
         console.log(chalk.bold('\nCurrent CMDGEN Configuration:'));
         Object.entries(config).forEach(([k, v]) => {
-            if (k !== 'lastRunDate' && k !== 'last_update_check') {
+            if (k !== 'lastRunDate' && k !== 'last_update_check' && k !== 'history') {
                 console.log(`  ${chalk.cyan(k)}: ${chalk.yellow(v)}`);
             }
         });
@@ -180,7 +197,7 @@ async function checkForUpdates() {
     const now = Date.now();
     if (now - (config.last_update_check || 0) < 24 * 60 * 60 * 1000) return;
     try {
-        const response = await axios.get('https://api.github.com/repos/amirhosseinyavari0iz1/ay-cmdgen/releases/latest', { timeout: 2000 });
+        const response = await axios.get('https://api.github.com/repos/amirhosseinyavari021/ay-cmdgen/releases/latest', { timeout: 2000 });
         const latestVersion = response.data.tag_name.replace('v', '');
         const currentVersion = packageJson.version;
         if (semver.gt(latestVersion, currentVersion)) {
@@ -299,7 +316,7 @@ const run = async () => {
         .scriptName("cmdgen")
         .help(false)
         .version(false)
-        .command(['generate <request>', 'g <request>'], 'Create a command for you', {}, async (argv) => {
+        .command(['generate <request>', 'g <request>'], 'Generate a single command', {}, async (argv) => {
             if (!argv.os || !argv.shell) {
                 console.log(chalk.red('Default OS/Shell not configured. Please run `cmdgen config` first.'));
                 process.exit(1);
@@ -309,6 +326,7 @@ const run = async () => {
                 const initialResult = await callApi({ ...argv, userInput: argv.request, mode: 'generate', cli: argv.shell });
                 if (initialResult?.data?.commands?.length > 0) {
                     allCommands = initialResult.data.commands;
+                    allCommands.forEach(cmd => addToHistory(cmd));
                     displayNewSuggestions(allCommands, allCommands, true);
                 } else {
                     console.log(chalk.yellow("\nNo suggestions could be generated for your request."));
@@ -321,7 +339,10 @@ const run = async () => {
                         gracefulExit();
                     } else if (choice.type === 'more') {
                         const newCmds = await getMoreSuggestions(argv, allCommands);
-                        if(newCmds.length > 0) allCommands.push(...newCmds);
+                        if(newCmds.length > 0) {
+                            newCmds.forEach(cmd => addToHistory(cmd));
+                            allCommands.push(...newCmds);
+                        }
                         else console.log(chalk.yellow("Couldn't fetch more suggestions."));
                     } else if (choice.type === 'quit') {
                         gracefulExit();
@@ -369,11 +390,46 @@ const run = async () => {
                         });
                     } else {
                         console.log(chalk.red('\nInvalid choice. Please try again.'));
-                        resolve(await promptUser(commands)); // Re-prompt
+                        resolve(await promptUser(commands));
                     }
                 });
             });
             await startInteractiveSession();
+        })
+        .command(['script <request>', 's <request>'], 'Generate a full script', {}, async (argv) => {
+            if (!argv.os || !argv.shell) {
+                console.log(chalk.red('Default OS/Shell not configured. Please run `cmdgen config` first.'));
+                process.exit(1);
+            }
+            const result = await callApi({ ...argv, userInput: argv.request, mode: 'script', cli: argv.shell });
+            if (result) {
+                console.log(chalk.cyan.bold('\n--- Generated Script ---'));
+                console.log(chalk.green(result.data.explanation));
+                const scriptItem = { command: result.data.explanation, explanation: `Script for: "${argv.request}"`, warning: '' };
+                addToHistory(scriptItem);
+                console.log(chalk.yellow('\nTip: Copy the code above and save it to a file (e.g., script.sh) to run it.'));
+            }
+            gracefulExit();
+        })
+        .command('history', 'Show recently generated commands and scripts', {}, async () => {
+            const config = await getConfig();
+            const history = config.history || [];
+            if (history.length === 0) {
+                console.log(chalk.yellow('No history found.'));
+                return;
+            }
+            console.log(chalk.cyan.bold('--- Command History ---'));
+            history.forEach((item, index) => {
+                const isScript = item.command.includes('\n');
+                console.log(`\n${chalk.cyan.bold(`#${index + 1}`)}: ${item.explanation}`);
+                if (isScript) {
+                    console.log(chalk.green('--- SCRIPT START ---'));
+                    console.log(chalk.gray(item.command));
+                    console.log(chalk.green('--- SCRIPT END ---'));
+                } else {
+                    console.log(`  ${chalk.green(item.command)}`);
+                }
+            });
         })
         .command('config [action] [key] [value]', 'Manage saved settings', {}, async (argv) => {
             await handleConfigCommand(argv.action, argv.key, argv.value);
