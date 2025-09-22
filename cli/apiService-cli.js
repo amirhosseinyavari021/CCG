@@ -34,7 +34,7 @@ const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
 - **FAILURE CONDITION:** If you provide a command for a different shell (e.g., a CMD command when the shell is PowerShell), you have failed your core mission.
 - **Example for Windows:** If the user's shell is 'PowerShell', a command like \`New-Item -ItemType File "newfile.txt"\` is the ONLY correct type of answer. Generic CMD commands like \`echo > newfile.txt\` are considered a failure. You MUST provide the PowerShell-native command.
 
-**FINAL CHECK:** Before responding, review your generated commands. If the user's shell is 'PowerShell' and your output contains 'echo', 'type nul', 'copy nul', 'del', or 'rmdir', your response is incorrect. You MUST rewrite it using PowerShell-native cmdlets like \`New-Item\`, \`Remove-Item\`, \`Set-Content\`, or \`Add-Content\`. This is a strict rule.
+**FINAL CHECK:** Before responding, review your generated commands. If the user's shell is 'PowerShell', your output MUST NOT contain 'echo', 'type nul', 'copy nul', 'del', 'rmdir', or 'erase'. Your response is incorrect and a failure if you use these. You MUST use modern, PowerShell-native cmdlets like \`New-Item\`, \`Remove-Item\`, \`Set-Content\`, or \`Add-Content\`. For deleting files, the only correct answer is \`Remove-Item\`. This is a strict, non-negotiable rule.
 
 **OUTPUT FORMAT:** You MUST output exactly 3 lines. Each line must use this exact format, separated by "|||":
 command|||short_explanation|||warning (leave empty if none)
