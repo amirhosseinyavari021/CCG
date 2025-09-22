@@ -20,6 +20,22 @@ export const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) =>
     const language = lang === 'fa' ? 'Persian' : 'English';
     const { existingCommands = [] } = options;
 
+    let shellInstructions = "";
+    if (cli.toLowerCase() === 'powershell') {
+        shellInstructions = `
+**SHELL NUANCE: POWERSHELL**
+- You MUST use modern, PowerShell-native cmdlets (e.g., \`Remove-Item\`, \`Get-Content\`, \`New-Item\`).
+- Use standard environment variables like \`$env:USERPROFILE\` or \`$HOME\` instead of unix-style \`~\`.
+- **FAILURE CONDITION:** If your output contains legacy aliases or CMD commands like 'del', 'rmdir', 'erase', 'copy', 'move', 'dir', 'cls', or 'type', you have FAILED. Rewrite the command using the proper PowerShell cmdlet. For deleting files, the only correct answer is \`Remove-Item\`. This is a strict, non-negotiable rule.
+`;
+    } else if (cli.toLowerCase() === 'cmd') {
+        shellInstructions = `
+**SHELL NUANCE: CMD (Command Prompt)**
+- You MUST use traditional Windows CMD commands (e.g., \`del\`, \`rmdir\`, \`copy\`, \`move\`, \`dir\`, \`cls\`, \`type\`).
+- **FAILURE CONDITION:** If your output contains PowerShell cmdlets like \`Remove-Item\`, \`Get-Content\`, or \`New-Item\`, you have FAILED. You must provide the classic CMD equivalent.
+`;
+    }
+
     switch (mode) {
         case 'generate':
             const existingCommandsPrompt = existingCommands.length > 0
@@ -31,11 +47,8 @@ export const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) =>
                     : ' Please provide 3 highly useful and practical command-line suggestions for the user\'s request.');
 
             return `${finalBasePrompt}
-**MISSION:** For the user's request, provide 3 distinct command-line suggestions. ${existingCommandsPrompt}
-**GUIDELINES FOR COMMANDS:**
-- **Effectiveness:** Prioritize commands that are efficient and directly solve the user's problem.
-- **Clarity & Simplicity:** Commands should be easy to understand. Use common flags and avoid unnecessary complexity unless required.
-- **Relevance:** The commands must be perfectly tailored to the user's OS and Shell.
+**MISSION:** For the user's request, provide 3 distinct, practical, and efficient command-line suggestions. Adhere to the highest standards of correctness and best practices for the specified shell.
+${shellInstructions}
 **OUTPUT FORMAT:** You MUST output exactly 3 lines. Each line must use this exact format, separated by "|||":
 command|||short_explanation|||warning (leave empty if none)
 Your entire response MUST adhere to this format. Do not add any introductory text, numbering, or markdown.
@@ -44,6 +57,7 @@ Your entire response MUST adhere to this format. Do not add any introductory tex
         case 'explain':
             return `${finalBasePrompt}
 **MISSION:** The user has provided a command or a script. Analyze it and provide a comprehensive, well-structured explanation in **${language}**.
+${shellInstructions}
 **OUTPUT FORMAT:** Your response must be a single block of text using Markdown. Structure your explanation with clear headings (in ${language}) like:
 - **Purpose:** (A brief, one-sentence summary of what the command does.)
 - **Breakdown:** (A detailed, part-by-part explanation of each component, flag, and argument.)
@@ -55,6 +69,7 @@ Do not add any text before or after this structured explanation.
         case 'error':
              return `${finalBasePrompt}
 **MISSION:** The user has provided an error message and context. Analyze this information intelligently to provide a clear, actionable, step-by-step solution in ${language}. Your diagnosis must be highly relevant to the user's environment and context.
+${shellInstructions}
 **USER INPUT STRUCTURE:**
 Error Message:
 [The user's error message]
