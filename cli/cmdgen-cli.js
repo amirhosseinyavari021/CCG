@@ -24,15 +24,13 @@ async function getConfig() {
     await fs.ensureDir(configDir);
     if (await fs.pathExists(configFile)) {
         try {
-            // *** FIX FOR CORRUPTED CONFIG ***
-            // Try to read the file, if it fails, it's corrupted.
             const config = await fs.readJson(configFile);
             if (!config.history) config.history = [];
             return config;
         } catch (error) {
             console.error(chalk.yellow('Warning: Configuration file was corrupted and has been reset.'));
-            await fs.remove(configFile); // Delete the corrupted file
-            return { history: [] }; // Return a fresh config
+            await fs.remove(configFile);
+            return { history: [] };
         }
     }
     return { history: [] };
@@ -324,6 +322,7 @@ const run = async () => {
                     if (choice.type === 'execute') {
                         await executeCommand(allCommands[choice.index], argv.shell);
                         gracefulExit();
+                        break;
                     } else if (choice.type === 'more') {
                         const newCmds = await getMoreSuggestions(argv, allCommands);
                         if(newCmds.length > 0) {
@@ -333,7 +332,9 @@ const run = async () => {
                         else console.log(chalk.yellow("Couldn't fetch more suggestions."));
                     } else if (choice.type === 'quit') {
                         gracefulExit();
+                        break;
                     }
+                    // If choice.type is 'reprompt', the loop will continue naturally
                 }
             };
             const displayNewSuggestions = (newSuggestions, allCommands, isFirstTime) => {
@@ -358,7 +359,7 @@ const run = async () => {
             const promptUser = (commands) => new Promise(resolve => {
                 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
                 const promptText = chalk.bold(`\nEnter a number (1-${commands.length}), (m)ore, or (q)uit: `);
-                rl.question(promptText, async (choice) => {
+                rl.question(promptText, (choice) => {
                     rl.close();
                     choice = choice.toLowerCase().trim();
                     if (choice === 'm') return resolve({ type: 'more' });
@@ -377,7 +378,7 @@ const run = async () => {
                         });
                     } else {
                         console.log(chalk.red('\nInvalid choice. Please try again.'));
-                        resolve(await promptUser(commands));
+                        resolve({ type: 'reprompt' });
                     }
                 });
             });
@@ -481,11 +482,13 @@ const run = async () => {
     }
     
     if (!config.os || !config.shell) {
-        if (argv._.length > 0 && !['config', 'update'].includes(argv._[0])) {
+        if (args.length === 0 || (argv._.length > 0 && !['config', 'update'].includes(argv._[0]))) {
             console.log(chalk.yellow('Welcome to CMDGEN! You need to configure it before first use.'));
             config = await runSetupWizard();
-            console.log(chalk.cyan('\nSetup complete. Please run your command again.'));
-            process.exit(0);
+            if (argv._.length > 0) {
+                 console.log(chalk.cyan('\nSetup complete. Please run your command again.'));
+                 process.exit(0);
+            }
         }
     }
     
@@ -498,5 +501,6 @@ const run = async () => {
 
 run().catch(err => {
     console.error(chalk.red(`\nA critical error occurred: ${err.message}`));
+    console.error(err);
     process.exit(1);
 });
