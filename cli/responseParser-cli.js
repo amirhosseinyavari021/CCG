@@ -1,7 +1,14 @@
 const parseAndConstructData = (textResponse, mode) => {
     try {
-        const trimmedResponse = textResponse.trim();
+        let trimmedResponse = textResponse.trim();
         if (!trimmedResponse) return null;
+
+        // *** FIX: Robustly strip markdown code blocks for script mode ***
+        if (mode === 'script') {
+            // This regex removes the opening and closing markdown backticks and the language specifier
+            const scriptContent = trimmedResponse.replace(/^```(?:\w+)?\s*\n?([\s\S]+?)\n?```$/, '$1');
+            return { explanation: scriptContent.trim() };
+        }
 
         if (mode === 'generate') {
             const lines = trimmedResponse.split('\n').filter(line => line.trim());
@@ -25,9 +32,7 @@ const parseAndConstructData = (textResponse, mode) => {
             return { commands };
         }
 
-        // *** FIX IS HERE ***
-        // Script and Explain modes both treat the entire response as the main content.
-        if (mode === 'explain' || mode === 'script') {
+        if (mode === 'explain') {
             return { explanation: trimmedResponse };
         }
         
