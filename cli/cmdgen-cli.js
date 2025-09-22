@@ -15,7 +15,7 @@ const { getSystemPrompt } = require('./apiService-cli.js');
 const { parseAndConstructData } = require('./responseParser-cli.js');
 const packageJson = require('./package.json');
 
-// --- Config and State Management ---
+// --- Config and State Management (No Changes) ---
 const configDir = path.join(os.homedir(), '.cmdgen');
 const configFile = path.join(configDir, 'config.json');
 const MAX_HISTORY = 20;
@@ -52,7 +52,7 @@ async function addToHistory(commandItem) {
     await setConfig({ history });
 }
 
-// --- UI & UX Functions ---
+// --- UI & UX Functions (No Changes) ---
 const showHelp = (config = {}) => {
     const osDefault = chalk.yellow(config.os || 'not set');
     const shellDefault = chalk.yellow(config.shell || 'not set');
@@ -186,7 +186,10 @@ const startSpinner = (message) => {
 };
 
 const stopSpinner = () => {
-    clearInterval(spinnerInterval);
+    if (spinnerInterval) {
+        clearInterval(spinnerInterval);
+        spinnerInterval = null;
+    }
     process.stdout.write('\r' + ' '.repeat(50) + '\r');
     process.stdout.write('\x1B[?25h');
 };
@@ -266,7 +269,7 @@ const executeCommand = (command, shell) => {
         const commandString = command.command;
         let child;
         if (process.platform === 'win32') {
-            if (shell && shell.toLowerCase() === 'powershell') {
+            if (shell && shell.toLowerCase().includes('powershell')) {
                 child = spawn('powershell.exe', ['-NoProfile', '-Command', commandString], { stdio: 'inherit' });
             } else {
                 child = spawn('cmd.exe', ['/C', commandString], { stdio: 'inherit' });
@@ -289,7 +292,6 @@ const run = async () => {
     let config = await getConfig();
     const args = hideBin(process.argv);
     
-    // Make the main command case-insensitive
     const command = args[0]?.toLowerCase();
 
     const needsConfig = !['config', 'update', undefined, '--help', '-h', '--version', '-v'].includes(command);
@@ -385,13 +387,15 @@ const run = async () => {
             });
             await startInteractiveSession();
         })
-      .command(['script <request>', 's'], 'Generate a full script', {}, async (argv) => {
+        .command(['script <request>', 's'], 'Generate a full script', {}, async (argv) => {
             const result = await callApi({ ...argv, userInput: argv.request, mode: 'script', cli: argv.shell });
             if (result) {
                 console.log(chalk.cyan.bold('\n--- Generated Script ---'));
                 console.log(chalk.green(result.data.explanation));
                 const scriptItem = { command: result.data.explanation, explanation: `Script for: "${argv.request}"`, warning: '' };
                 addToHistory(scriptItem);
+
+                // *** اصلاح نهایی: راهنمایی هوشمند برای ذخیره فایل ***
                 const shellType = argv.shell.toLowerCase();
                 let fileExtension = '.sh'; // Default
                 if (shellType.includes('powershell')) {
@@ -404,6 +408,7 @@ const run = async () => {
             gracefulExit();
         })
         .command('history', 'Show recently generated commands and scripts', {}, async (argv) => {
+            const config = await getConfig(); // Get latest config
             const history = config.history || [];
             if (history.length === 0) {
                 console.log(chalk.yellow('No history found.'));
@@ -446,7 +451,13 @@ const run = async () => {
                 console.log(chalk.bold(`\nProbable Cause:`), chalk.red(result.data.cause));
                 console.log(chalk.bold(`\nExplanation:`), result.data.explanation);
                 console.log(chalk.bold(`\nSolution:`));
-                result.data.solution.forEach(step => console.log(chalk.green(`  - ${step}`)));
+                result.data.solution.forEach(step => {
+                    if (step.startsWith('CMD:')) {
+                        console.log(chalk.green(`  - Run command: `) + chalk.cyan(step.substring(4).trim()));
+                    } else {
+                        console.log(chalk.green(`  - ${step}`));
+                    }
+                });
             }
             gracefulExit();
         })
@@ -472,7 +483,7 @@ const run = async () => {
     
     const today = new Date().toISOString().slice(0, 10);
     if (!config.lastRunDate) {
-        showWelcomeBanner();
+        if (!command) showWelcomeBanner();
         await setConfig({ lastRunDate: today });
     }
     
@@ -486,7 +497,7 @@ const run = async () => {
 };
 
 run().catch(err => {
-    stopSpinner(); // Ensure spinner stops on any catastrophic failure
+    stopSpinner();
     console.error(chalk.red(`\nA critical error occurred: ${err.message}`));
     console.error(err.stack);
     process.exit(1);
