@@ -289,7 +289,8 @@ const executeCommand = (command, shell) => {
 const run = async () => {
     let config = await getConfig();
     const args = hideBin(process.argv);
-
+    
+    // Make the main command case-insensitive
     if (args.length > 0 && !args[0].startsWith('-')) {
         args[0] = args[0].toLowerCase();
     }
@@ -298,9 +299,9 @@ const run = async () => {
         .scriptName("cmdgen")
         .help(false)
         .version(false)
-        .option('h', { alias: 'help', type: 'boolean', description: 'Show this help menu' })
-        .option('v', { alias: 'version', type: 'boolean', description: 'Show version number' })
-        .command(['generate <request>', 'g <request>'], 'Generate a single command', {}, async (argv) => {
+        .option('h', { alias: 'help', type: 'boolean' })
+        .option('v', { alias: 'version', type: 'boolean' })
+        .command(['generate <request>', 'g'], 'Generate a single command', {}, async (argv) => {
             const startInteractiveSession = async () => {
                 let allCommands = [];
                 const initialResult = await callApi({ ...argv, userInput: argv.request, mode: 'generate', cli: argv.shell });
@@ -379,7 +380,7 @@ const run = async () => {
             });
             await startInteractiveSession();
         })
-        .command(['script <request>', 's <request>'], 'Generate a full script', {}, async (argv) => {
+        .command(['script <request>', 's'], 'Generate a full script', {}, async (argv) => {
             const result = await callApi({ ...argv, userInput: argv.request, mode: 'script', cli: argv.shell });
             if (result) {
                 console.log(chalk.cyan.bold('\n--- Generated Script ---'));
@@ -391,7 +392,6 @@ const run = async () => {
             gracefulExit();
         })
         .command('history', 'Show recently generated commands and scripts', {}, async (argv) => {
-            const config = await getConfig();
             const history = config.history || [];
             if (history.length === 0) {
                 console.log(chalk.yellow('No history found.'));
@@ -422,12 +422,12 @@ const run = async () => {
                 spawn(command, { stdio: 'inherit', shell: true }).on('close', code => process.exit(code));
             }
         })
-        .command(['analyze <command>', 'a <command>'], 'Understand what a command does', {}, async (argv) => {
+        .command(['analyze <command>', 'a'], 'Understand what a command does', {}, async (argv) => {
             const result = await callApi({ ...argv, userInput: argv.command, mode: 'explain', cli: argv.shell });
             if (result) console.log(result.data.explanation);
             gracefulExit();
         })
-        .command(['error <message>', 'e <message>'], 'Help with an error message', {}, async (argv) => {
+        .command(['error <message>', 'e'], 'Help with an error message', {}, async (argv) => {
             const userInput = `Error Message:\n${argv.message}` + (argv.context ? `\n\nContext:\n${argv.context}` : '');
             const result = await callApi({ ...argv, userInput: userInput, mode: 'error', cli: argv.shell });
             if (result) {
@@ -447,7 +447,6 @@ const run = async () => {
             process.exit(1);
         });
 
-    // --- LOGIC TO TRIGGER SETUP OR COMMANDS ---
     const argv = await parser.argv;
 
     if (argv.help) {
@@ -459,30 +458,27 @@ const run = async () => {
         process.exit(0);
     }
     
+    // --- ROBUST LOGIC TO TRIGGER SETUP OR COMMANDS ---
+    const command = argv._[0];
+    const needsConfig = !['config', 'update', undefined].includes(command);
+
+    if (needsConfig && (!config.os || !config.shell)) {
+        console.log(chalk.yellow('Welcome to CMDGEN! You need to configure it before first use.'));
+        await runSetupWizard();
+        console.log(chalk.cyan('\nSetup complete. Please run your command again.'));
+        process.exit(0);
+    }
+    
     const today = new Date().toISOString().slice(0, 10);
     if (config.lastRunDate !== today) {
         showWelcomeBanner();
         await setConfig({ lastRunDate: today });
     }
     
-    // If config is missing, force setup for any command that needs it.
-    const command = argv._[0];
-    const allowedCommandsWithoutConfig = ['config', 'update', undefined]; 
-    if (!config.os || !config.shell) {
-        if (!allowedCommandsWithoutConfig.includes(command)) {
-            console.log(chalk.yellow('Welcome to CMDGEN! You need to configure it before first use.'));
-            await runSetupWizard();
-            console.log(chalk.cyan('\nSetup complete. Please run your command again.'));
-            process.exit(0);
-        }
-    }
-    
-    // We only check for updates if a command is actually going to be run
-    if(command){
+    if (command) {
         await checkForUpdates();
     }
 
-    // If no command was provided (e.g., just `cmdgen`), show help.
     if (!command) {
         showHelp(config);
     }
