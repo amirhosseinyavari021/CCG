@@ -42,7 +42,6 @@ command|||short_explanation|||warning (leave empty if none)
 Do not add any introductory text, numbering, or markdown.
 `;
         
-        // ... (The rest of the file remains the same)
         case 'explain':
              return `${finalBasePrompt}
 **MISSION:** The user has provided a command or a script. Analyze it and provide a comprehensive, well-structured explanation.
