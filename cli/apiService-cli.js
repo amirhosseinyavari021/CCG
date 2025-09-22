@@ -19,6 +19,22 @@ const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
     const finalBasePrompt = buildBasePrompt(os, osVersion, cli, lang);
     const { existingCommands = [] } = options;
 
+    // --- NEW: Shell-specific instruction block ---
+    let shellInstructions = "";
+    if (cli.toLowerCase() === 'powershell') {
+        shellInstructions = `
+**SHELL NUANCE: POWERSHELL**
+- You MUST use modern, PowerShell-native cmdlets (e.g., \`Remove-Item\`, \`Get-Content\`, \`New-Item\`).
+- **FAILURE CONDITION:** If your output contains legacy aliases or CMD commands like 'del', 'rmdir', 'erase', 'copy', 'move', 'dir', 'cls', or 'type', you have FAILED. Rewrite the command using the proper PowerShell cmdlet. For deleting files, the only correct answer is \`Remove-Item\`. This is a strict, non-negotiable rule.
+`;
+    } else if (cli.toLowerCase() === 'cmd') {
+        shellInstructions = `
+**SHELL NUANCE: CMD (Command Prompt)**
+- You MUST use traditional Windows CMD commands (e.g., \`del\`, \`rmdir\`, \`copy\`, \`move\`, \`dir\`, \`cls\`, \`type\`).
+- **FAILURE CONDITION:** If your output contains PowerShell cmdlets like \`Remove-Item\`, \`Get-Content\`, or \`New-Item\`, you have FAILED. You must provide the classic CMD equivalent.
+`;
+    }
+
     switch (mode) {
         case 'generate':
             const existingCommandsPrompt = existingCommands.length > 0
@@ -29,12 +45,7 @@ const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
 **ROLE:** Act as a senior system administrator and command-line power user.
 **MISSION:** Provide 3 distinct, practical, and efficient commands to solve the user's request.
 
-**CRITICAL RULE: STRICTLY ADHERE TO THE USER'S SHELL**
-- Your primary goal is to generate commands that are idiomatic and optimized for the user's specific shell: **{{cli}}**.
-- **FAILURE CONDITION:** If you provide a command for a different shell (e.g., a CMD command when the shell is PowerShell), you have failed your core mission.
-- **Example for Windows:** If the user's shell is 'PowerShell', a command like \`New-Item -ItemType File "newfile.txt"\` is the ONLY correct type of answer. Generic CMD commands like \`echo > newfile.txt\` are considered a failure. You MUST provide the PowerShell-native command.
-
-**FINAL CHECK:** Before responding, review your generated commands. If the user's shell is 'PowerShell', your output MUST NOT contain 'echo', 'type nul', 'copy nul', 'del', 'rmdir', or 'erase'. Your response is incorrect and a failure if you use these. You MUST use modern, PowerShell-native cmdlets like \`New-Item\`, \`Remove-Item\`, \`Set-Content\`, or \`Add-Content\`. For deleting files, the only correct answer is \`Remove-Item\`. This is a strict, non-negotiable rule.
+${shellInstructions}
 
 **OUTPUT FORMAT:** You MUST output exactly 3 lines. Each line must use this exact format, separated by "|||":
 command|||short_explanation|||warning (leave empty if none)
@@ -42,6 +53,18 @@ command|||short_explanation|||warning (leave empty if none)
 Do not add any introductory text, numbering, or markdown.
 `;
         
+        case 'script':
+            const shellType = cli.toLowerCase().includes('powershell') ? 'PowerShell (.ps1)' : 'Shell Script (.sh)';
+            return `${finalBasePrompt}
+**ROLE:** Act as an expert script developer.
+**MISSION:** The user has described a multi-step task. Your goal is to generate a complete, executable script that automates this task.
+**GUIDELINES:**
+- The script must be robust, clear, and well-commented.
+- The shebang (e.g., \`#!/bin/bash\`) or initial setup for the script must be correct for the user's shell: **${shellType}**.
+- Provide the full script content without any introductory or concluding text.
+**OUTPUT FORMAT:** You MUST output only the raw script code.
+`;
+
         case 'explain':
              return `${finalBasePrompt}
 **MISSION:** The user has provided a command or a script. Analyze it and provide a comprehensive, well-structured explanation.
