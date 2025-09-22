@@ -254,6 +254,20 @@ const executeCommand = (command, shell) => {
 // --- Main Application Logic ---
 const run = async () => {
     let config = await getConfig();
+    const args = hideBin(process.argv);
+
+    // *** FIX FOR CASE-INSENSITIVE COMMANDS ***
+    // Find the first argument that isn't a flag and convert it to lowercase.
+    if (args.length > 0 && !args[0].startsWith('-')) {
+        args[0] = args[0].toLowerCase();
+    }
+    
+    // Manually check for case-insensitive help flag before parsing
+    const helpRequested = args.some(arg => arg.toLowerCase() === '--help' || arg.toLowerCase() === '-h');
+    if (helpRequested) {
+        showHelp(config);
+        process.exit(0);
+    }
 
     const today = new Date().toISOString().slice(0, 10);
     if (config.lastRunDate !== today) {
@@ -261,9 +275,8 @@ const run = async () => {
         await setConfig({ ...config, lastRunDate: today });
     }
 
-    const args = process.argv.slice(2);
     if (!config.os || !config.shell) {
-        if (args.length > 0 && args[0] !== 'config' && args[0] !== 'update' && !args.includes('--help') && !args.includes('-h') && !args.includes('--version') && !args.includes('-v')) {
+        if (args.length > 0 && args[0] !== 'config' && args[0] !== 'update' && !args.includes('--version') && !args.includes('-v')) {
              console.log('Welcome to CMDGEN!');
              config = await runSetupWizard();
         }
@@ -271,7 +284,7 @@ const run = async () => {
     
     checkForUpdates();
 
-    const parser = yargs(hideBin(process.argv))
+    const parser = yargs(args) // Use the modified 'args' array
         .scriptName("cmdgen")
         .help(false)
         .version(false)
@@ -373,7 +386,6 @@ const run = async () => {
         .option('os', { describe: 'Target OS', type: 'string', default: config.os })
         .option('shell', { describe: 'Target shell', type: 'string', default: config.shell })
         .option('lang', { describe: 'Response language', type: 'string', default: 'en' })
-        .option('h', { alias: 'help', type: 'boolean', description: 'Show this help menu' })
         .option('v', { alias: 'version', type: 'boolean', description: 'Show version number' })
         .strict()
         .fail((msg, err) => {
@@ -381,12 +393,8 @@ const run = async () => {
             process.exit(1);
         });
 
-    const argv = parser.parse(args);
+    const argv = parser.parse();
 
-    if (argv.help || argv.h) {
-        showHelp(config);
-        process.exit(0);
-    }
     if (argv.version || argv.v) {
         console.log(packageJson.version);
         process.exit(0);
