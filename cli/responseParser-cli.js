@@ -1,14 +1,7 @@
 const parseAndConstructData = (textResponse, mode) => {
     try {
-        let trimmedResponse = textResponse.trim();
+        const trimmedResponse = textResponse.trim();
         if (!trimmedResponse) return null;
-
-        // *** FIX: Robustly strip markdown code blocks for script mode ***
-        if (mode === 'script') {
-            // This regex removes the opening and closing markdown backticks and the language specifier
-            const scriptContent = trimmedResponse.replace(/^```(?:\w+)?\s*\n?([\s\S]+?)\n?```$/, '$1');
-            return { explanation: scriptContent.trim() };
-        }
 
         if (mode === 'generate') {
             const lines = trimmedResponse.split('\n').filter(line => line.trim());
@@ -16,7 +9,8 @@ const parseAndConstructData = (textResponse, mode) => {
                 const parts = line.split('|||');
                 if (parts.length < 2) return null;
 
-                const rawCommand = parts[0]?.trim() || '';
+                // *** اصلاح نهایی: حذف بک‌تیک‌ها و فضاهای خالی اضافی با اطمینان کامل ***
+                const rawCommand = parts[0]?.trim().replace(/^`|`$/g, '').trim() || '';
                 const cleanedCommand = rawCommand.replace(/^\s*\d+\.\s*/, '');
 
                 if (!cleanedCommand) {
@@ -32,6 +26,11 @@ const parseAndConstructData = (textResponse, mode) => {
             return { commands };
         }
 
+        if (mode === 'script') {
+            const scriptContent = trimmedResponse.replace(/^```(?:\w+)?\s*\n?([\s\S]+?)\n?```$/, '$1');
+            return { explanation: scriptContent.trim() };
+        }
+        
         if (mode === 'explain') {
             return { explanation: trimmedResponse };
         }
