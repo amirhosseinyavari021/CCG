@@ -1,29 +1,21 @@
 {
-  "name": "ay-cmdgen-server",
+  "name": "ay-cmdgen-cli",
   "version": "2.3.0",
-  "private": true,
-  "description": "The server and web component for AY-CMDGEN",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js",
-    "build": "cd client && npm install && cross-env REACT_APP_VERSION=$npm_package_version npm run build",
-    "pkg:linux": "cd cli && npm install && pkg . --targets latest-linux-x64 --output ../dist/cmdgen-linux",
-    "pkg:win": "cd cli && npm install && pkg . --targets latest-win-x64 --output ../dist/cmdgen-win.exe",
-    "pkg:macos": "cd cli && npm install && pkg . --targets latest-macos-x64 --output ../dist/cmdgen-macos",
-    "release": "npm run build && npm run pkg:linux && npm run pkg:win && npm run pkg:macos"
-  },
-  "engines": {
-    "node": "20.x"
+  "description": "Your Intelligent Command-Line Assistant - CLI",
+  "main": "cmdgen-cli.js",
+  "bin": {
+    "cmdgen": "./cmdgen-cli.js"
   },
   "dependencies": {
     "axios": "^1.7.2",
-    "express": "^4.18.2",
-    "express-rate-limit": "^6.7.0",
-    "express-validator": "^7.0.1",
-    "node-fetch": "^2.6.7"
+    "chalk": "^4.1.2",
+    "fs-extra": "^11.2.0",
+    "semver": "^7.6.2",
+    "yargs": "^17.7.2"
   },
-  "devDependencies": {
-    "cross-env": "^7.0.3",
-    "pkg": "^5.8.1"
+  "pkg": {
+    "assets": [
+      "package.json"
+    ]
   }
 }
