@@ -257,16 +257,16 @@ const run = async () => {
             });
             await startInteractiveSession();
         })
-       .command('update', 'Update cmdgen to the latest version', {}, () => {
-    if (process.platform === 'win32') {
-        const command = 'iwr https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.ps1 | iex';
-        // Explicitly use powershell.exe to run the update command on Windows
-        spawn('powershell.exe', ['-Command', command], { stdio: 'inherit', shell: true }).on('close', code => process.exit(code));
-    } else {
-        const command = 'curl -fsSL https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.sh | bash';
-        spawn(command, { stdio: 'inherit', shell: true }).on('close', code => process.exit(code));
-    }
-})
+        .command('update', 'Update cmdgen to the latest version', {}, () => {
+            if (process.platform === 'win32') {
+                const command = 'iwr https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.ps1 | iex';
+                // Explicitly use powershell.exe to run the update command on Windows
+                spawn('powershell.exe', ['-Command', command], { stdio: 'inherit', shell: true }).on('close', code => process.exit(code));
+            } else {
+                const command = 'curl -fsSL https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.sh | bash';
+                spawn(command, { stdio: 'inherit', shell: true }).on('close', code => process.exit(code));
+            }
+        })
         .command(['analyze <command>', 'a <command>'], 'Analyze a command', {}, async (argv) => {
             const result = await callApi({ ...argv, userInput: argv.command, mode: 'explain' });
             if (result) console.log(result.data.explanation);
