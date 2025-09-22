@@ -21,14 +21,14 @@ const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
 
     // --- NEW: Shell-specific instruction block ---
     let shellInstructions = "";
-    // *** FIX IS HERE: Added a check to ensure 'cli' is not undefined before calling toLowerCase() ***
-    if (cli && cli.toLowerCase() === 'powershell') {
+    if (cli.toLowerCase() === 'powershell') {
         shellInstructions = `
 **SHELL NUANCE: POWERSHELL**
 - You MUST use modern, PowerShell-native cmdlets (e.g., \`Remove-Item\`, \`Get-Content\`, \`New-Item\`).
+- Use standard environment variables like \`$env:USERPROFILE\` or \`$HOME\` instead of unix-style \`~\`.
 - **FAILURE CONDITION:** If your output contains legacy aliases or CMD commands like 'del', 'rmdir', 'erase', 'copy', 'move', 'dir', 'cls', or 'type', you have FAILED. Rewrite the command using the proper PowerShell cmdlet. For deleting files, the only correct answer is \`Remove-Item\`. This is a strict, non-negotiable rule.
 `;
-    } else if (cli && cli.toLowerCase() === 'cmd') {
+    } else if (cli.toLowerCase() === 'cmd') {
         shellInstructions = `
 **SHELL NUANCE: CMD (Command Prompt)**
 - You MUST use traditional Windows CMD commands (e.g., \`del\`, \`rmdir\`, \`copy\`, \`move\`, \`dir\`, \`cls\`, \`type\`).
@@ -44,7 +44,7 @@ const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
 
             return `${finalBasePrompt}
 **ROLE:** Act as a senior system administrator and command-line power user.
-**MISSION:** Provide 3 distinct, practical, and efficient commands to solve the user's request.
+**MISSION:** Provide 3 distinct, practical, and efficient commands to solve the user's request. Adhere to the highest standards of correctness and best practices for the specified shell.
 
 ${shellInstructions}
 
@@ -55,15 +55,19 @@ Do not add any introductory text, numbering, or markdown.
 `;
         
         case 'script':
-            const shellType = cli && cli.toLowerCase().includes('powershell') ? 'PowerShell (.ps1)' : 'Shell Script (.sh)';
+            const shellType = cli.toLowerCase().includes('powershell') ? 'PowerShell (.ps1)' : 'Shell Script (.sh)';
             return `${finalBasePrompt}
 **ROLE:** Act as an expert script developer.
-**MISSION:** The user has described a multi-step task. Your goal is to generate a complete, executable script that automates this task.
+**MISSION:** The user has described a multi-step task. Your goal is to generate a complete, executable, and robust script that automates this task.
+
+${shellInstructions}
+
 **GUIDELINES:**
-- The script must be robust, clear, and well-commented.
+- The script must be robust, clear, and well-commented to explain the logic.
+- Use variables for paths or important values to make the script reusable.
 - The shebang (e.g., \`#!/bin/bash\`) or initial setup for the script must be correct for the user's shell: **${shellType}**.
 - Provide the full script content without any introductory or concluding text.
-**OUTPUT FORMAT:** You MUST output only the raw script code.
+**OUTPUT FORMAT:** You MUST output only the raw script code, enclosed in a single markdown code block.
 `;
 
         case 'explain':
