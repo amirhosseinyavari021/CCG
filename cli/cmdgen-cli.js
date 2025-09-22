@@ -23,7 +23,6 @@ async function getConfig() {
     if (await fs.pathExists(configFile)) {
         return fs.readJson(configFile);
     }
-    // Return a default structure indicating config is missing
     return { first_run_shown: false, last_update_check: 0 };
 }
 
@@ -35,7 +34,8 @@ async function setConfig(newConfig) {
 // --- Interactive Setup Wizard ---
 const runSetupWizard = async () => {
     console.log('\n--- CMDGEN First-Time Setup ---');
-    console.log('Please select your operating system and default shell.');
+    console.log('This one-time setup saves your default OS and Shell for future use.');
+    console.log('You can change these settings anytime by running: cmdgen config');
     
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     const question = (query) => new Promise(resolve => rl.question(query, resolve));
@@ -75,7 +75,7 @@ const runSetupWizard = async () => {
     const newConfig = {
         'os': os,
         'shell': shell,
-        'osVersion': '' // Let the user set this manually if needed, or leave it blank
+        'osVersion': ''
     };
 
     await setConfig(newConfig);
@@ -208,12 +208,10 @@ const executeCommand = (command, shell) => {
 const run = async () => {
     let config = await getConfig();
 
-    // Check if configuration is set, if not, run the wizard
+    const args = process.argv.slice(2);
     if (!config.os || !config.shell) {
-        // Allow 'config' and 'update' commands to run without setup
-        const args = process.argv.slice(2);
-        if (args[0] !== 'config' && args[0] !== 'update' && args[0] !== '--help' && args[0] !== '-h' && args[0] !== '--version' && args[0] !== '-v') {
-             console.log('Welcome to CMDGEN! You need to configure it before first use.');
+        if (args.length > 0 && args[0] !== 'config' && args[0] !== 'update' && args[0] !== '--help' && args[0] !== '-h' && args[0] !== '--version' && args[0] !== '-v') {
+             console.log('Welcome to CMDGEN!');
              config = await runSetupWizard();
         }
     }
@@ -223,6 +221,10 @@ const run = async () => {
     const parser = yargs(hideBin(process.argv))
         .scriptName("cmdgen")
         .command(['generate <request>', 'g <request>'], 'Generate a command', {}, async (argv) => {
+            if (!argv.os || !argv.shell) {
+                console.log('Default OS/Shell not configured. Please run `cmdgen config` first.');
+                process.exit(1);
+            }
             const startInteractiveSession = async () => {
                 let allCommands = [];
                 const initialResult = await callApi({ ...argv, userInput: argv.request, mode: 'generate', cli: argv.shell });
@@ -297,10 +299,18 @@ const run = async () => {
             }
         })
         .command(['analyze <command>', 'a <command>'], 'Analyze a command', {}, async (argv) => {
+            if (!argv.os || !argv.shell) {
+                console.log('Default OS/Shell not configured. Please run `cmdgen config` first.');
+                process.exit(1);
+            }
             const result = await callApi({ ...argv, userInput: argv.command, mode: 'explain', cli: argv.shell });
             if (result) console.log(result.data.explanation);
         })
         .command(['error <message>', 'e <message>'], 'Analyze an error message', {}, async (argv) => {
+            if (!argv.os || !argv.shell) {
+                console.log('Default OS/Shell not configured. Please run `cmdgen config` first.');
+                process.exit(1);
+            }
             const userInput = `Error Message:\n${argv.message}` + (argv.context ? `\n\nContext:\n${argv.context}` : '');
             const result = await callApi({ ...argv, userInput: userInput, mode: 'error', cli: argv.shell });
             if (result) {
@@ -316,17 +326,25 @@ const run = async () => {
         .help('h').alias('h', 'help')
         .version('v', `Show version number: ${packageJson.version}`).alias('v', 'version')
         .strict().wrap(null)
-        .fail((msg, err) => {
-            if (err) console.error(`\n❌ An unexpected error occurred: ${err.message}`);
-            else { console.error(`\n❌ Error: ${msg}`); parser.showHelp(); }
+        .fail((msg, err, yargs) => {
+            if (err) {
+                 console.error(`\n❌ An unexpected error occurred: ${err.message}`);
+            } else {
+                 console.error(`\n❌ Error: ${msg}`);
+                 yargs.showHelp();
+            }
             process.exit(1);
         });
 
-    const argv = await parser.parse(process.argv.slice(2));
-    if (argv._.length === 0 && !argv.h && !argv.v && !config.os) {
-         // This case handles running `cmdgen` with no args and no config.
-         // The initial check at the top of run() will have already triggered the wizard.
+    const argv = parser.parse(process.argv.slice(2));
+
+    // If no command is given and no config exists, show the wizard
+    if (args.length === 0 && (!config.os || !config.shell)) {
+        await runSetupWizard();
     }
 };
 
-run();
+run().catch(err => {
+    console.error(`A critical error occurred: ${err.message}`);
+    process.exit(1);
+});
