@@ -260,8 +260,8 @@ const run = async () => {
         .command('update', 'Update cmdgen to the latest version', {}, () => {
             if (process.platform === 'win32') {
                 const command = 'iwr https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.ps1 | iex';
-                // Explicitly use powershell.exe to run the update command on Windows
-                spawn('powershell.exe', ['-Command', command], { stdio: 'inherit', shell: true }).on('close', code => process.exit(code));
+                // CORRECT WAY: Call powershell.exe directly without shell: true
+                spawn('powershell.exe', ['-Command', command], { stdio: 'inherit' }).on('close', code => process.exit(code));
             } else {
                 const command = 'curl -fsSL https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.sh | bash';
                 spawn(command, { stdio: 'inherit', shell: true }).on('close', code => process.exit(code));
