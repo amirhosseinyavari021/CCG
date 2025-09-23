@@ -17,6 +17,12 @@ CMDGEN is a smart, cross-platform tool that bridges the gap between natural lang
 
 The installation script automatically detects your OS, downloads the correct version, and sets it up for you.
 
+**Via NPM:**
+
+```bash
+npm install -g @amirhosseinyavari/ay-cmdgen
+```
+
 **For Linux & macOS:**
 
 ```bash
@@ -27,12 +33,6 @@ curl -fsSL https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main
 
 ```powershell
 iwr https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.ps1 | iex
-```
-
-**Via NPM:**
-
-```bash
-npm install -g @amirhosseinyavari/ay-cmdgen
 ```
 
 After installation, open a new terminal window to start using `cmdgen`.
