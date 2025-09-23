@@ -1,5 +1,5 @@
 {
-  "name": "ay-cmdgen-cli",
+  "name": "ay-cmdgen",
   "version": "2.3.0",
   "description": "Your Intelligent Command-Line Assistant - CLI",
   "main": "cmdgen-cli.js",
