@@ -1,0 +1,33 @@
+name: Create Release and Upload Binaries
+
+on:
+  push:
+    tags:
+      - 'v*' 
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install dependencies and build executables
+        run: |
+          npm install
+          npm run release
+
+      - name: Create GitHub Release and Upload Assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/cmdgen-linux
+            dist/cmdgen-macos
+            dist/cmdgen-win.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
