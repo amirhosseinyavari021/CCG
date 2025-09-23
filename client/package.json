@@ -1,6 +1,10 @@
 {
   "name": "client",
+<<<<<<< HEAD
+  "version": "2.4.2",
+=======
   "version": "2.4.1",
+>>>>>>> d44af67fd6bdce1c006abaa7e3b77c7d1f9ab3b8
   "private": true,
   "homepage": "https://cmdgen.onrender.com",
   "dependencies": {
