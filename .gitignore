@@ -1,7 +1,10 @@
-/*
+# Node modules
 /node_modules
 /client/node_modules
+
+# Build output
 /client/build
+
+# Environment variables
 .env
 /client/.env
-*/
