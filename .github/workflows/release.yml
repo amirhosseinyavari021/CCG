@@ -3,12 +3,12 @@ name: Create Release and Upload Binaries
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*' 
 
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
-    permissions: 
+    permissions:
       contents: write 
 
     steps:
