@@ -8,8 +8,6 @@ const parseAndConstructData = (textResponse, mode) => {
             const commands = lines.map(line => {
                 const parts = line.split('|||');
                 if (parts.length < 2) return null;
-
-                // *** اصلاح نهایی: حذف بک‌تیک‌ها و فضاهای خالی اضافی با اطمینان کامل ***
                 const rawCommand = parts[0]?.trim().replace(/^`|`$/g, '').trim() || '';
                 const cleanedCommand = rawCommand.replace(/^\s*\d+[\.\s]*\s*/, '');
                 if (!cleanedCommand) {
