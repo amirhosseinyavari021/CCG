@@ -61,7 +61,7 @@ export const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) =>
             return `${finalBasePrompt}
 ${goldenRules}
 ${shellInstructions}
-**MISSION:** Provide 3 distinct, practical, and **syntactically PERFECT** commands for the user's request.
+**MISSION:** Provide 3 distinct, practical, and **syntactically PERFECT** commands for the user's request. Focus on real-world scenarios and avoid overly simplistic or trivial commands (e.g., avoid basic 'cd' or 'dir' unless they are part of a more complex chain).
 **OUTPUT FORMAT:** You MUST output exactly 3 lines using this exact format:
 command|||short_explanation|||warning (if any)
 `;
@@ -81,8 +81,8 @@ ${shellInstructions}
         case 'error':
              return `${finalBasePrompt}
 ${goldenRules}
-**MISSION:** Analyze the user's error message. Provide a probable cause, a simple explanation, and a sequence of concrete solution steps.
-**OUTPUT FORMAT:** You MUST output a single line with the actual analysis, separated by "|||". DO NOT output the placeholder words 'probable_cause' or 'solution_step_1'.
+**MISSION:** Analyze the user's error message. Provide a probable cause, a simple explanation, and a sequence of concrete solution steps. The solution must include actionable commands.
+**OUTPUT FORMAT:** You MUST output a single line with the actual analysis, separated by "|||". Provide up to 3 distinct commands as solutions, each prefixed with \`CMD:\`.
 **CORRECT EXAMPLE:** PowerShell Execution Policy Restriction|||This error means security settings are preventing scripts from running.|||CMD: Get-ExecutionPolicy -Scope CurrentUser|||CMD: Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned -Force
 `;
         
