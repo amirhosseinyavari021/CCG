@@ -11,8 +11,7 @@ const parseAndConstructData = (textResponse, mode) => {
 
                 // *** اصلاح نهایی: حذف بک‌تیک‌ها و فضاهای خالی اضافی با اطمینان کامل ***
                 const rawCommand = parts[0]?.trim().replace(/^`|`$/g, '').trim() || '';
-                const cleanedCommand = rawCommand.replace(/^\s*\d+\.\s*/, '');
-
+                const cleanedCommand = rawCommand.replace(/^\s*\d+[\.\s]*\s*/, '');
                 if (!cleanedCommand) {
                     return null;
                 }
