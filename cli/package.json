@@ -1,10 +1,13 @@
 {
-  "name": "ay-cmdgen",
+  "name": "@amirhosseinyavari/ay-cmdgen",
   "version": "2.3.0",
   "description": "Your Intelligent Command-Line Assistant - CLI",
   "main": "cmdgen-cli.js",
   "bin": {
     "cmdgen": "./cmdgen-cli.js"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "axios": "^1.7.2",
@@ -12,10 +15,5 @@
     "fs-extra": "^11.2.0",
     "semver": "^7.6.2",
     "yargs": "^17.7.2"
-  },
-  "pkg": {
-    "assets": [
-      "package.json"
-    ]
   }
 }
