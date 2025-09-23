@@ -11,13 +11,17 @@ CMDGEN is a smart, cross-platform tool that bridges the gap between natural lang
 - **In-depth Analysis:** Paste any command to get a detailed, expert-level explanation of what it does.
 - **Error Debugging:** Got an error? CMDGEN analyzes it and gives you a step-by-step solution.
 - **Command History:** Access your 20 most recently generated commands with the `history` command.
-- **Cross-Platform:** Natively supports Windows, macOS, and Linux.
+- **Cross-Platform Support:** Natively works on Windows, macOS, and Linux for seamless compatibility.
+- **Multi-Language Support:** Available in both English and Persian to cater to a wider audience.
+- **Interactive Mode:** After generating commands in the CLI, execute them directly, request more suggestions, or exit effortlessly.
+- **Configuration Management:** Easily manage default settings (like OS and shell) using the intuitive `config` command.
+- **Self-Update Mechanism:** Automatically upgrade to the latest version with a simple `update` command.
 
 ## 🚀 Quick Install (Recommended)
 
 The installation script automatically detects your OS, downloads the correct version, and sets it up for you.
 
-**Via NPM:**
+**Via NPM (Recommended for Node.js Users):**
 
 ```bash
 npm install -g @amirhosseinyavari/ay-cmdgen
@@ -38,6 +42,20 @@ iwr https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/instal
 After installation, open a new terminal window to start using `cmdgen`.
 
 ## ⚙️ How to Use
+
+### Command Summary
+
+Here's a quick reference table for all available commands:
+
+| Command              | Alias | Description                                      |
+|----------------------|-------|--------------------------------------------------|
+| `generate <request>` | `g`   | Generate a single command                        |
+| `script <request>`   | `s`   | Generate a full script                           |
+| `analyze <command>`  | `a`   | Understand what a command does                   |
+| `error <message>`    | `e`   | Help with an error message                       |
+| `history`            |       | Show recently generated commands                 |
+| `config [action]`    |       | Manage saved settings (show, set, wizard)        |
+| `update`             |       | Update cmdgen to the latest version              |
 
 ### 1. First-Time Setup
 
@@ -106,6 +124,27 @@ Quickly access your recently generated commands.
 cmdgen history
 ```
 
+### 7. Manage Configuration (config)
+
+Run the setup wizard or view/manage your settings.
+
+```bash
+# Run the setup wizard to configure default OS and shell
+cmdgen config wizard
+
+# View current saved settings
+cmdgen config show
+```
+
+### 8. Update the Tool (update)
+
+Keep CMDGEN up-to-date with the latest features and fixes.
+
+```bash
+# Update cmdgen to the latest version
+cmdgen update
+```
+
 ## 💻 Web Version
 
 Prefer a graphical interface? Use the web version instantly without any installation.
@@ -122,6 +161,14 @@ Want to contribute or build from the source?
 
    The output files will be in the `dist` folder.
 
+## Configuration
+
+User settings are stored in a configuration file at `~/.cmdgen/config.json`. Advanced users can manually edit this file if needed to customize their default OS, shell, or other preferences.
+
+## Contributing
+
+Contributions are welcome! If you'd like to help improve CMDGEN, please feel free to fork the repository and submit a pull request.
+
 ## 📜 License
 
-This project is dual-licensed under the MIT and Apache 2.0 licenses. See the LICENSE file for details.
+This project is dual-licensed under the [MIT License](https://opensource.org/licenses/MIT) and the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). See the LICENSE file for details.
