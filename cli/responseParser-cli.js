@@ -8,8 +8,14 @@ const parseAndConstructData = (textResponse, mode) => {
             const commands = lines.map(line => {
                 const parts = line.split('|||');
                 if (parts.length < 2) return null;
+                const rawCommand = parts[0]?.trim().replace(/^`|`$/g, '').trim() || '';
+                const cleanedCommand = rawCommand.replace(/^\s*\d+[\.\s]*\s*/, '');
+                if (!cleanedCommand) {
+                    return null;
+                }
+
                 return {
-                    command: parts[0]?.trim() || '',
+                    command: cleanedCommand,
                     explanation: parts[1]?.trim() || '',
                     warning: parts[2]?.trim() || ''
                 };
@@ -17,6 +23,11 @@ const parseAndConstructData = (textResponse, mode) => {
             return { commands };
         }
 
+        if (mode === 'script') {
+            const scriptContent = trimmedResponse.replace(/^```(?:\w+)?\s*\n?([\s\S]+?)\n?```$/, '$1');
+            return { explanation: scriptContent.trim() };
+        }
+        
         if (mode === 'explain') {
             return { explanation: trimmedResponse };
         }

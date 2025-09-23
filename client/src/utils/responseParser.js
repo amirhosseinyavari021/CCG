@@ -12,8 +12,15 @@ export const parseAndConstructData = (textResponse, mode) => {
             const commands = lines.map(line => {
                 const parts = line.split('|||');
                 if (parts.length < 2) return null; // A valid line needs a command and explanation
+
+                // Clean the command: remove backticks and any leading numbers/periods.
+                const rawCommand = parts[0]?.trim().replace(/^`|`$/g, '').trim() || '';
+                const cleanedCommand = rawCommand.replace(/^\s*\d+[\.\s]*\s*/, '');
+                
+                if (!cleanedCommand) return null; // Ignore if the command is empty after cleaning
+
                 return {
-                    command: parts[0]?.trim() || '',
+                    command: cleanedCommand,
                     explanation: parts[1]?.trim() || '',
                     warning: parts[2]?.trim() || ''
                 };

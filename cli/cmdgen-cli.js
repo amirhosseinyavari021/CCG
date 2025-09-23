@@ -3,245 +3,502 @@
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
 const axios = require('axios/dist/node/axios.cjs');
-const { spawn, execSync } = require('child_process');
-const { TextDecoder } = require('util');
+const { spawn } = require('child_process');
 const os = require('os');
+const path = require('path');
+const fs = require('fs-extra');
+const semver = require('semver');
+const readline = require('readline');
+const chalk = require('chalk');
+
 const { getSystemPrompt } = require('./apiService-cli.js');
 const { parseAndConstructData } = require('./responseParser-cli.js');
 const packageJson = require('./package.json');
-const readline = require('readline');
 
-// --- UX IMPROVEMENT: SPINNER ---
+// --- Config and State Management (No Changes) ---
+const configDir = path.join(os.homedir(), '.cmdgen');
+const configFile = path.join(configDir, 'config.json');
+const MAX_HISTORY = 20;
+
+async function getConfig() {
+    await fs.ensureDir(configDir);
+    if (await fs.pathExists(configFile)) {
+        try {
+            const config = await fs.readJson(configFile);
+            if (!config.history) config.history = [];
+            return config;
+        } catch (error) {
+            console.error(chalk.yellow('Warning: Configuration file was corrupted and has been reset.'));
+            await fs.remove(configFile);
+            return { history: [] };
+        }
+    }
+    return { history: [] };
+}
+
+async function setConfig(newConfig) {
+    const currentConfig = await getConfig();
+    await fs.writeJson(configFile, { ...currentConfig, ...newConfig });
+}
+
+async function addToHistory(commandItem) {
+    const config = await getConfig();
+    const history = config.history || [];
+    if (history.some(item => item.command === commandItem.command)) return;
+    history.unshift(commandItem);
+    if (history.length > MAX_HISTORY) {
+        history.pop();
+    }
+    await setConfig({ history });
+}
+
+// --- UI & UX Functions (No Changes) ---
+const showHelp = (config = {}) => {
+    const osDefault = chalk.yellow(config.os || 'not set');
+    const shellDefault = chalk.yellow(config.shell || 'not set');
+
+    console.log(chalk.cyan(`
+█▀▀ █▄█ █▀▄ █▀▀ █▄█ █▄░█
+█▄▄ ░█░ █▄▀ ██▄ ░█░ █░▀█
+`));
+    console.log(chalk.bold('cmdgen - Your AI-powered command generator\n'));
+    console.log(chalk.bold('Usage:'));
+    console.log('  cmdgen <command> [options]\n');
+    console.log(chalk.bold('Examples:'));
+    console.log(chalk.gray('  cmdgen generate "list all files in Linux"'));
+    console.log(chalk.gray('  cmdgen script "backup all .log files into a zip"'));
+    console.log(chalk.gray('  cmdgen history\n'));
+    console.log(chalk.bold('Commands:'));
+    console.log(`  ${chalk.green('generate <request>')}    Generate a single command           [alias: g]`);
+    console.log(`  ${chalk.green('script <request>')}      Generate a full script              [alias: s]`);
+    console.log(`  ${chalk.green('analyze <command>')}     Understand what a command does      [alias: a]`);
+    console.log(`  ${chalk.green('error <message>')}       Help with an error message          [alias: e]`);
+    console.log(`  ${chalk.green('history')}               Show recently generated commands`);
+    console.log(`  ${chalk.green('config <action>')}       Manage saved settings (show, set, wizard)`);
+    console.log(`  ${chalk.green('update')}                Update cmdgen to the latest version\n`);
+    console.log(chalk.bold('Options:'));
+    console.log(`  --os                  Target OS (e.g., windows, linux)  [default: ${osDefault}]`);
+    console.log(`  --shell               Target shell (e.g., PowerShell, bash) [default: ${shellDefault}]`);
+    console.log(`  -h, --help            Show this help menu`);
+    console.log(`  -v, --version         Show version number`);
+};
+
+const showWelcomeBanner = () => {
+    console.log(chalk.cyan(`
+█░█░█ █▀▀ █░░ █▀▀ █▀█ █▀▄▀█ █▀▀   ▀█▀ █▀█   ▄▀█ █▄█ ▄▄ █▀▀ █▀▄▀█ █▀▄ █▀▀ █▀▀ █▄░█
+▀▄▀▄▀ ██▄ █▄▄ █▄▄ █▄█ █░▀░█ ██▄   ░█░ █▄█   █▀█ ░█░ ░░ █▄▄ █░▀░█ █▄▀ █▄█ ██▄ █░▀█
+`));
+    console.log(chalk.bold('\nWelcome to AY-CMDGEN!'));
+    console.log(chalk.gray('Made with ❤ by Amirhossein Yavari\n'));
+    console.log('Not sure where to start? Try one of these:');
+    console.log(chalk.yellow('  cmdgen generate "list all files larger than 100MB"'));
+    console.log(chalk.yellow('  cmdgen script "create a folder and three files inside it"'));
+    console.log(chalk.yellow('  cmdgen history\n'));
+    console.log('For more details, run: cmdgen --help');
+};
+
+const gracefulExit = () => {
+    console.log(chalk.green(`\n🙏  Thank you for using cmdgen!  `));
+    process.exit(0);
+};
+
+const runSetupWizard = async () => {
+    console.log(chalk.cyan('\n--- CMDGEN Setup Wizard ---'));
+    console.log('This setup saves your default OS and Shell for future use.');
+    
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const question = (query) => new Promise(resolve => rl.question(query, resolve));
+
+    const osOptions = ['Windows', 'macOS', 'Linux', 'Other'];
+    console.log('\nSelect your Operating System:');
+    osOptions.forEach((opt, i) => console.log(chalk.gray(`  ${i + 1}. ${opt}`)));
+    const osChoice = await question('> ');
+    const selectedOsKey = osOptions[parseInt(osChoice) - 1]?.toLowerCase() || 'other';
+
+    let os, shell;
+
+    if (selectedOsKey === 'other') {
+        os = await question('Enter your OS name (e.g., FreeBSD): ');
+        shell = await question('Enter your Shell name (e.g., sh): ');
+    } else {
+        os = selectedOsKey;
+        const shellMap = {
+            windows: ['PowerShell', 'CMD'],
+            macos: ['zsh', 'bash'],
+            linux: ['bash', 'zsh', 'fish'],
+        };
+        const shellOptions = shellMap[os];
+        console.log(`\nSelect a Shell for ${os}:`);
+        shellOptions.forEach((opt, i) => console.log(chalk.gray(`  ${i + 1}. ${opt}`)));
+        const shellChoice = await question('> ');
+        shell = shellOptions[parseInt(shellChoice) - 1];
+    }
+
+    rl.close();
+
+    if (!os || !shell) {
+        console.error(chalk.red('\n❌ Invalid selection. Please run `cmdgen config wizard` again.'));
+        process.exit(1);
+    }
+
+    const newConfig = { 'os': os, 'shell': shell, 'osVersion': '' };
+    await setConfig(newConfig);
+    console.log(chalk.green(`\n✅ Configuration saved successfully: OS=${os}, Shell=${shell}`));
+    return newConfig;
+};
+
+const handleConfigCommand = async (action, key, value) => {
+    const config = await getConfig();
+    if (action === 'show') {
+        console.log(chalk.bold('\nCurrent CMDGEN Configuration:'));
+        Object.entries(config).forEach(([k, v]) => {
+            if (k !== 'lastRunDate' && k !== 'last_update_check' && k !== 'history') {
+                console.log(`  ${chalk.cyan(k)}: ${chalk.yellow(v)}`);
+            }
+        });
+    } else if (action === 'set') {
+        if (!key || !value) {
+            console.error(chalk.red('Error: "set" action requires a key and a value.'));
+            console.log(chalk.gray('Example: cmdgen config set os linux'));
+            return;
+        }
+        const validKeys = ['os', 'osVersion', 'shell', 'lang'];
+        if (validKeys.includes(key)) {
+            await setConfig({ [key]: value });
+            console.log(chalk.green(`✅ Success! Set "${key}" to "${value}".`));
+        } else {
+            console.error(chalk.red(`Error: Invalid configuration key "${key}".`));
+            console.log(chalk.gray(`Valid keys are: ${validKeys.join(', ')}`));
+        }
+    } else { // 'wizard' or default action
+        await runSetupWizard();
+    }
+};
+
 let spinnerInterval;
 const startSpinner = (message) => {
     const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
     let i = 0;
-    process.stdout.write('\x1B[?25l'); // Hide cursor
+    process.stdout.write('\x1B[?25l');
     spinnerInterval = setInterval(() => {
-        process.stdout.write(`\r${frames[i++ % frames.length]} ${message}`);
+        process.stdout.write(chalk.blue(`\r${frames[i++ % frames.length]} ${message}`));
     }, 80);
 };
 
 const stopSpinner = () => {
-    clearInterval(spinnerInterval);
-    process.stdout.write('\r' + ' '.repeat(50) + '\r'); // Clear the line
-    process.stdout.write('\x1B[?25h'); // Show cursor
-};
-// --- END UX IMPROVEMENT ---
-
-// --- OS & System Info Detection ---
-const getSystemInfo = () => {
-    const platform = process.platform;
-    let detectedOS = 'linux';
-    let detectedVersion = os.release();
-    let detectedShell = 'sh';
-
-    if (platform === 'win32') {
-        detectedOS = 'windows';
-        detectedVersion = os.release();
-        detectedShell = process.env.PSModulePath ? 'PowerShell' : 'CMD';
-    } else if (platform === 'darwin') {
-        detectedOS = 'macos';
-        detectedVersion = execSync('sw_vers -productVersion').toString().trim();
-        detectedShell = process.env.SHELL ? path.basename(process.env.SHELL) : 'zsh';
-    } else { // Linux
-        detectedOS = 'linux';
-        try {
-            const osRelease = execSync('cat /etc/os-release').toString();
-            const versionMatch = osRelease.match(/^PRETTY_NAME="([^"]+)"/m);
-            if (versionMatch) detectedVersion = versionMatch[1];
-        } catch (e) { /* Fallback */ }
-        detectedShell = process.env.SHELL ? path.basename(process.env.SHELL) : 'bash';
+    if (spinnerInterval) {
+        clearInterval(spinnerInterval);
+        spinnerInterval = null;
     }
-    return { detectedOS, detectedVersion, detectedShell };
+    process.stdout.write('\r' + ' '.repeat(50) + '\r');
+    process.stdout.write('\x1B[?25h');
 };
 
-// --- Banner and Info ---
-const showBanner = () => {
-    console.log(`\n  \x1b[1mAY-CMDGEN v${packageJson.version}\x1b[0m - Your Intelligent Command-Line Assistant`);
-    console.log(`  Created by Amirhossein Yavari. Licensed under ${packageJson.license}.`);
-    console.log('  Type "cmdgen --help" for a list of commands.\n');
-};
-
-// --- Remote API Endpoint ---
-const serverUrl = 'https://ay-cmdgen-cli.onrender.com';
-
-// --- Core API with UX improvements ---
-const callApi = async ({ mode, userInput, os, osVersion, cli, lang, options = {} }) => {
-    const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, options);
-    const payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userInput }] };
-    
-    startSpinner('Connecting to server...');
-
+async function checkForUpdates() {
+    const config = await getConfig();
+    const now = Date.now();
+    if (now - (config.last_update_check || 0) < 24 * 60 * 60 * 1000) return;
     try {
-        const response = await axios.post(`${serverUrl}/api/proxy`, payload, { 
-            responseType: 'stream',
-            timeout: 60000 // 60 second timeout for cold starts
-        });
-        
-        stopSpinner();
-        startSpinner('Generating response...');
+        const response = await axios.get('https://api.github.com/repos/amirhosseinyavari021/ay-cmdgen/releases/latest', { timeout: 2000 });
+        const latestVersion = response.data.tag_name.replace('v', '');
+        const currentVersion = packageJson.version;
+        if (semver.gt(latestVersion, currentVersion)) {
+            console.log(chalk.green(`\n💡 New version available! (${currentVersion} -> ${latestVersion})`));
+            console.log(`   Run ${chalk.cyan('cmdgen update')} to get the latest version.\n`);
+        }
+        await setConfig({ last_update_check: now });
+    } catch (error) {}
+}
 
-        let fullContent = '';
-        const decoder = new TextDecoder();
-        
-        return new Promise((resolve, reject) => {
-            response.data.on('data', (chunk) => {
+const primaryServerUrl = 'https://ay-cmdgen-cli.onrender.com';
+const fallbackServerUrl = 'https://cmdgen.onrender.com';
+
+const callApi = async (params) => {
+    const { mode, userInput, os, osVersion, cli, lang, options = {} } = params;
+    const systemPrompt = getSystemPrompt(mode, os, osVersion || 'N/A', cli, lang, options);
+    const payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userInput }] };
+    const attemptRequest = (url) => new Promise(async (resolve, reject) => {
+        try {
+            const response = await axios.post(`${url}/api/proxy`, payload, { responseType: 'stream', timeout: 60000 });
+            stopSpinner();
+            startSpinner('Generating response...');
+            let fullContent = '';
+            const decoder = new TextDecoder();
+            response.data.on('data', chunk => {
                 const textChunk = decoder.decode(chunk, { stream: true });
-                const dataLines = textChunk.split('\n').filter(line => line.startsWith('data: '));
-                for (const line of dataLines) {
+                textChunk.split('\n').filter(line => line.startsWith('data: ')).forEach(line => {
                     const jsonPart = line.substring(5).trim();
                     if (jsonPart && jsonPart !== "[DONE]") {
-                        try {
-                            fullContent += JSON.parse(jsonPart).choices[0].delta.content || '';
-                        } catch (e) {}
+                        try { fullContent += JSON.parse(jsonPart).choices[0].delta.content || ''; } catch (e) {}
                     }
-                }
+                });
             });
             response.data.on('end', () => {
                 stopSpinner();
                 const finalData = parseAndConstructData(fullContent, mode, cli);
-                if (!finalData) reject(new Error("Parsing failed: The AI response was empty or malformed."));
+                if (!finalData) reject(new Error("Parsing failed"));
                 else resolve({ type: mode, data: finalData });
             });
-            response.data.on('error', (err) => {
-                stopSpinner();
-                reject(err);
-            });
-        });
-    } catch (err) {
+            response.data.on('error', reject);
+        } catch (err) { reject(err); }
+    });
+    try {
+        startSpinner('Connecting to primary server...');
+        return await attemptRequest(primaryServerUrl);
+    } catch (primaryError) {
         stopSpinner();
-        if (err.code === 'ECONNABORTED') {
-            console.error(`\n❌ Error: The server took too long to respond.`);
-            console.error(`   This can happen during a cold start. Please try again in a moment.`);
-        } else if (err.response) {
-            console.error(`\n❌ Error: The server responded with status ${err.response.status}.`);
-            console.error(`   Message: ${err.response.data?.error?.message || 'An unknown server error occurred.'}`);
-        } else if (err.request) {
-            console.error(`\n❌ Error: Could not connect to the server.`);
-            console.error(`   Please check your internet connection.`);
-        } else {
-            console.error(`\n❌ Error: ${err.message || "An unknown error occurred."}`);
+        console.warn(chalk.yellow(`\n⚠️  Primary server failed. Trying fallback...`));
+        startSpinner('Connecting to fallback server...');
+        try {
+            return await attemptRequest(fallbackServerUrl);
+        } catch (fallbackError) {
+            stopSpinner();
+            const err = fallbackError || primaryError;
+            if (err.code === 'ECONNABORTED') console.error(chalk.red(`\n❌ Error: Both servers timed out.`));
+            else if (err.response) console.error(chalk.red(`\n❌ Error: Server responded with status ${err.response.status}.`));
+            else if (err.request) console.error(chalk.red(`\n❌ Error: Could not connect to any server.`));
+            else console.error(chalk.red(`\n❌ Error: ${err.message || "An unknown error occurred."}`));
+            return null;
         }
-        return null;
     }
 };
 
-// --- Interactive Prompt ---
-const promptForChoice = (commands, onExecute, onMore, onQuit) => {
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-    console.log('\n');
-    console.warn('🚨 WARNING: Executing AI-generated commands can be dangerous. Always review them carefully.');
-    
-    rl.question(`Enter a number to execute (1-${commands.length}), (m)ore suggestions, or (q)uit: `, (choice) => {
-        rl.close();
-        const lowerChoice = choice.toLowerCase().trim();
-        if (lowerChoice === 'm') onMore();
-        else if (lowerChoice === 'q' || lowerChoice === '') onQuit();
-        else {
-            const index = parseInt(lowerChoice, 10) - 1;
-            if (index >= 0 && index < commands.length) onExecute(commands[index]);
-            else {
-                console.log('\nInvalid choice. Quitting.');
-                onQuit();
-            }
-        }
-    });
-};
-
-// --- Smart Command Execution ---
-const executeCommand = (command) => {
+const executeCommand = (command, shell) => {
     return new Promise((resolve) => {
-        const commandToExecute = command.command;
-        console.log(`\n🚀 Executing: ${commandToExecute}`);
-        const child = spawn(commandToExecute, [], { stdio: 'inherit', shell: true });
+        console.log(chalk.magenta(`\n🚀 Executing: ${command.command}`));
+        const commandString = command.command;
+        let child;
+        if (process.platform === 'win32') {
+            if (shell && shell.toLowerCase().includes('powershell')) {
+                child = spawn('powershell.exe', ['-NoProfile', '-Command', commandString], { stdio: 'inherit' });
+            } else {
+                child = spawn('cmd.exe', ['/C', commandString], { stdio: 'inherit' });
+            }
+        } else {
+            child = spawn(commandString, [], { stdio: 'inherit', shell: true });
+        }
         child.on('close', (code) => {
-            if (code !== 0) console.error(`\n❌ Process exited with code ${code}`);
+            if (code !== 0) console.error(chalk.red(`\n❌ Process exited with code ${code}`));
             resolve();
         });
         child.on('error', (err) => {
-            console.error(`\n❌ Failed to start process:\n${err.message}`);
+            console.error(chalk.red(`\n❌ Failed to start process: ${err.message}`));
             resolve();
         });
     });
 };
 
-// --- Yargs Command Parser ---
 const run = async () => {
-    try {
-        const { detectedOS, detectedVersion, detectedShell } = getSystemInfo();
-        const parser = yargs(hideBin(process.argv))
-            .scriptName("cmdgen")
-            .usage('Usage: $0 <command> "[input]" [options]')
-            .command(['generate <request>', 'g <request>'], 'Generate a command', {}, async (argv) => {
-                let currentCommands = [];
-                const getMoreSuggestions = async () => {
-                    console.log("\n🔄 Getting more suggestions...");
-                    const existing = currentCommands.map(c => c.command);
-                    const result = await callApi({ ...argv, userInput: argv.request, options: { existingCommands: existing }, mode: 'generate' });
-                    if (result && result.data.commands && result.data.commands.length > 0) {
-                        currentCommands.push(...result.data.commands);
-                        handleSuggestions(result.data.commands);
-                    } else if (result !== null) {
-                        console.log("\nCouldn't fetch more suggestions.");
-                        process.exit(0);
-                    } else process.exit(1);
-                };
-                const handleSuggestions = (newSuggestions) => {
-                    newSuggestions.forEach((cmd, idx) => {
-                        const displayIndex = currentCommands.length - newSuggestions.length + idx + 1;
-                        console.log(`\nSuggestion #${displayIndex}:\n  \x1b[36m${cmd.command}\x1b[0m\n  └─ Explanation: ${cmd.explanation}`);
-                        if (cmd.warning) console.log(`     └─ \x1b[33mWarning: ${cmd.warning}\x1b[0m`);
-                    });
-                    promptForChoice(currentCommands, async (cmd) => { await executeCommand(cmd); process.exit(0); }, getMoreSuggestions, () => { console.log('\nExiting.'); process.exit(0); });
-                };
-                const initialResult = await callApi({ ...argv, userInput: argv.request, mode: 'generate' });
-                if (initialResult && initialResult.data.commands && initialResult.data.commands.length > 0) {
-                    currentCommands = initialResult.data.commands;
-                    handleSuggestions(currentCommands);
-                } else if (initialResult !== null) {
-                    console.log("\nNo suggestions could be generated for your request.");
-                    process.exit(0);
-                } else process.exit(1);
-            })
-            .command(['analyze <command>', 'a <command>'], 'Analyze a command', {}, async (argv) => {
-                const result = await callApi({ ...argv, userInput: argv.command, mode: 'explain' });
-                if (result) console.log(result.data.explanation);
-                else process.exit(1);
-                process.exit(0);
-            })
-            .command(['error <message>', 'e <message>'], 'Analyze an error message', {}, async (argv) => {
-                const userInput = `Error Message:\n${argv.message}` + (argv.context ? `\n\nContext:\n${argv.context}` : '');
-                const result = await callApi({ ...argv, userInput: userInput, mode: 'error' });
-                if (result) {
-                    console.log(`\nProbable Cause: ${result.data.cause}\n\nExplanation: ${result.data.explanation}\n\nSolution:`);
-                    result.data.solution.forEach(step => console.log(`  - ${step}`));
-                } else process.exit(1);
-                process.exit(0);
-            })
-            .option('os', { describe: 'Target OS', type: 'string', default: detectedOS })
-            .option('osVersion', { describe: 'Target OS Version', type: 'string', default: detectedVersion })
-            .option('shell', { describe: 'Target shell', type: 'string', default: detectedShell })
-            .option('context', { alias: 'c', describe: 'Provide context for error analysis', type: 'string' })
-            .option('lang', { describe: 'Set response language (en, fa)', type: 'string', default: 'en' })
-            .demandCommand(1, 'You must provide one of the main commands.')
-            .help('h').alias('h', 'help')
-            .version('v', `Show version number: ${packageJson.version}`).alias('v', 'version')
-            .strict().wrap(null).exitProcess(false)
-            .fail((msg, err) => {
-                if (err) console.error("\n❌ An unexpected error occurred:", err.message);
-                else {
-                    console.error(`\n❌ Error: ${msg}`);
-                    parser.showHelp();
+    let config = await getConfig();
+    const args = hideBin(process.argv);
+    
+    const command = args[0]?.toLowerCase();
+
+    const needsConfig = !['config', 'update', undefined, '--help', '-h', '--version', '-v'].includes(command);
+
+    if (needsConfig && (!config.os || !config.shell)) {
+        console.log(chalk.yellow('Welcome to CMDGEN! Let\'s get you set up first.'));
+        config = await runSetupWizard();
+        console.log(chalk.cyan('\nSetup complete! Now running your original command...'));
+    }
+
+    const parser = yargs(args)
+        .scriptName("cmdgen")
+        .help(false)
+        .version(false)
+        .option('h', { alias: 'help', type: 'boolean' })
+        .option('v', { alias: 'version', type: 'boolean' })
+        .command(['generate <request>', 'g'], 'Generate a single command', {}, async (argv) => {
+            const startInteractiveSession = async () => {
+                let allCommands = [];
+                const initialResult = await callApi({ ...argv, userInput: argv.request, mode: 'generate', cli: argv.shell });
+                if (initialResult?.data?.commands?.length > 0) {
+                    allCommands = initialResult.data.commands;
+                    allCommands.forEach(cmd => addToHistory(cmd));
+                    displayNewSuggestions(allCommands, allCommands, true);
+                } else {
+                    console.log(chalk.yellow("\nNo suggestions could be generated for your request."));
+                    process.exit(1);
                 }
-                process.exit(1);
+                while (true) {
+                    const choice = await promptUser(allCommands);
+                    if (choice.type === 'execute') {
+                        await executeCommand(allCommands[choice.index], argv.shell);
+                        gracefulExit();
+                        return;
+                    } else if (choice.type === 'more') {
+                        const newCmds = await getMoreSuggestions(argv, allCommands);
+                        if(newCmds.length > 0) {
+                            newCmds.forEach(cmd => addToHistory(cmd));
+                            allCommands.push(...newCmds);
+                        } else {
+                             console.log(chalk.yellow("Couldn't fetch more suggestions."));
+                        }
+                    } else if (choice.type === 'quit') {
+                        gracefulExit();
+                        return;
+                    }
+                }
+            };
+            const displayNewSuggestions = (newSuggestions, allCommands, isFirstTime) => {
+                 newSuggestions.forEach((cmd, idx) => {
+                    const displayIndex = allCommands.length - newSuggestions.length + idx + 1;
+                    console.log(`\n${chalk.cyan.bold(`Suggestion #${displayIndex}`)}:\n  ${chalk.green(cmd.command)}\n  └─ Explanation: ${cmd.explanation}`);
+                    if (cmd.warning) console.log(`     └─ ${chalk.yellow.bold('Warning:')} ${chalk.yellow(cmd.warning)}`);
+                });
+                if(isFirstTime) console.warn(chalk.red.bold('\n🚨 WARNING: Executing AI-generated commands can be dangerous. Review them carefully.'));
+            };
+            const getMoreSuggestions = async (argv, allCommands) => {
+                console.log(chalk.blue("\n🔄 Getting more suggestions..."));
+                const existing = allCommands.map(c => c.command);
+                const result = await callApi({ ...argv, userInput: argv.request, options: { existingCommands: existing }, mode: 'generate', cli: argv.shell });
+                if (result?.data?.commands?.length > 0) {
+                    const newCommands = result.data.commands;
+                    displayNewSuggestions(newCommands, allCommands, false);
+                    return newCommands;
+                }
+                return [];
+            };
+            const promptUser = (commands) => new Promise(resolve => {
+                const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+                const promptText = chalk.bold(`\nEnter a number (1-${commands.length}), (m)ore, or (q)uit: `);
+                rl.question(promptText, (choice) => {
+                    rl.close();
+                    choice = choice.toLowerCase().trim();
+                    if (choice === 'm') return resolve({ type: 'more' });
+                    if (choice === 'q' || choice === '') return resolve({ type: 'quit' });
+                    const index = parseInt(choice, 10) - 1;
+                    if (index >= 0 && index < commands.length) {
+                        const confirmRl = readline.createInterface({ input: process.stdin, output: process.stdout });
+                        confirmRl.question(chalk.yellow(`\nExecute: "${chalk.cyan(commands[index].command)}"? [y/N] `), answer => {
+                            confirmRl.close();
+                            if (answer.toLowerCase() === 'y') {
+                                resolve({ type: 'execute', index });
+                            } else {
+                                console.log(chalk.gray('Execution cancelled.'));
+                                resolve({ type: 'quit' });
+                            }
+                        });
+                    } else {
+                        console.log(chalk.red('\nInvalid choice. Please try again.'));
+                        resolve({ type: 'reprompt' });
+                    }
+                });
             });
-        const argv = await parser.parse();
-        if (argv._.length === 0 && !argv.h && !argv.v) showBanner();
-    } catch (error) {
-        console.error("\n❌ A critical error occurred during startup:", error.message);
-        process.exit(1);
+            await startInteractiveSession();
+        })
+        .command(['script <request>', 's'], 'Generate a full script', {}, async (argv) => {
+            const result = await callApi({ ...argv, userInput: argv.request, mode: 'script', cli: argv.shell });
+            if (result) {
+                console.log(chalk.cyan.bold('\n--- Generated Script ---'));
+                console.log(chalk.green(result.data.explanation));
+                const scriptItem = { command: result.data.explanation, explanation: `Script for: "${argv.request}"`, warning: '' };
+                addToHistory(scriptItem);
+
+                // *** اصلاح نهایی: راهنمایی هوشمند برای ذخیره فایل ***
+                const shellType = argv.shell.toLowerCase();
+                let fileExtension = '.sh'; // Default
+                if (shellType.includes('powershell')) {
+                    fileExtension = '.ps1';
+                } else if (shellType === 'cmd') {
+                    fileExtension = '.bat';
+                }
+                console.log(chalk.yellow(`\nTip: Copy the code above and save it to a file (e.g., script${fileExtension}) to run it.`));
+            }
+            gracefulExit();
+        })
+        .command('history', 'Show recently generated commands and scripts', {}, async (argv) => {
+            const config = await getConfig(); // Get latest config
+            const history = config.history || [];
+            if (history.length === 0) {
+                console.log(chalk.yellow('No history found.'));
+                return;
+            }
+            console.log(chalk.cyan.bold('--- Command History ---'));
+            history.forEach((item, index) => {
+                const isScript = item.command.includes('\n');
+                console.log(`\n${chalk.cyan.bold(`#${index + 1}`)}: ${item.explanation}`);
+                if (isScript) {
+                    console.log(chalk.green('--- SCRIPT START ---'));
+                    console.log(chalk.gray(item.command));
+                    console.log(chalk.green('--- SCRIPT END ---'));
+                } else {
+                    console.log(`  ${chalk.green(item.command)}`);
+                }
+            });
+        })
+        .command('config [action] [key] [value]', 'Manage saved settings', {}, async (argv) => {
+            await handleConfigCommand(argv.action, argv.key, argv.value);
+        })
+        .command('update', 'Update cmdgen to the latest version', {}, () => {
+            if (process.platform === 'win32') {
+                const command = 'iwr https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.ps1 | iex';
+                spawn('powershell.exe', ['-Command', command], { stdio: 'inherit' }).on('close', code => process.exit(code));
+            } else {
+                const command = 'curl -fsSL https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.sh | bash';
+                spawn(command, { stdio: 'inherit', shell: true }).on('close', code => process.exit(code));
+            }
+        })
+        .command(['analyze <command>', 'a'], 'Understand what a command does', {}, async (argv) => {
+            const result = await callApi({ ...argv, userInput: argv.command, mode: 'explain', cli: argv.shell });
+            if (result) console.log(result.data.explanation);
+            gracefulExit();
+        })
+        .command(['error <message>', 'e'], 'Help with an error message', {}, async (argv) => {
+            const userInput = `Error Message:\n${argv.message}` + (argv.context ? `\n\nContext:\n${argv.context}` : '');
+            const result = await callApi({ ...argv, userInput: userInput, mode: 'error', cli: argv.shell });
+            if (result) {
+                console.log(chalk.bold(`\nProbable Cause:`), chalk.red(result.data.cause));
+                console.log(chalk.bold(`\nExplanation:`), result.data.explanation);
+                console.log(chalk.bold(`\nSolution:`));
+                result.data.solution.forEach(step => {
+                    if (step.startsWith('CMD:')) {
+                        console.log(chalk.green(`  - Run command: `) + chalk.cyan(step.substring(4).trim()));
+                    } else {
+                        console.log(chalk.green(`  - ${step}`));
+                    }
+                });
+            }
+            gracefulExit();
+        })
+        .option('os', { describe: 'Target OS', type: 'string', default: config.os })
+        .option('shell', { describe: 'Target shell', type: 'string', default: config.shell })
+        .option('lang', { describe: 'Response language', type: 'string', default: 'en' })
+        .strict()
+        .fail((msg, err) => {
+            console.error(chalk.red(`\n❌ Error: ${msg || err.message}`));
+            process.exit(1);
+        });
+
+    const argv = await parser.argv;
+
+    if (argv.help) {
+        showHelp(config);
+        process.exit(0);
+    }
+    if (argv.version) {
+        console.log(packageJson.version);
+        process.exit(0);
+    }
+    
+    const today = new Date().toISOString().slice(0, 10);
+    if (!config.lastRunDate) {
+        if (!command) showWelcomeBanner();
+        await setConfig({ lastRunDate: today });
+    }
+    
+    if (command) {
+        await checkForUpdates();
+    }
+
+    if (!command && args.length === 0) {
+        showHelp(config);
     }
 };
 
-run();
+run().catch(err => {
+    stopSpinner();
+    console.error(chalk.red(`\nA critical error occurred: ${err.message}`));
+    console.error(err.stack);
+    process.exit(1);
+});
