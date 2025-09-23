@@ -3,11 +3,14 @@ name: Create Release and Upload Binaries
 on:
   push:
     tags:
-      - 'v*' 
+      - 'v*' # این اکشن فقط زمانی اجرا می‌شود که یک تگ با الگوی v* پوش شود
 
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
