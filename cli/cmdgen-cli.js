@@ -15,7 +15,6 @@ const { getSystemPrompt } = require('./apiService-cli.js');
 const { parseAndConstructData } = require('./responseParser-cli.js');
 const packageJson = require('./package.json');
 
-// --- Config and State Management (No Changes) ---
 const configDir = path.join(os.homedir(), '.cmdgen');
 const configFile = path.join(configDir, 'config.json');
 const MAX_HISTORY = 20;
@@ -52,7 +51,6 @@ async function addToHistory(commandItem) {
     await setConfig({ history });
 }
 
-// --- UI & UX Functions (No Changes) ---
 const showHelp = (config = {}) => {
     const osDefault = chalk.yellow(config.os || 'not set');
     const shellDefault = chalk.yellow(config.shell || 'not set');
@@ -170,7 +168,7 @@ const handleConfigCommand = async (action, key, value) => {
             console.error(chalk.red(`Error: Invalid configuration key "${key}".`));
             console.log(chalk.gray(`Valid keys are: ${validKeys.join(', ')}`));
         }
-    } else { // 'wizard' or default action
+    } else {
         await runSetupWizard();
     }
 };
@@ -344,7 +342,9 @@ const run = async () => {
                  newSuggestions.forEach((cmd, idx) => {
                     const displayIndex = allCommands.length - newSuggestions.length + idx + 1;
                     console.log(`\n${chalk.cyan.bold(`Suggestion #${displayIndex}`)}:\n  ${chalk.green(cmd.command)}\n  └─ Explanation: ${cmd.explanation}`);
-                    if (cmd.warning) console.log(`     └─ ${chalk.yellow.bold('Warning:')} ${chalk.yellow(cmd.warning)}`);
+                    if (cmd.warning) {
+                        console.log(`  └─ ${chalk.yellow.bold('Warning:')} ${chalk.yellow(cmd.warning)}`);
+                    }
                 });
                 if(isFirstTime) console.warn(chalk.red.bold('\n🚨 WARNING: Executing AI-generated commands can be dangerous. Review them carefully.'));
             };
@@ -395,9 +395,8 @@ const run = async () => {
                 const scriptItem = { command: result.data.explanation, explanation: `Script for: "${argv.request}"`, warning: '' };
                 addToHistory(scriptItem);
 
-                // *** اصلاح نهایی: راهنمایی هوشمند برای ذخیره فایل ***
                 const shellType = argv.shell.toLowerCase();
-                let fileExtension = '.sh'; // Default
+                let fileExtension = '.sh';
                 if (shellType.includes('powershell')) {
                     fileExtension = '.ps1';
                 } else if (shellType === 'cmd') {
@@ -408,7 +407,7 @@ const run = async () => {
             gracefulExit();
         })
         .command('history', 'Show recently generated commands and scripts', {}, async (argv) => {
-            const config = await getConfig(); // Get latest config
+            const config = await getConfig();
             const history = config.history || [];
             if (history.length === 0) {
                 console.log(chalk.yellow('No history found.'));

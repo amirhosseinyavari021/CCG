@@ -8,8 +8,10 @@ const parseAndConstructData = (textResponse, mode) => {
             const commands = lines.map(line => {
                 const parts = line.split('|||');
                 if (parts.length < 2) return null;
-                const rawCommand = parts[0]?.trim().replace(/^`|`$/g, '').trim() || '';
+                
+                const rawCommand = parts[0]?.trim().replace(/^`{1,3}|`{1,3}$/g, '').trim() || '';
                 const cleanedCommand = rawCommand.replace(/^\s*\d+[\.\s]*\s*/, '');
+                
                 if (!cleanedCommand) {
                     return null;
                 }
