@@ -1,5 +1,8 @@
 # CMDGEN - Your Intelligent Command-Line Assistant
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+
 Generate, analyze, script, and debug command-line instructions with an AI-powered assistant, right in your terminal.
 
 CMDGEN is a smart, cross-platform tool that bridges the gap between natural language and the command line. Whether you're a seasoned sysadmin, a developer, or just starting out, CMDGEN helps you master the terminal with ease. This project features both a powerful Command-Line Tool (CLI) and a user-friendly Web Application.
@@ -21,25 +24,68 @@ CMDGEN is a smart, cross-platform tool that bridges the gap between natural lang
 
 The installation script automatically detects your OS, downloads the correct version, and sets it up for you.
 
-**Via NPM (Recommended for Node.js Users):**
+⚠️ Administrator Privileges Required
+
+cmdgen requires administrator/root privileges for global installation.  
+Global installations write files into system directories (e.g., /usr/local/bin on macOS/Linux or Program Files on Windows). These locations are protected, so elevated permissions are needed.
+
+Why it matters:  
+Without admin privileges, installation may fail with “permission denied” errors or the program may not be accessible globally.
+
+How to Install
+
+**For macOS / Linux:**
+
+Using NPM (recommended for Node.js users):
 
 ```bash
+sudo npm install -g @amirhosseinyavari/ay-cmdgen
+```
+
+Using the installation script (requires sudo):
+
+```bash
+sudo curl -fsSL https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.sh | bash
+```
+
+**For Windows:**
+
+1. Open PowerShell as Administrator (right-click → Run as Administrator).
+
+2. Install via NPM:
+
+```powershell
 npm install -g @amirhosseinyavari/ay-cmdgen
 ```
 
-**For Linux & macOS:**
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.sh | bash
-```
-
-**For Windows (in PowerShell as Administrator):**
+3. Or using the installation script:
 
 ```powershell
 iwr https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.ps1 | iex
 ```
 
-After installation, open a new terminal window to start using `cmdgen`.
+✅ Tip for Users Without Admin Rights
+
+If you cannot run commands with sudo (macOS/Linux) or as Administrator (Windows), you can still use cmdgen without installing it globally by using npx.  
+npx is included with Node.js and allows you to run npm packages temporarily, without writing files to system directories, so admin privileges are not required.
+
+Example:
+
+```bash
+npx @amirhosseinyavari/ay-cmdgen generate "list all files in system"
+```
+
+This runs the command directly without a global installation.
+
+After Installation
+
+- Open a new terminal window to start using cmdgen.
+
+- Verify the installation by running:
+
+```bash
+cmdgen --help
+```
 
 ## ⚙️ How to Use
 
