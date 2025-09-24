@@ -14,6 +14,7 @@ import LoadingSpinner from './components/common/LoadingSpinner';
 const AboutModal = lazy(() => import('./components/AboutModal'));
 const ErrorAnalysis = lazy(() => import('./components/ErrorAnalysis'));
 const MobileDrawer = lazy(() => import('./components/MobileDrawer'));
+const FeedbackCard = lazy(() => import('./components/FeedbackCard'));
 
 function AppContent() {
   const [lang, setLang] = useState('en');
@@ -32,16 +33,23 @@ function AppContent() {
   
   const [formState, setFormState] = useState({}); 
 
+  const [showFeedback, setShowFeedback] = useState(false);
+
   const t = translations[lang];
 
   useEffect(() => {
-    // Theme is set in index.html, this just syncs the state
     const savedTheme = localStorage.getItem('theme') || 'dark';
     setTheme(savedTheme);
     
     const savedLang = localStorage.getItem('lang') || 'en';
     setLang(savedLang);
     document.body.dir = savedLang === 'fa' ? 'rtl' : 'ltr';
+
+    const usageCount = parseInt(localStorage.getItem('usageCount') || '0', 10);
+    const feedbackRequested = localStorage.getItem('feedbackRequested') === 'true';
+    if (usageCount >= 15 && !feedbackRequested) {
+        setShowFeedback(true);
+    }
   }, []);
 
   const handleLangChange = (newLang) => {
@@ -65,6 +73,15 @@ function AppContent() {
     setMoreCommandsCount(0);
     setIsLoading(true);
   };
+
+  const incrementUsageCount = () => {
+      const currentCount = parseInt(localStorage.getItem('usageCount') || '0', 10);
+      const newCount = currentCount + 1;
+      localStorage.setItem('usageCount', newCount);
+      if (newCount >= 15 && localStorage.getItem('feedbackRequested') !== 'true') {
+          setShowFeedback(true);
+      }
+  };
   
   const handleGenerate = async (formData) => {
     resetStateForNewRequest();
@@ -77,6 +94,7 @@ function AppContent() {
     
     if (apiResult?.data?.commands) {
       setCommandList(apiResult.data.commands);
+      incrementUsageCount();
     }
     setIsLoading(false);
   };
@@ -92,6 +110,7 @@ function AppContent() {
     
     if (apiResult?.data?.explanation) {
       setExplanation(apiResult.data.explanation);
+      incrementUsageCount();
     }
     setIsLoading(false);
   };
@@ -108,6 +127,11 @@ function AppContent() {
       setMoreCommandsCount(iteration);
     }
     setIsLoadingMore(false);
+  };
+
+  const dismissFeedback = () => {
+      setShowFeedback(false);
+      localStorage.setItem('feedbackRequested', 'true');
   };
 
   return (
@@ -152,6 +176,12 @@ function AppContent() {
                     loadingMessage={loadingMessage}
                     lang={lang}
                 />
+                
+                {showFeedback && (
+                    <Suspense fallback={<div />}>
+                        <FeedbackCard lang={lang} onDismiss={dismissFeedback} />
+                    </Suspense>
+                )}
 
                 <div className="mt-8 space-y-4">
                     {commandList.map((cmd, index) => (
