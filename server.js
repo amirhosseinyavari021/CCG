@@ -7,8 +7,7 @@ const app = express();
 app.set('trust proxy', 1);
 app.use(express.json());
 
-// --- API Key Check on Startup ---
-const apiKey = process.env.API_KEY; // Using the standard 'API_KEY' name
+const apiKey = process.env.API_KEY;
 if (apiKey) {
     console.log("✅ API_KEY loaded successfully from environment variables.");
 } else {
@@ -17,16 +16,26 @@ if (apiKey) {
 
 const limiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 20, // Increased limit slightly
+  max: 30, // کمی افزایش برای درخواست‌های آنالیتیکس
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 app.use('/api/', limiter);
 
+// --- [جدید] Endpoint برای آمارگیری ---
+app.post('/api/ping', (req, res) => {
+    const { event, source } from req.body;
+    // در اینجا می‌توانید رویدادها را به سرویس آنالیتیکس خود ارسال کنید
+    // برای سادگی، فعلاً فقط در کنسول سرور لاگ می‌اندازیم
+    console.log(`[Analytics Ping] Event: ${event}, Source: ${source}`);
+    res.status(200).send({ status: 'ok' });
+});
+// ------------------------------------
+
 app.post('/api/proxy', async (req, res) => {
   if (!apiKey) {
-    return res.status(500).json({ error: { code: 'SERVER_CONFIG_ERROR', message: 'API key is not configured on the server. The administrator has been notified.' } });
+    return res.status(500).json({ error: { code: 'SERVER_CONFIG_ERROR', message: 'API key is not configured on the server.' } });
   }
 
   try {
@@ -36,13 +45,12 @@ app.post('/api/proxy', async (req, res) => {
     }
 
     const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
-    // Using a reliable and free model
     const payload = { model: 'openai/gpt-3.5-turbo', messages, stream: true };
 
     const apiResponse = await axios.post(openRouterUrl, payload, {
       headers: { 
         'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://cmdgen.onrender.com', // Optional: Referer for tracking
+        'HTTP-Referer': 'https://cmdgen.onrender.com',
         'X-Title': 'AY-CMDGEN',
       },
       responseType: 'stream'
@@ -58,16 +66,13 @@ app.post('/api/proxy', async (req, res) => {
   }
 });
 
-// Serve static files for the web version
 const staticPath = path.join(__dirname, 'client/build');
 app.use(express.static(staticPath));
 
-// Fallback for SPA (Single Page Application)
 app.get('*', (req, res) => {
     const indexPath = path.join(staticPath, 'index.html');
     res.sendFile(indexPath, (err) => {
       if (err) {
-        // If index.html doesn't exist, it means this is an API-only service.
         res.status(404).send('Web interface not found. API is running correctly.');
       }
     });
