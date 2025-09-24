@@ -11,13 +11,16 @@
     <script>
       (function() {
         try {
+          // Default to 'dark' if no theme is found in localStorage
           const theme = localStorage.getItem('theme') || 'dark';
           document.documentElement.className = theme;
-        } catch (e) { console.error("Could not set theme from localStorage", e); }
+        } catch (e) {
+          console.error("Could not set theme from localStorage", e);
+        }
       })();
     </script>
     
-    <script async defer src="https://beampipe.io/js/tracker.js" data-beampipe-domain="<script async defer src="https://beampipe.io/js/tracker.js" data-beampipe-domain="cmdgen.onrender.com"></script>"></script>
+    <script async defer src="https://beampipe.io/js/tracker.js" data-beampipe-domain="cmdgen.onrender.com"></script>
     
     <link rel="icon" type="image/x-icon" href="%PUBLIC_URL%/favicon.ico" />
     <link href="https://cdn.jsdelivr.net/npm/vazirmatn@33.0.3/Vazirmatn-font-face.css" rel="stylesheet" />
