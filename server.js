@@ -16,16 +16,18 @@ if (apiKey) {
 
 const limiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 30, // کمی افزایش برای درخواست‌های آنالیتیکس
+  max: 30, 
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 app.use('/api/', limiter);
 
-// --- [جدید] Endpoint برای آمارگیری ---
+// --- Endpoint برای آمارگیری (اصلاح‌شده) ---
 app.post('/api/ping', (req, res) => {
-    const { event, source } from req.body;
+    // اگر body وجود نداشت، یک آبجکت خالی در نظر بگیر تا خطا ندهد
+    const { event, source } = req.body || {}; 
+    
     // در اینجا می‌توانید رویدادها را به سرویس آنالیتیکس خود ارسال کنید
     // برای سادگی، فعلاً فقط در کنسول سرور لاگ می‌اندازیم
     console.log(`[Analytics Ping] Event: ${event}, Source: ${source}`);
