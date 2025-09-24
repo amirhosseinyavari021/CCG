@@ -54,7 +54,11 @@ export const translations = {
     errorInput: "Your request could not be processed. Please check your input.",
     errorParse: "We received an unexpected response from the AI. Please try rephrasing your request.",
     errorTooManyRequests: "You've sent too many requests. Please wait a moment before trying again.",
-    errorDefault: "An unexpected error occurred. We're looking into it. Please try again later."
+    errorDefault: "An unexpected error occurred. We're looking into it. Please try again later.",
+    feedbackTitle: "We Value Your Feedback!",
+    feedbackSubheader: "You've used CMDGEN several times. Would you mind sharing your thoughts to help us improve?",
+    feedbackAction: "Provide Feedback",
+    feedbackDismiss: "Maybe Later",
   },
   fa: {
     about: "درباره",
@@ -111,6 +115,10 @@ export const translations = {
     errorInput: "درخواست شما قابل پردازش نبود. لطفاً ورودی خود را بررسی کنید.",
     errorParse: "پاسخ غیرمنتظره‌ای از هوش مصنوعی دریافت شد. لطفاً درخواست خود را با بیانی دیگر مطرح کنید.",
     errorTooManyRequests: "تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید.",
-    errorDefault: "یک خطای غیرمنتظره رخ داد. در حال بررسی آن هستیم. لطفاً بعداً تلاش کنید."
+    errorDefault: "یک خطای غیرمنتظره رخ داد. در حال بررسی آن هستیم. لطفاً بعداً تلاش کنید.",
+    feedbackTitle: "نظر شما برای ما ارزشمند است!",
+    feedbackSubheader: "شما چندین بار از CMDGEN استفاده کرده‌اید. برای کمک به بهبود ابزار، نظر خود را با ما در میان می‌گذارید؟",
+    feedbackAction: "ثبت بازخورد",
+    feedbackDismiss: "بعداً",
   }
 };

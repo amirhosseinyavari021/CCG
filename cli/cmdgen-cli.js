@@ -10,10 +10,16 @@ const fs = require('fs-extra');
 const semver = require('semver');
 const readline = require('readline');
 const chalk = require('chalk');
+const open = require('open');
 
 const { getSystemPrompt } = require('./apiService-cli.js');
 const { parseAndConstructData } = require('./responseParser-cli.js');
 const packageJson = require('./package.json');
+
+// --- متغیرهای مربوط به بازخورد ---
+const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSdt_16-wZOgOViET55XwQYAsetfWxQWDW1DBb4yks6AgtOI9g/viewform?usp=header';
+const USAGE_THRESHOLD_FOR_FEEDBACK = 20;
+// ------------------------------------
 
 const configDir = path.join(os.homedir(), '.cmdgen');
 const configFile = path.join(configDir, 'config.json');
@@ -25,14 +31,16 @@ async function getConfig() {
         try {
             const config = await fs.readJson(configFile);
             if (!config.history) config.history = [];
+            if (config.usageCount === undefined) config.usageCount = 0;
+            if (config.feedbackRequested === undefined) config.feedbackRequested = false;
             return config;
         } catch (error) {
             console.error(chalk.yellow('Warning: Configuration file was corrupted and has been reset.'));
             await fs.remove(configFile);
-            return { history: [] };
+            return { history: [], usageCount: 0, feedbackRequested: false };
         }
     }
-    return { history: [] };
+    return { history: [], usageCount: 0, feedbackRequested: false };
 }
 
 async function setConfig(newConfig) {
@@ -50,6 +58,29 @@ async function addToHistory(commandItem) {
     }
     await setConfig({ history });
 }
+
+// --- تابع مدیریت بازخورد ---
+async function handleFeedback() {
+    const config = await getConfig();
+    if (config.usageCount >= USAGE_THRESHOLD_FOR_FEEDBACK && !config.feedbackRequested) {
+        console.log(chalk.cyan.bold('\n--- We Value Your Feedback! ---'));
+        console.log("You've used CMDGEN over 20 times. Would you mind sharing your thoughts to help us improve?");
+
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+        const question = (query) => new Promise(resolve => rl.question(query, resolve));
+        
+        const answer = await question(chalk.yellow('Open feedback form in browser? (y/N) '));
+        rl.close();
+
+        if (answer.toLowerCase() === 'y') {
+            console.log(chalk.green('Thank you! Opening the form in your browser...'));
+            await open(FEEDBACK_URL);
+        }
+        
+        await setConfig({ feedbackRequested: true });
+    }
+}
+// --------------------------------
 
 const showHelp = (config = {}) => {
     const osDefault = chalk.yellow(config.os || 'not set');
@@ -307,9 +338,14 @@ const run = async () => {
         .option('h', { alias: 'help', type: 'boolean' })
         .option('v', { alias: 'version', type: 'boolean' })
         .command(['generate <request>', 'g'], 'Generate a single command', {}, async (argv) => {
+            const initialResult = await callApi({ ...argv, userInput: argv.request, mode: 'generate', cli: argv.shell });
+            if (initialResult?.data?.commands?.length > 0) {
+                const currentConfig = await getConfig();
+                await setConfig({ usageCount: currentConfig.usageCount + 1 });
+            }
+            
             const startInteractiveSession = async () => {
                 let allCommands = [];
-                const initialResult = await callApi({ ...argv, userInput: argv.request, mode: 'generate', cli: argv.shell });
                 if (initialResult?.data?.commands?.length > 0) {
                     allCommands = initialResult.data.commands;
                     allCommands.forEach(cmd => addToHistory(cmd));
@@ -390,6 +426,8 @@ const run = async () => {
         .command(['script <request>', 's'], 'Generate a full script', {}, async (argv) => {
             const result = await callApi({ ...argv, userInput: argv.request, mode: 'script', cli: argv.shell });
             if (result) {
+                const currentConfig = await getConfig();
+                await setConfig({ usageCount: currentConfig.usageCount + 1 });
                 console.log(chalk.cyan.bold('\n--- Generated Script ---'));
                 console.log(chalk.green(result.data.explanation));
                 const scriptItem = { command: result.data.explanation, explanation: `Script for: "${argv.request}"`, warning: '' };
@@ -488,6 +526,7 @@ const run = async () => {
     
     if (command) {
         await checkForUpdates();
+        await handleFeedback();
     }
 
     if (!command && args.length === 0) {
