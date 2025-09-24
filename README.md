@@ -84,7 +84,7 @@ After Installation
 - Verify the installation by running:
 
 ```bash
-cmdgen --help
+cmdgen 
 ```
 
 ## ⚙️ How to Use
