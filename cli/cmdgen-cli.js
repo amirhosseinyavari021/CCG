@@ -16,8 +16,10 @@ const { getSystemPrompt } = require('./apiService-cli.js');
 const { parseAndConstructData } = require('./responseParser-cli.js');
 const packageJson = require('./package.json');
 
-// --- متغیرهای مربوط به بازخورد ---
+// --- متغیرهای مربوط به بازخورد و حذف ---
 const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSdt_16-wZOgOViET55XwQYAsetfWxQWDW1DBb4yks6AgtOI9g/viewform?usp=header';
+const UNINSTALL_REASON_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSeKgyrKv_owvzTgF6iULQ-YeUBf1eRRwOdKw9Ho3JvZ2A0VwA/formResponse';
+const UNINSTALL_REASON_ENTRY_ID = 'entry.183938337';
 const USAGE_THRESHOLD_FOR_FEEDBACK = 20;
 // ------------------------------------
 
@@ -59,7 +61,6 @@ async function addToHistory(commandItem) {
     await setConfig({ history });
 }
 
-// --- تابع مدیریت بازخورد ---
 async function handleFeedback() {
     const config = await getConfig();
     if (config.usageCount >= USAGE_THRESHOLD_FOR_FEEDBACK && !config.feedbackRequested) {
@@ -80,7 +81,6 @@ async function handleFeedback() {
         await setConfig({ feedbackRequested: true });
     }
 }
-// --------------------------------
 
 const showHelp = (config = {}) => {
     const osDefault = chalk.yellow(config.os || 'not set');
@@ -96,15 +96,17 @@ const showHelp = (config = {}) => {
     console.log(chalk.bold('Examples:'));
     console.log(chalk.gray('  cmdgen generate "list all files in Linux"'));
     console.log(chalk.gray('  cmdgen script "backup all .log files into a zip"'));
-    console.log(chalk.gray('  cmdgen history\n'));
+    console.log(chalk.gray('  cmdgen feedback\n'));
     console.log(chalk.bold('Commands:'));
     console.log(`  ${chalk.green('generate <request>')}    Generate a single command           [alias: g]`);
     console.log(`  ${chalk.green('script <request>')}      Generate a full script              [alias: s]`);
     console.log(`  ${chalk.green('analyze <command>')}     Understand what a command does      [alias: a]`);
     console.log(`  ${chalk.green('error <message>')}       Help with an error message          [alias: e]`);
     console.log(`  ${chalk.green('history')}               Show recently generated commands`);
+    console.log(`  ${chalk.green('feedback')}               Provide feedback on the tool        [alias: f]`);
     console.log(`  ${chalk.green('config <action>')}       Manage saved settings (show, set, wizard)`);
-    console.log(`  ${chalk.green('update')}                Update cmdgen to the latest version\n`);
+    console.log(`  ${chalk.green('update')}                Update cmdgen to the latest version`);
+    console.log(`  ${chalk.green('delete')}                Uninstall cmdgen from your system   [alias: d]\n`);
     console.log(chalk.bold('Options:'));
     console.log(`  --os                  Target OS (e.g., windows, linux)  [default: ${osDefault}]`);
     console.log(`  --shell               Target shell (e.g., PowerShell, bash) [default: ${shellDefault}]`);
@@ -227,7 +229,12 @@ async function checkForUpdates() {
     const config = await getConfig();
     const now = Date.now();
     if (now - (config.last_update_check || 0) < 24 * 60 * 60 * 1000) return;
+
     try {
+        // ارسال پینگ کاربر فعال
+        const analyticsPayload = { event: 'cli_active_user', source: 'cli' };
+        axios.post('https://cmdgen.onrender.com/api/ping', analyticsPayload, { timeout: 1500 }).catch(() => {});
+        
         const response = await axios.get('https://api.github.com/repos/amirhosseinyavari021/ay-cmdgen/releases/latest', { timeout: 2000 });
         const latestVersion = response.data.tag_name.replace('v', '');
         const currentVersion = packageJson.version;
@@ -236,7 +243,9 @@ async function checkForUpdates() {
             console.log(`   Run ${chalk.cyan('cmdgen update')} to get the latest version.\n`);
         }
         await setConfig({ last_update_check: now });
-    } catch (error) {}
+    } catch (error) {
+        await setConfig({ last_update_check: now });
+    }
 }
 
 const primaryServerUrl = 'https://ay-cmdgen-cli.onrender.com';
@@ -323,7 +332,7 @@ const run = async () => {
     
     const command = args[0]?.toLowerCase();
 
-    const needsConfig = !['config', 'update', undefined, '--help', '-h', '--version', '-v'].includes(command);
+    const needsConfig = !['config', 'update', 'delete', 'd', 'feedback', 'f', undefined, '--help', '-h', '--version', '-v'].includes(command);
 
     if (needsConfig && (!config.os || !config.shell)) {
         console.log(chalk.yellow('Welcome to CMDGEN! Let\'s get you set up first.'));
@@ -464,6 +473,11 @@ const run = async () => {
                 }
             });
         })
+        .command(['feedback', 'f'], 'Provide feedback about CMDGEN', {}, async () => {
+            console.log(chalk.cyan('Thank you for helping us improve! Opening the feedback form in your browser...'));
+            await open(FEEDBACK_URL);
+            gracefulExit();
+        })
         .command('config [action] [key] [value]', 'Manage saved settings', {}, async (argv) => {
             await handleConfigCommand(argv.action, argv.key, argv.value);
         })
@@ -498,6 +512,56 @@ const run = async () => {
             }
             gracefulExit();
         })
+        .command(['delete', 'd'], 'Uninstall cmdgen from your system', {}, async () => {
+            console.log(chalk.red.bold('\n--- Uninstall CMDGEN ---'));
+            
+            const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+            const question = (query) => new Promise(resolve => rl.question(query, resolve));
+
+            const confirm = await question(chalk.yellow('Are you sure you want to permanently delete CMDGEN and its config file? (y/N) '));
+            if (confirm.toLowerCase() !== 'y') {
+                console.log(chalk.gray('Uninstall cancelled.'));
+                rl.close();
+                return;
+            }
+            
+            const reason = await question(chalk.yellow('(Optional) To help us improve, please share why you are uninstalling: '));
+            if (reason.trim()) {
+                try {
+                    const formData = new URLSearchParams();
+                    formData.append(UNINSTALL_REASON_ENTRY_ID, reason);
+                    axios.post(UNINSTALL_REASON_FORM_URL, formData, {
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+                    }).catch(() => {});
+                } catch (e) { /* Ignore errors */ }
+            }
+            
+            rl.close();
+
+            try {
+                console.log('Removing configuration files...');
+                if (await fs.pathExists(configDir)) {
+                    await fs.remove(configDir);
+                }
+
+                const exePath = process.execPath;
+                if (exePath && (exePath.toLowerCase().includes('cmdgen') || exePath.toLowerCase().includes('ay-cmdgen'))) {
+                     console.log(`Removing application from: ${exePath}`);
+                     await fs.remove(exePath);
+                } else {
+                    console.log(chalk.yellow("Could not automatically determine the installation path. You may need to remove it manually."));
+                }
+                
+                console.log(chalk.green('\n✅ CMDGEN has been successfully uninstalled.'));
+                console.log('You may need to restart your terminal for changes to take full effect.');
+
+            } catch (err) {
+                console.error(chalk.red(`\nAn error occurred during uninstallation: ${err.message}`));
+                console.log('Please try removing the files manually:');
+                console.log(`- Config directory: ${configDir}`);
+                console.log(`- Check your system's application install location for the cmdgen executable.`);
+            }
+        })
         .option('os', { describe: 'Target OS', type: 'string', default: config.os })
         .option('shell', { describe: 'Target shell', type: 'string', default: config.shell })
         .option('lang', { describe: 'Response language', type: 'string', default: 'en' })
@@ -524,7 +588,7 @@ const run = async () => {
         await setConfig({ lastRunDate: today });
     }
     
-    if (command) {
+    if (command && !['delete', 'd', 'feedback', 'f'].includes(command)) {
         await checkForUpdates();
         await handleFeedback();
     }
