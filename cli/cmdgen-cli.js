@@ -3,7 +3,7 @@
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
 const axios = require('axios/dist/node/axios.cjs');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const os = require('os');
 const path = require('path');
 const fs = require('fs-extra');
@@ -61,11 +61,12 @@ async function addToHistory(commandItem) {
     await setConfig({ history });
 }
 
-async function handleFeedback() {
+async function handleFeedback(force = false) {
     const config = await getConfig();
-    if (config.usageCount >= USAGE_THRESHOLD_FOR_FEEDBACK && !config.feedbackRequested) {
+    // فقط اگر به حد استفاده رسید یا force=true
+    if ((config.usageCount >= USAGE_THRESHOLD_FOR_FEEDBACK && !config.feedbackRequested) || force) {
         console.log(chalk.cyan.bold('\n--- We Value Your Feedback! ---'));
-        console.log("You've used CMDGEN over 20 times. Would you mind sharing your thoughts to help us improve?");
+        console.log("You've used CMDGEN several times. Would you mind sharing your thoughts to help us improve?");
 
         const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
         const question = (query) => new Promise(resolve => rl.question(query, resolve));
@@ -73,9 +74,17 @@ async function handleFeedback() {
         const answer = await question(chalk.yellow('Open feedback form in browser? (y/N) '));
         rl.close();
 
-        if (answer.toLowerCase() === 'y') {
+        if (answer.trim().toLowerCase() === 'y') {
             console.log(chalk.green('Thank you! Opening the form in your browser...'));
-            await open(FEEDBACK_URL);
+            try {
+                await open(FEEDBACK_URL);
+            } catch (err) {
+                console.error(chalk.red('Could not open browser automatically. Please open this link manually:'));
+                console.log(chalk.yellow(FEEDBACK_URL));
+            }
+        } else {
+            console.log(chalk.gray('You can always provide feedback later via:'));
+            console.log(chalk.yellow(FEEDBACK_URL));
         }
         
         await setConfig({ feedbackRequested: true });
@@ -110,21 +119,8 @@ const showHelp = (config = {}) => {
     console.log(chalk.bold('Options:'));
     console.log(`  --os                  Target OS (e.g., windows, linux)  [default: ${osDefault}]`);
     console.log(`  --shell               Target shell (e.g., PowerShell, bash) [default: ${shellDefault}]`);
-    console.log(`  -h, --help            Show this help menu`);
-    console.log(`  -v, --version         Show version number`);
-};
-
-const showWelcomeBanner = () => {
-    console.log(chalk.cyan(`
-█░█░█ █▀▀ █░░ █▀▀ █▀█ █▀▄▀█ █▀▀   ▀█▀ █▀█   ▄▀█ █▄█ ▄▄ █▀▀ █▀▄▀█ █▄▀ █▀▀ █▀▀ █▄░█
-▀▄▀▄▀ ██▄ █▄▄ █▄▄ █▄█ █░▀░█ ██▄   ░█░ █▄█   █▀█ ░█░ ░░ █▄▄ █░▀░█ █▄▀ █▄█ ██▄ █░▀█
-`));
-    console.log(chalk.bold('\nWelcome to AY-CMDGEN!'));
-    console.log(chalk.gray('Made with ❤ by Amirhossein Yavari\n'));
-    console.log('Not sure where to start? Try one of these:');
-    console.log(chalk.yellow('  cmdgen generate "list all files larger than 100MB"'));
-    console.log(chalk.yellow('  cmdgen script "create a folder and three files inside it"'));
-    console.log(chalk.yellow('  cmdgen history\n'));
+    console.log('  -h, --help            Show this help menu');
+    console.log('  -v, --version         Show version number');
     console.log('For more details, run: cmdgen --help');
 };
 
@@ -146,191 +142,125 @@ const runSetupWizard = async () => {
     const osChoice = await question('> ');
     const selectedOsKey = osOptions[parseInt(osChoice) - 1]?.toLowerCase() || 'other';
 
-    let os, shell;
+    let osSel, shellSel;
 
     if (selectedOsKey === 'other') {
-        os = await question('Enter your OS name (e.g., FreeBSD): ');
-        shell = await question('Enter your Shell name (e.g., sh): ');
+        osSel = await question('Please enter your OS: ');
     } else {
-        os = selectedOsKey;
-        const shellMap = {
-            windows: ['PowerShell', 'CMD'],
-            macos: ['zsh', 'bash'],
-            linux: ['bash', 'zsh', 'fish'],
-        };
-        const shellOptions = shellMap[os];
-        console.log(`\nSelect a Shell for ${os}:`);
-        shellOptions.forEach((opt, i) => console.log(chalk.gray(`  ${i + 1}. ${opt}`)));
-        const shellChoice = await question('> ');
-        shell = shellOptions[parseInt(shellChoice) - 1];
+        osSel = selectedOsKey;
     }
+
+    console.log('\nEnter your default shell (e.g., bash, zsh, PowerShell):');
+    shellSel = await question('> ');
 
     rl.close();
+    await setConfig({ os: osSel, shell: shellSel });
 
-    if (!os || !shell) {
-        console.error(chalk.red('\n❌ Invalid selection. Please run `cmdgen config wizard` again.'));
-        process.exit(1);
-    }
-
-    const newConfig = { 'os': os, 'shell': shell, 'osVersion': '' };
-    await setConfig(newConfig);
-    console.log(chalk.green(`\n✅ Configuration saved successfully: OS=${os}, Shell=${shell}`));
-    return newConfig;
+    return { os: osSel, shell: shellSel };
 };
 
-const handleConfigCommand = async (action, key, value) => {
-    const config = await getConfig();
-    if (action === 'show') {
-        console.log(chalk.bold('\nCurrent CMDGEN Configuration:'));
-        Object.entries(config).forEach(([k, v]) => {
-            if (k !== 'lastRunDate' && k !== 'last_update_check' && k !== 'history') {
-                console.log(`  ${chalk.cyan(k)}: ${chalk.yellow(v)}`);
+async function handleDelete() {
+    console.log(chalk.red.bold('\n--- Uninstall CMDGEN ---'));
+
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const question = (query) => new Promise(resolve => rl.question(query, resolve));
+
+    const confirm = await question(chalk.yellow('Are you sure you want to permanently delete CMDGEN and its config file? (y/N) '));
+    if (confirm.toLowerCase() !== 'y') {
+        console.log(chalk.gray('Uninstall cancelled.'));
+        rl.close();
+        return;
+    }
+
+    const reason = await question(chalk.yellow('(Optional) To help us improve, please share why you are uninstalling: '));
+    if (reason.trim()) {
+        try {
+            const formData = new URLSearchParams();
+            formData.append(UNINSTALL_REASON_ENTRY_ID, reason);
+            axios.post(UNINSTALL_REASON_FORM_URL, formData, {
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            }).catch(() => {});
+        } catch (e) { /* Ignore errors */ }
+    }
+    rl.close();
+
+    let configRemoved = false;
+    let cmdgenRemoved = false;
+    let removedFiles = [];
+    let failedFiles = [];
+
+    try {
+        await fs.remove(configDir);
+        configRemoved = true;
+        console.log(chalk.gray('Removing configuration files...'));
+    } catch (e) {}
+
+    // حذف اجرایی
+    function tryRemoveFile(file) {
+        if (!file) return false;
+        try {
+            if (fs.existsSync(file)) {
+                fs.removeSync(file);
+                removedFiles.push(file);
+                return true;
             }
-        });
-    } else if (action === 'set') {
-        if (!key || !value) {
-            console.error(chalk.red('Error: "set" action requires a key and a value.'));
-            console.log(chalk.gray('Example: cmdgen config set os linux'));
-            return;
+        } catch (e) {
+            failedFiles.push(file);
         }
-        const validKeys = ['os', 'osVersion', 'shell', 'lang'];
-        if (validKeys.includes(key)) {
-            await setConfig({ [key]: value });
-            console.log(chalk.green(`✅ Success! Set "${key}" to "${value}".`));
-        } else {
-            console.error(chalk.red(`Error: Invalid configuration key "${key}".`));
-            console.log(chalk.gray(`Valid keys are: ${validKeys.join(', ')}`));
-        }
+        return false;
+    }
+
+    let execPaths = [];
+    if (process.platform === 'win32') {
+        // روی ویندوز
+        try {
+            const res = execSync('where cmdgen', { encoding: 'utf8' });
+            execPaths = res.split('\n').map(s => s.trim()).filter(Boolean);
+        } catch (e) {}
     } else {
-        await runSetupWizard();
-    }
-};
-
-let spinnerInterval;
-const startSpinner = (message) => {
-    const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-    let i = 0;
-    process.stdout.write('\x1B[?25l');
-    spinnerInterval = setInterval(() => {
-        process.stdout.write(chalk.blue(`\r${frames[i++ % frames.length]} ${message}`));
-    }, 80);
-};
-
-const stopSpinner = () => {
-    if (spinnerInterval) {
-        clearInterval(spinnerInterval);
-        spinnerInterval = null;
-    }
-    process.stdout.write('\r' + ' '.repeat(50) + '\r');
-    process.stdout.write('\x1B[?25h');
-};
-
-async function checkForUpdates() {
-    const config = await getConfig();
-    const now = Date.now();
-    if (now - (config.last_update_check || 0) < 24 * 60 * 60 * 1000) return;
-
-    try {
-        // ارسال پینگ کاربر فعال
-        const analyticsPayload = { event: 'cli_active_user', source: 'cli' };
-        axios.post('https://cmdgen.onrender.com/api/ping', analyticsPayload, { timeout: 1500 }).catch(() => {});
-        
-        const response = await axios.get('https://api.github.com/repos/amirhosseinyavari021/ay-cmdgen/releases/latest', { timeout: 2000 });
-        const latestVersion = response.data.tag_name.replace('v', '');
-        const currentVersion = packageJson.version;
-        if (semver.gt(latestVersion, currentVersion)) {
-            console.log(chalk.green(`\n💡 New version available! (${currentVersion} -> ${latestVersion})`));
-            console.log(`   Run ${chalk.cyan('cmdgen update')} to get the latest version.\n`);
-        }
-        await setConfig({ last_update_check: now });
-    } catch (error) {
-        await setConfig({ last_update_check: now });
-    }
-}
-
-const primaryServerUrl = 'https://ay-cmdgen-cli.onrender.com';
-const fallbackServerUrl = 'https://cmdgen.onrender.com';
-
-const callApi = async (params) => {
-    const { mode, userInput, os, osVersion, cli, lang, options = {} } = params;
-    const systemPrompt = getSystemPrompt(mode, os, osVersion || 'N/A', cli, lang, options);
-    const payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userInput }] };
-    const attemptRequest = (url) => new Promise(async (resolve, reject) => {
+        // لینوکس و مک
         try {
-            const response = await axios.post(`${url}/api/proxy`, payload, { responseType: 'stream', timeout: 60000 });
-            stopSpinner();
-            startSpinner('Generating response...');
-            let fullContent = '';
-            const decoder = new TextDecoder();
-            response.data.on('data', chunk => {
-                const textChunk = decoder.decode(chunk, { stream: true });
-                textChunk.split('\n').filter(line => line.startsWith('data: ')).forEach(line => {
-                    const jsonPart = line.substring(5).trim();
-                    if (jsonPart && jsonPart !== "[DONE]") {
-                        try { fullContent += JSON.parse(jsonPart).choices[0].delta.content || ''; } catch (e) {}
-                    }
-                });
-            });
-            response.data.on('end', () => {
-                stopSpinner();
-                const finalData = parseAndConstructData(fullContent, mode, cli);
-                if (!finalData) reject(new Error("Parsing failed"));
-                else resolve({ type: mode, data: finalData });
-            });
-            response.data.on('error', reject);
-        } catch (err) { reject(err); }
-    });
-    try {
-        startSpinner('Connecting to primary server...');
-        return await attemptRequest(primaryServerUrl);
-    } catch (primaryError) {
-        stopSpinner();
-        console.warn(chalk.yellow(`\n⚠️  Primary server failed. Trying fallback...`));
-        startSpinner('Connecting to fallback server...');
-        try {
-            return await attemptRequest(fallbackServerUrl);
-        } catch (fallbackError) {
-            stopSpinner();
-            const err = fallbackError || primaryError;
-            if (err.code === 'ECONNABORTED') console.error(chalk.red(`\n❌ Error: Both servers timed out.`));
-            else if (err.response) console.error(chalk.red(`\n❌ Error: Server responded with status ${err.response.status}.`));
-            else if (err.request) console.error(chalk.red(`\n❌ Error: Could not connect to any server.`));
-            else console.error(chalk.red(`\n❌ Error: ${err.message || "An unknown error occurred."}`));
-            return null;
-        }
+            const res = execSync('which cmdgen', { encoding: 'utf8' });
+            execPaths = res.split('\n').map(s => s.trim()).filter(Boolean);
+        } catch (e) {}
     }
-};
 
-const executeCommand = (command, shell) => {
-    return new Promise((resolve) => {
-        console.log(chalk.magenta(`\n🚀 Executing: ${command.command}`));
-        const commandString = command.command;
-        let child;
-        if (process.platform === 'win32') {
-            if (shell && shell.toLowerCase().includes('powershell')) {
-                child = spawn('powershell.exe', ['-NoProfile', '-Command', commandString], { stdio: 'inherit' });
-            } else {
-                child = spawn('cmd.exe', ['/C', commandString], { stdio: 'inherit' });
+    for (const file of execPaths) {
+        if (tryRemoveFile(file)) {
+            cmdgenRemoved = true;
+        }
+        // در ویندوز فایل batch هم هست:
+        if (process.platform === 'win32' && !file.endsWith('.cmd')) {
+            const batchFile = file + '.cmd';
+            if (tryRemoveFile(batchFile)) {
+                cmdgenRemoved = true;
             }
-        } else {
-            child = spawn(commandString, [], { stdio: 'inherit', shell: true });
         }
-        child.on('close', (code) => {
-            if (code !== 0) console.error(chalk.red(`\n❌ Process exited with code ${code}`));
-            resolve();
-        });
-        child.on('error', (err) => {
-            console.error(chalk.red(`\n❌ Failed to start process: ${err.message}`));
-            resolve();
-        });
-    });
-};
+    }
+
+    if (configRemoved || cmdgenRemoved) {
+        console.log(chalk.green('✅ CMDGEN has been successfully uninstalled.'));
+        if (removedFiles.length) {
+            console.log(chalk.gray('Removed files:'));
+            removedFiles.forEach(f => console.log(chalk.gray('  - ' + f)));
+        }
+        if (failedFiles.length) {
+            console.log(chalk.yellow('Some files could not be removed automatically:'));
+            failedFiles.forEach(f => console.log(chalk.yellow('  - ' + f)));
+            console.log('You may need to remove them manually.');
+        }
+        console.log(chalk.gray('\nIf you installed via npm, you may also want to run: npm uninstall -g ay-cmdgen'));
+    } else {
+        console.log(chalk.red('Could not automatically remove all CMDGEN files. Please remove them manually.'));
+    }
+    console.log('You may need to restart your terminal for changes to take full effect.');
+    gracefulExit();
+}
 
 const run = async () => {
     let config = await getConfig();
     const args = hideBin(process.argv);
-    
-    const command = args[0]?.toLowerCase();
+    const command = args[0];
 
     const needsConfig = !['config', 'update', 'delete', 'd', 'feedback', 'f', undefined, '--help', '-h', '--version', '-v'].includes(command);
 
@@ -349,115 +279,49 @@ const run = async () => {
         .command(['generate <request>', 'g'], 'Generate a single command', {}, async (argv) => {
             const initialResult = await callApi({ ...argv, userInput: argv.request, mode: 'generate', cli: argv.shell });
             if (initialResult?.data?.commands?.length > 0) {
-                const currentConfig = await getConfig();
-                await setConfig({ usageCount: currentConfig.usageCount + 1 });
+                for (const cmd of initialResult.data.commands) {
+                    await addToHistory({ command: cmd.command, explanation: cmd.explanation });
+                }
+                printCommandResult(initialResult.data.commands);
+                incrementUsageCount();
+            } else {
+                console.log(chalk.red('No command could be generated.'));
             }
-            
-            const startInteractiveSession = async () => {
-                let allCommands = [];
-                if (initialResult?.data?.commands?.length > 0) {
-                    allCommands = initialResult.data.commands;
-                    allCommands.forEach(cmd => addToHistory(cmd));
-                    displayNewSuggestions(allCommands, allCommands, true);
-                } else {
-                    console.log(chalk.yellow("\nNo suggestions could be generated for your request."));
-                    process.exit(1);
-                }
-                while (true) {
-                    const choice = await promptUser(allCommands);
-                    if (choice.type === 'execute') {
-                        await executeCommand(allCommands[choice.index], argv.shell);
-                        gracefulExit();
-                        return;
-                    } else if (choice.type === 'more') {
-                        const newCmds = await getMoreSuggestions(argv, allCommands);
-                        if(newCmds.length > 0) {
-                            newCmds.forEach(cmd => addToHistory(cmd));
-                            allCommands.push(...newCmds);
-                        } else {
-                             console.log(chalk.yellow("Couldn't fetch more suggestions."));
-                        }
-                    } else if (choice.type === 'quit') {
-                        gracefulExit();
-                        return;
-                    }
-                }
-            };
-            const displayNewSuggestions = (newSuggestions, allCommands, isFirstTime) => {
-                 newSuggestions.forEach((cmd, idx) => {
-                    const displayIndex = allCommands.length - newSuggestions.length + idx + 1;
-                    console.log(`\n${chalk.cyan.bold(`Suggestion #${displayIndex}`)}:\n  ${chalk.green(cmd.command)}\n  └─ Explanation: ${cmd.explanation}`);
-                    if (cmd.warning) {
-                        console.log(`  └─ ${chalk.yellow.bold('Warning:')} ${chalk.yellow(cmd.warning)}`);
-                    }
-                });
-                if(isFirstTime) console.warn(chalk.red.bold('\n🚨 WARNING: Executing AI-generated commands can be dangerous. Review them carefully.'));
-            };
-            const getMoreSuggestions = async (argv, allCommands) => {
-                console.log(chalk.blue("\n🔄 Getting more suggestions..."));
-                const existing = allCommands.map(c => c.command);
-                const result = await callApi({ ...argv, userInput: argv.request, options: { existingCommands: existing }, mode: 'generate', cli: argv.shell });
-                if (result?.data?.commands?.length > 0) {
-                    const newCommands = result.data.commands;
-                    displayNewSuggestions(newCommands, allCommands, false);
-                    return newCommands;
-                }
-                return [];
-            };
-            const promptUser = (commands) => new Promise(resolve => {
-                const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-                const promptText = chalk.bold(`\nEnter a number (1-${commands.length}), (m)ore, or (q)uit: `);
-                rl.question(promptText, (choice) => {
-                    rl.close();
-                    choice = choice.toLowerCase().trim();
-                    if (choice === 'm') return resolve({ type: 'more' });
-                    if (choice === 'q' || choice === '') return resolve({ type: 'quit' });
-                    const index = parseInt(choice, 10) - 1;
-                    if (index >= 0 && index < commands.length) {
-                        const confirmRl = readline.createInterface({ input: process.stdin, output: process.stdout });
-                        confirmRl.question(chalk.yellow(`\nExecute: "${chalk.cyan(commands[index].command)}"? [y/N] `), answer => {
-                            confirmRl.close();
-                            if (answer.toLowerCase() === 'y') {
-                                resolve({ type: 'execute', index });
-                            } else {
-                                console.log(chalk.gray('Execution cancelled.'));
-                                resolve({ type: 'quit' });
-                            }
-                        });
-                    } else {
-                        console.log(chalk.red('\nInvalid choice. Please try again.'));
-                        resolve({ type: 'reprompt' });
-                    }
-                });
-            });
-            await startInteractiveSession();
         })
         .command(['script <request>', 's'], 'Generate a full script', {}, async (argv) => {
-            const result = await callApi({ ...argv, userInput: argv.request, mode: 'script', cli: argv.shell });
-            if (result) {
-                const currentConfig = await getConfig();
-                await setConfig({ usageCount: currentConfig.usageCount + 1 });
-                console.log(chalk.cyan.bold('\n--- Generated Script ---'));
-                console.log(chalk.green(result.data.explanation));
-                const scriptItem = { command: result.data.explanation, explanation: `Script for: "${argv.request}"`, warning: '' };
-                addToHistory(scriptItem);
-
-                const shellType = argv.shell.toLowerCase();
-                let fileExtension = '.sh';
-                if (shellType.includes('powershell')) {
-                    fileExtension = '.ps1';
-                } else if (shellType === 'cmd') {
-                    fileExtension = '.bat';
-                }
-                console.log(chalk.yellow(`\nTip: Copy the code above and save it to a file (e.g., script${fileExtension}) to run it.`));
+            const initialResult = await callApi({ ...argv, userInput: argv.request, mode: 'script', cli: argv.shell });
+            if (initialResult?.data?.script) {
+                await addToHistory({ command: initialResult.data.script, explanation: initialResult.data.explanation || '' });
+                printScriptResult(initialResult.data.script, initialResult.data.explanation);
+                incrementUsageCount();
+            } else {
+                console.log(chalk.red('No script could be generated.'));
             }
-            gracefulExit();
         })
-        .command('history', 'Show recently generated commands and scripts', {}, async (argv) => {
+        .command(['analyze <command>', 'a'], 'Understand what a command does', {}, async (argv) => {
+            const initialResult = await callApi({ ...argv, userInput: argv.command, mode: 'analyze', cli: argv.shell });
+            if (initialResult?.data?.explanation) {
+                await addToHistory({ command: argv.command, explanation: initialResult.data.explanation });
+                printAnalyzeResult(argv.command, initialResult.data.explanation);
+                incrementUsageCount();
+            } else {
+                console.log(chalk.red('Could not analyze the command.'));
+            }
+        })
+        .command(['error <message>', 'e'], 'Help with an error message', {}, async (argv) => {
+            const initialResult = await callApi({ ...argv, userInput: argv.message, mode: 'error', cli: argv.shell });
+            if (initialResult?.data?.help) {
+                printErrorHelp(argv.message, initialResult.data.help);
+                incrementUsageCount();
+            } else {
+                console.log(chalk.red('Could not provide help for this error.'));
+            }
+        })
+        .command(['history'], 'Show recently generated commands', {}, async () => {
             const config = await getConfig();
             const history = config.history || [];
-            if (history.length === 0) {
-                console.log(chalk.yellow('No history found.'));
+            if (!history.length) {
+                console.log(chalk.yellow('No command history found.'));
                 return;
             }
             console.log(chalk.cyan.bold('--- Command History ---'));
@@ -474,132 +338,96 @@ const run = async () => {
             });
         })
         .command(['feedback', 'f'], 'Provide feedback about CMDGEN', {}, async () => {
+            // همیشه فرم فیدبک را با open و اگر نشد لینک را چاپ کن
             console.log(chalk.cyan('Thank you for helping us improve! Opening the feedback form in your browser...'));
-            await open(FEEDBACK_URL);
-            gracefulExit();
-        })
-        .command('config [action] [key] [value]', 'Manage saved settings', {}, async (argv) => {
-            await handleConfigCommand(argv.action, argv.key, argv.value);
-        })
-        .command('update', 'Update cmdgen to the latest version', {}, () => {
-            if (process.platform === 'win32') {
-                const command = 'iwr https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.ps1 | iex';
-                spawn('powershell.exe', ['-Command', command], { stdio: 'inherit' }).on('close', code => process.exit(code));
-            } else {
-                const command = 'curl -fsSL https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.sh | bash';
-                spawn(command, { stdio: 'inherit', shell: true }).on('close', code => process.exit(code));
-            }
-        })
-        .command(['analyze <command>', 'a'], 'Understand what a command does', {}, async (argv) => {
-            const result = await callApi({ ...argv, userInput: argv.command, mode: 'explain', cli: argv.shell });
-            if (result) console.log(result.data.explanation);
-            gracefulExit();
-        })
-        .command(['error <message>', 'e'], 'Help with an error message', {}, async (argv) => {
-            const userInput = `Error Message:\n${argv.message}` + (argv.context ? `\n\nContext:\n${argv.context}` : '');
-            const result = await callApi({ ...argv, userInput: userInput, mode: 'error', cli: argv.shell });
-            if (result) {
-                console.log(chalk.bold(`\nProbable Cause:`), chalk.red(result.data.cause));
-                console.log(chalk.bold(`\nExplanation:`), result.data.explanation);
-                console.log(chalk.bold(`\nSolution:`));
-                result.data.solution.forEach(step => {
-                    if (step.startsWith('CMD:')) {
-                        console.log(chalk.green(`  - Run command: `) + chalk.cyan(step.substring(4).trim()));
-                    } else {
-                        console.log(chalk.green(`  - ${step}`));
-                    }
-                });
+            try {
+                await open(FEEDBACK_URL);
+            } catch (err) {
+                console.error(chalk.red('Could not open browser automatically. Please open this link manually:'));
+                console.log(chalk.yellow(FEEDBACK_URL));
             }
             gracefulExit();
         })
         .command(['delete', 'd'], 'Uninstall cmdgen from your system', {}, async () => {
-            console.log(chalk.red.bold('\n--- Uninstall CMDGEN ---'));
-            
-            const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-            const question = (query) => new Promise(resolve => rl.question(query, resolve));
-
-            const confirm = await question(chalk.yellow('Are you sure you want to permanently delete CMDGEN and its config file? (y/N) '));
-            if (confirm.toLowerCase() !== 'y') {
-                console.log(chalk.gray('Uninstall cancelled.'));
-                rl.close();
-                return;
-            }
-            
-            const reason = await question(chalk.yellow('(Optional) To help us improve, please share why you are uninstalling: '));
-            if (reason.trim()) {
-                try {
-                    const formData = new URLSearchParams();
-                    formData.append(UNINSTALL_REASON_ENTRY_ID, reason);
-                    axios.post(UNINSTALL_REASON_FORM_URL, formData, {
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-                    }).catch(() => {});
-                } catch (e) { /* Ignore errors */ }
-            }
-            
-            rl.close();
-
-            try {
-                console.log('Removing configuration files...');
-                if (await fs.pathExists(configDir)) {
-                    await fs.remove(configDir);
-                }
-
-                const exePath = process.execPath;
-                if (exePath && (exePath.toLowerCase().includes('cmdgen') || exePath.toLowerCase().includes('ay-cmdgen'))) {
-                     console.log(`Removing application from: ${exePath}`);
-                     await fs.remove(exePath);
-                } else {
-                    console.log(chalk.yellow("Could not automatically determine the installation path. You may need to remove it manually."));
-                }
-                
-                console.log(chalk.green('\n✅ CMDGEN has been successfully uninstalled.'));
-                console.log('You may need to restart your terminal for changes to take full effect.');
-
-            } catch (err) {
-                console.error(chalk.red(`\nAn error occurred during uninstallation: ${err.message}`));
-                console.log('Please try removing the files manually:');
-                console.log(`- Config directory: ${configDir}`);
-                console.log(`- Check your system's application install location for the cmdgen executable.`);
-            }
+            await handleDelete();
         })
-        .option('os', { describe: 'Target OS', type: 'string', default: config.os })
-        .option('shell', { describe: 'Target shell', type: 'string', default: config.shell })
-        .option('lang', { describe: 'Response language', type: 'string', default: 'en' })
-        .strict()
-        .fail((msg, err) => {
-            console.error(chalk.red(`\n❌ Error: ${msg || err.message}`));
-            process.exit(1);
-        });
-
-    const argv = await parser.argv;
-
-    if (argv.help) {
-        showHelp(config);
-        process.exit(0);
-    }
-    if (argv.version) {
-        console.log(packageJson.version);
-        process.exit(0);
-    }
-    
-    const today = new Date().toISOString().slice(0, 10);
-    if (!config.lastRunDate) {
-        if (!command) showWelcomeBanner();
-        await setConfig({ lastRunDate: today });
-    }
-    
-    if (command && !['delete', 'd', 'feedback', 'f'].includes(command)) {
-        await checkForUpdates();
-        await handleFeedback();
-    }
+        .command('config [action] [key] [value]', 'Manage saved settings', {}, async (argv) => {
+            await handleConfigCommand(argv.action, argv.key, argv.value);
+        })
+        .parse();
 
     if (!command && args.length === 0) {
         showHelp(config);
     }
+
+    await handleFeedback();
 };
 
+function incrementUsageCount() {
+    getConfig().then(config => {
+        const usageCount = (config.usageCount || 0) + 1;
+        setConfig({ usageCount });
+    });
+}
+
+function printCommandResult(commands) {
+    commands.forEach((cmd, i) => {
+        console.log(chalk.cyan.bold(`\nCommand #${i + 1}:`));
+        console.log(chalk.green(cmd.command));
+        if (cmd.explanation) {
+            console.log(chalk.gray(`Explanation: ${cmd.explanation}`));
+        }
+    });
+}
+
+function printScriptResult(script, explanation) {
+    console.log(chalk.cyan.bold('\nGenerated Script:'));
+    console.log(chalk.green(script));
+    if (explanation) {
+        console.log(chalk.gray(`Explanation: ${explanation}`));
+    }
+}
+
+function printAnalyzeResult(command, explanation) {
+    console.log(chalk.cyan.bold('\nCommand Analysis:'));
+    console.log(chalk.green(command));
+    console.log(chalk.gray(explanation));
+}
+
+function printErrorHelp(message, help) {
+    console.log(chalk.cyan.bold('\nError Help:'));
+    console.log(chalk.yellow(message));
+    console.log(chalk.gray(help));
+}
+
+async function handleConfigCommand(action, key, value) {
+    const config = await getConfig();
+    switch ((action || '').toLowerCase()) {
+        case 'show':
+        default:
+            console.log(chalk.bold('\nCurrent config:'));
+            Object.entries(config).forEach(([k, v]) => {
+                if (k === 'history') return;
+                console.log(`${chalk.green(k)}: ${v}`);
+            });
+            break;
+        case 'set':
+            if (!key || typeof value === 'undefined') {
+                console.log(chalk.red('Usage: cmdgen config set <key> <value>'));
+                return;
+            }
+            await setConfig({ [key]: value });
+            console.log(chalk.green(`Config key "${key}" set to "${value}"`));
+            break;
+        case 'wizard':
+            await runSetupWizard();
+            console.log(chalk.green('Setup complete!'));
+            break;
+    }
+}
+
+// اجرای برنامه
 run().catch(err => {
-    stopSpinner();
     console.error(chalk.red(`\nA critical error occurred: ${err.message}`));
     console.error(err.stack);
     process.exit(1);
