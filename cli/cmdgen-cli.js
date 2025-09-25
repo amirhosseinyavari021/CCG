@@ -11,10 +11,10 @@ const semver = require('semver');
 const readline = require('readline');
 const chalk = require('chalk');
 const open = require('open');
+const packageJson = require('./package.json');
 
 const { getSystemPrompt } = require('./apiService-cli.js');
 const { parseAndConstructData } = require('./responseParser-cli.js');
-const packageJson = require('./package.json');
 
 // --- متغیرهای مربوط به بازخورد و حذف ---
 const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSdt_16-wZOgOViET55XwQYAsetfWxQWDW1DBb4yks6AgtOI9g/viewform?usp=header';
@@ -26,6 +26,7 @@ const USAGE_THRESHOLD_FOR_FEEDBACK = 20;
 const configDir = path.join(os.homedir(), '.cmdgen');
 const configFile = path.join(configDir, 'config.json');
 const MAX_HISTORY = 20;
+const NPM_PACKAGE_NAME = 'ay-cmdgen';
 
 async function getConfig() {
     await fs.ensureDir(configDir);
@@ -63,7 +64,6 @@ async function addToHistory(commandItem) {
 
 async function handleFeedback(force = false) {
     const config = await getConfig();
-    // فقط اگر به حد استفاده رسید یا force=true
     if ((config.usageCount >= USAGE_THRESHOLD_FOR_FEEDBACK && !config.feedbackRequested) || force) {
         console.log(chalk.cyan.bold('\n--- We Value Your Feedback! ---'));
         console.log("You've used CMDGEN several times. Would you mind sharing your thoughts to help us improve?");
@@ -159,6 +159,59 @@ const runSetupWizard = async () => {
     return { os: osSel, shell: shellSel };
 };
 
+async function getLatestVersion() {
+    try {
+        const res = await axios.get(`https://registry.npmjs.org/${NPM_PACKAGE_NAME}/latest`, { timeout: 4000 });
+        return res.data.version;
+    } catch (e) {
+        return null;
+    }
+}
+
+async function notifyIfUpdateAvailable() {
+    const localVersion = packageJson.version;
+    const latestVersion = await getLatestVersion();
+    if (latestVersion && semver.gt(latestVersion, localVersion)) {
+        console.log(chalk.yellow.bold('\n⚡️ New version available!'));
+        console.log(chalk.yellow(`You are using v${localVersion}, but v${latestVersion} is available.`));
+        console.log(chalk.yellow('For the best experience, run: ') + chalk.blue.bold('npm install -g ay-cmdgen'));
+        console.log('');
+    }
+}
+
+async function handleUpdate() {
+    console.log(chalk.cyan('Checking for updates...'));
+    const latestVersion = await getLatestVersion();
+    if (!latestVersion) {
+        console.log(chalk.red('Could not fetch latest version from npm. Please check your internet connection or try again later.'));
+        gracefulExit();
+        return;
+    }
+    if (semver.gte(packageJson.version, latestVersion)) {
+        console.log(chalk.green('You are already using the latest version of CMDGEN.'));
+        gracefulExit();
+        return;
+    }
+
+    console.log(chalk.cyan(`Updating CMDGEN from v${packageJson.version} to v${latestVersion} ...`));
+    try {
+        // فقط و فقط npm
+        const child = spawn('npm', ['install', '-g', NPM_PACKAGE_NAME], { stdio: 'inherit', shell: true });
+        child.on('close', code => {
+            if (code === 0) {
+                console.log(chalk.green('\n✅ CMDGEN was successfully updated! Restart your terminal to use the new version.'));
+            } else {
+                console.log(chalk.red('\nUpdate failed. Please try running this command manually:'));
+                console.log(chalk.blue.bold('npm install -g ay-cmdgen'));
+            }
+            gracefulExit();
+        });
+    } catch (e) {
+        console.log(chalk.red('Update failed. Please run: npm install -g ay-cmdgen'));
+        gracefulExit();
+    }
+}
+
 async function handleDelete() {
     console.log(chalk.red.bold('\n--- Uninstall CMDGEN ---'));
 
@@ -195,7 +248,6 @@ async function handleDelete() {
         console.log(chalk.gray('Removing configuration files...'));
     } catch (e) {}
 
-    // حذف اجرایی
     function tryRemoveFile(file) {
         if (!file) return false;
         try {
@@ -212,13 +264,11 @@ async function handleDelete() {
 
     let execPaths = [];
     if (process.platform === 'win32') {
-        // روی ویندوز
         try {
             const res = execSync('where cmdgen', { encoding: 'utf8' });
             execPaths = res.split('\n').map(s => s.trim()).filter(Boolean);
         } catch (e) {}
     } else {
-        // لینوکس و مک
         try {
             const res = execSync('which cmdgen', { encoding: 'utf8' });
             execPaths = res.split('\n').map(s => s.trim()).filter(Boolean);
@@ -229,7 +279,6 @@ async function handleDelete() {
         if (tryRemoveFile(file)) {
             cmdgenRemoved = true;
         }
-        // در ویندوز فایل batch هم هست:
         if (process.platform === 'win32' && !file.endsWith('.cmd')) {
             const batchFile = file + '.cmd';
             if (tryRemoveFile(batchFile)) {
@@ -261,6 +310,11 @@ const run = async () => {
     let config = await getConfig();
     const args = hideBin(process.argv);
     const command = args[0];
+
+    // نمایش پیام آپدیت در هر اجرا (به جز خود آپدیت)
+    if (command !== 'update') {
+        await notifyIfUpdateAvailable();
+    }
 
     const needsConfig = !['config', 'update', 'delete', 'd', 'feedback', 'f', undefined, '--help', '-h', '--version', '-v'].includes(command);
 
@@ -338,7 +392,6 @@ const run = async () => {
             });
         })
         .command(['feedback', 'f'], 'Provide feedback about CMDGEN', {}, async () => {
-            // همیشه فرم فیدبک را با open و اگر نشد لینک را چاپ کن
             console.log(chalk.cyan('Thank you for helping us improve! Opening the feedback form in your browser...'));
             try {
                 await open(FEEDBACK_URL);
@@ -347,6 +400,9 @@ const run = async () => {
                 console.log(chalk.yellow(FEEDBACK_URL));
             }
             gracefulExit();
+        })
+        .command(['update'], 'Update CMDGEN to the latest version', {}, async () => {
+            await handleUpdate();
         })
         .command(['delete', 'd'], 'Uninstall cmdgen from your system', {}, async () => {
             await handleDelete();
@@ -426,7 +482,6 @@ async function handleConfigCommand(action, key, value) {
     }
 }
 
-// اجرای برنامه
 run().catch(err => {
     console.error(chalk.red(`\nA critical error occurred: ${err.message}`));
     console.error(err.stack);
