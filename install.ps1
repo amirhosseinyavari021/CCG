@@ -10,7 +10,17 @@ $FallbackReleaseUrl = "https://github.com/$GithubRepo/releases/latest/download/$
 $DownloadPath = "$env:TEMP\$ReleaseAsset"
 
 # --- Main Logic ---
-Write-Host "Installing AY-CMDGEN for Windows..." -ForegroundColor Cyan
+Write-Host "Installing/Updating AY-CMDGEN for Windows..." -ForegroundColor Cyan
+
+# --- [اصلاح‌شده] متوقف کردن فرآیند در حال اجرا ---
+Write-Host "Checking for running instances of cmdgen..."
+$RunningProcesses = Get-Process -Name "cmdgen" -ErrorAction SilentlyContinue
+if ($RunningProcesses) {
+    Write-Host "Stopping running cmdgen process to allow update..." -ForegroundColor Yellow
+    Stop-Process -Name "cmdgen" -Force
+    Start-Sleep -Seconds 2 # Wait a moment for the process to terminate
+}
+# ----------------------------------------
 
 # 1. Attempt to download the latest release with fallback logic
 try {
