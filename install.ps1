@@ -1,65 +1,85 @@
-# --- Configuration ---
-$GithubRepo = "amirhosseinyavari021/ay-cmdgen"
-$InstallDir = "$env:ProgramFiles\AY-CMDGEN"
-$ExeName = "cmdgen.exe"
-$ReleaseAsset = "cmdgen-win.exe"
+#Requires -Version 5.1
+$ErrorActionPreference = "Stop"
 
-# Define primary and fallback URLs
-$PrimaryReleaseUrl = "https://github.com/$GithubRepo/releases/latest/download/$ReleaseAsset"
-$FallbackReleaseUrl = "https://github.com/$GithubRepo/releases/latest/download/$ReleaseAsset" # Example: could be a different mirror
-$DownloadPath = "$env:TEMP\$ReleaseAsset"
+# --- Configuration ---
+$GITHUB_REPO = "amirhosseinyavari021/ay-cmdgen"
+$INSTALL_DIR = "$env:ProgramFiles\AY-CMDGEN"
+$CMD_NAME = "cmdgen.exe"
+$PRIMARY_REPO_URL = "https://github.com"
+$FALLBACK_REPO_URL = "https://github.com"
+
+# --- Helper Functions ---
+function Write-Color {
+    param (
+        [string]$Color,
+        [string]$Text
+    )
+    $colors = @{
+        "Red" = "Red"
+        "Green" = "Green"
+        "Yellow" = "Yellow"
+        "Cyan" = "Cyan"
+    }
+    Write-Host $Text -ForegroundColor $colors[$Color]
+}
 
 # --- Main Logic ---
-Write-Host "Installing/Updating AY-CMDGEN for Windows..." -ForegroundColor Cyan
+Write-Color "Cyan" "Installing/Updating AY-CMDGEN for Windows..."
 
-# --- [اصلاح‌شده] متوقف کردن فرآیند در حال اجرا ---
-Write-Host "Checking for running instances of cmdgen..."
-$RunningProcesses = Get-Process -Name "cmdgen" -ErrorAction SilentlyContinue
-if ($RunningProcesses) {
-    Write-Host "Stopping running cmdgen process to allow update..." -ForegroundColor Yellow
-    Stop-Process -Name "cmdgen" -Force
-    Start-Sleep -Seconds 2 # Wait a moment for the process to terminate
+# --- Stop running processes ---
+Write-Color "Yellow" "Checking for running instances of cmdgen..."
+$processes = Get-Process -Name "cmdgen" -ErrorAction SilentlyContinue
+if ($processes) {
+    Write-Color "Yellow" "Stopping running cmdgen processes to allow update..."
+    $processes | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds 2
 }
-# ----------------------------------------
 
-# 1. Attempt to download the latest release with fallback logic
+# --- Determine Architecture ---
+$ARCH = [System.Environment]::ProcessorArchitecture
+$TARGET = switch ($ARCH) {
+    "Amd64" { "cmdgen-windows.exe" }
+    "Arm64" { "cmdgen-windows-arm.exe" }
+    default { Write-Color "Red" "Error: Architecture $ARCH is not supported."; exit 1 }
+}
+
+# --- Download ---
+$PRIMARY_RELEASE_URL = "$PRIMARY_REPO_URL/$GITHUB_REPO/releases/latest/download/$TARGET"
+$FALLBACK_RELEASE_URL = "$FALLBACK_REPO_URL/$GITHUB_REPO/releases/latest/download/$TARGET"
+$DOWNLOAD_PATH = "$env:TEMP\$TARGET"
+
+Write-Host "Attempting to download from: $PRIMARY_RELEASE_URL"
 try {
-    Write-Host "Attempting to download from primary source: $PrimaryReleaseUrl"
-    Invoke-WebRequest -Uri $PrimaryReleaseUrl -OutFile $DownloadPath -UseBasicParsing -ErrorAction Stop
+    Invoke-WebRequest -Uri $PRIMARY_RELEASE_URL -OutFile $DOWNLOAD_PATH
 } catch {
-    Write-Host "Primary download failed. Trying fallback source..." -ForegroundColor Yellow
-    try {
-        Write-Host "Attempting to download from fallback source: $FallbackReleaseUrl"
-        Invoke-WebRequest -Uri $FallbackReleaseUrl -OutFile $DownloadPath -UseBasicParsing -ErrorAction Stop
-    } catch {
-        Write-Host "Error: Download failed from all available sources. Please check your internet connection or the GitHub releases page." -ForegroundColor Red
-        exit 1
-    }
+    Write-Color "Yellow" "Primary download failed. Trying fallback..."
+    Invoke-WebRequest -Uri $FALLBACK_RELEASE_URL -OutFile $DOWNLOAD_PATH
 }
 
-# 2. Create installation directory
-if (-not (Test-Path $InstallDir)) {
-    New-Item -Path $InstallDir -ItemType Directory | Out-Null
-}
-
-# 3. Move the executable and rename it
-Move-Item -Path $DownloadPath -Destination "$InstallDir\$ExeName" -Force
-
-# 4. Add the installation directory to the user's PATH
-Write-Host "Adding '$InstallDir' to your PATH..."
-try {
-    $CurrentUserPath = [System.Environment]::GetEnvironmentVariable("Path", "User")
-    if ($CurrentUserPath -notlike "*$InstallDir*") {
-        $NewPath = "$CurrentUserPath;$InstallDir"
-        [System.Environment]::SetEnvironmentVariable("Path", $NewPath, "User")
-        Write-Host "Please open a new PowerShell window for the changes to take effect." -ForegroundColor Yellow
-    } else {
-        Write-Host "Installation directory is already in your PATH."
-    }
-} catch {
-    Write-Host "Error: Failed to add to PATH. Please add '$InstallDir' to your System Environment Variables manually." -ForegroundColor Red
+if (-not (Test-Path $DOWNLOAD_PATH) -or (Get-Item $DOWNLOAD_PATH).Length -eq 0) {
+    Write-Color "Red" "Error: Download failed. Check your internet or GitHub releases."
     exit 1
 }
 
-Write-Host "✅ AY-CMDGEN was installed successfully!" -ForegroundColor Green
-Write-Host "Open a new terminal and try running: cmdgen 
+# --- Install ---
+Write-Host "Installing to: $INSTALL_DIR\$CMD_NAME"
+if (-not (Test-Path $INSTALL_DIR)) {
+    New-Item -ItemType Directory -Path $INSTALL_DIR -Force | Out-Null
+}
+if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Write-Host "Admin privileges required for $INSTALL_DIR."
+    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"cd '$pwd'; & '$PSCommandPath'`"" -Verb RunAs
+    exit
+}
+Move-Item -Path $DOWNLOAD_PATH -Destination "$INSTALL_DIR\$CMD_NAME" -Force
+
+# --- Update PATH ---
+$envPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+if ($envPath -notlike "*$INSTALL_DIR*") {
+    [Environment]::SetEnvironmentVariable("Path", "$envPath;$INSTALL_DIR", "Machine")
+    Write-Host "Added $INSTALL_DIR to system PATH."
+}
+
+# --- Success ---
+Write-Color "Green" "✅ AY-CMDGEN installed/updated successfully!"
+Write-Host "Open a new terminal and try running: cmdgen"
