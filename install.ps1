@@ -62,4 +62,4 @@ try {
 }
 
 Write-Host "✅ AY-CMDGEN was installed successfully!" -ForegroundColor Green
-Write-Host "Open a new terminal and try running: cmdgen --help"
+Write-Host "Open a new terminal and try running: cmdgen 

@@ -101,4 +101,4 @@ fi
 # 4. Success message
 echo_color "32" "✅ AY-CMDGEN was installed successfully!"
 echo "You can now use the 'cmdgen' command in a new terminal window."
-echo "To get started, try running: cmdgen --help"
+echo "To get started, try running: cmdgen 
