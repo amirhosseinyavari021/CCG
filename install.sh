@@ -18,7 +18,21 @@ echo_color() {
 }
 
 # --- Main Logic ---
-echo_color "36" "Installing AY-CMDGEN..."
+echo_color "36" "Installing/Updating AY-CMDGEN..."
+
+# --- [اصلاح‌شده] متوقف کردن فرآیند در حال اجرا ---
+echo_color "33" "Checking for running instances of cmdgen..."
+if pgrep -x "cmdgen" > /dev/null; then
+    echo_color "33" "Stopping running cmdgen process to allow update..."
+    # Use killall if available, otherwise pkill. Ignore errors if process not found.
+    if command -v killall >/dev/null 2>&1; then
+        killall cmdgen || true
+    else
+        pkill -f cmdgen || true
+    fi
+    sleep 1
+fi
+# ----------------------------------------
 
 # 1. Determine OS and Architecture
 OS="$(uname -s)"
