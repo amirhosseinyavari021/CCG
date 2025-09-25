@@ -47,6 +47,12 @@ if ($processes) {
     Start-Sleep -Seconds 2
 }
 
+# --- Admin Check (safe, no restart) ---
+if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Write-Color "Yellow" "⚠️ Admin privileges required. Please restart PowerShell as Administrator and run this script again."
+    exit 1
+}
+
 # --- Download ---
 $DOWNLOAD_PATH = "$env:TEMP\$TARGET"
 $PRIMARY_RELEASE_URL = "$PRIMARY_REPO_URL/$GITHUB_REPO/releases/download/v2.5.6/$TARGET"
@@ -68,12 +74,6 @@ try {
 # --- Install ---
 Write-Host "Installing to: $INSTALL_DIR\$CMD_NAME"
 if (-not (Test-Path $INSTALL_DIR)) { New-Item -ItemType Directory -Path $INSTALL_DIR -Force | Out-Null }
-
-if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Color "Yellow" "Admin privileges required. Restarting as admin..."
-    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command `"cd '$pwd'; & '$PSCommandPath'`"" -Verb RunAs
-    exit
-}
 
 Move-Item -Path $DOWNLOAD_PATH -Destination "$INSTALL_DIR\$CMD_NAME" -Force
 
