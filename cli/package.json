@@ -1,20 +1,31 @@
 {
   "name": "@amirhosseinyavari/ay-cmdgen",
-  "version": "2.5.8",
-  "description": "Your Intelligent Command-Line Assistant - CLI",
-  "main": "cmdgen-cli.js",
+  "version": "2.5.9",
+  "description": "AI-powered command and script generator CLI",
   "bin": {
     "cmdgen": "./cmdgen-cli.js"
   },
-  "publishConfig": {
-    "access": "public"
+  "main": "cmdgen-cli.js",
+  "scripts": {
+    "start": "node cmdgen-cli.js"
   },
   "dependencies": {
-    "axios": "^1.7.2",
+    "axios": "^1.6.0",
     "chalk": "^4.1.2",
     "fs-extra": "^11.2.0",
-    "open": "^8.4.2",
-    "semver": "^7.6.2",
+    "open": "^9.1.0",
+    "semver": "^7.5.4",
     "yargs": "^17.7.2"
-  }
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "cli",
+    "ai",
+    "command",
+    "shell"
+  ],
+  "author": "Amir Hosseini Yavari",
+  "license": "MIT and Apache"
 }
