@@ -1,6 +1,6 @@
 {
   "name": "@amirhosseinyavari/ay-cmdgen",
-  "version": "2.6.2",
+  "version": "2.6.3",
   "description": "Your Intelligent Command-Line Assistant - CLI",
   "main": "cmdgen-cli.js",
   "bin": {
