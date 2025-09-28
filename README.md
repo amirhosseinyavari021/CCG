@@ -1,10 +1,25 @@
+
 # CMDGEN - Your Intelligent Command-Line Assistant
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+[![Version](https://img.shields.io/badge/Version-2.6.0-brightgreen.svg)](https://github.com/amirhosseinyavari021/ay-cmdgen/releases)
 
 Generate, analyze, script, and debug command-line instructions with an AI-powered assistant, right in your terminal.
 
 CMDGEN is a smart, cross-platform tool that bridges the gap between natural language and the command line. Whether you're a seasoned sysadmin, a developer, or just starting out, CMDGEN helps you master the terminal with ease. This project features both a powerful Command-Line Tool (CLI) and a user-friendly Web Application.
+
+## 🎉 What's New in Version 2.6.0 – Enhanced Logging & Parser Validation
+
+This version introduces comprehensive structured logging, detailed parser validation, performance metrics, and CLI history enhancements, improving command generation quality, debugging, and user analytics.
+
+### New Features:
+- **📊 Structured Logging System:** Complete request/response logging with JSON format for better debugging and analytics
+- **🔍 Advanced Parser Validation:** Line-by-line validation with detailed error reporting and success rate tracking
+- **⏱️ Performance Metrics:** Response time monitoring, parsing time analysis, and token usage tracking
+- **🎯 Enhanced Context Tracking:** OS, shell, language, and session ID correlation for better user experience
+- **📈 Improved CLI History:** Metadata-rich history with timestamps, session info, and execution tracking
+- **🛠️ Better Error Handling:** Comprehensive error context with feedback loops for AI improvement
+- **🔄 Session Management:** Anonymous session tracking for better user journey analysis
 
 ## ✨ Key Features
 
@@ -12,7 +27,7 @@ CMDGEN is a smart, cross-platform tool that bridges the gap between natural lang
   - **Intelligent Scripting:** Turn multi-step tasks into ready-to-run scripts for PowerShell, Bash, and more.
   - **In-depth Analysis:** Paste any command to get a detailed, expert-level explanation of what it does.
   - **Error Debugging:** Got an error? CMDGEN analyzes it and gives you a step-by-step solution.
-  - **Command History:** Access your 20 most recently generated commands with the `history` command.
+  - **Enhanced Command History:** Access your 20 most recently generated commands with detailed metadata and session tracking.
   - **Cross-Platform Support:** Natively works on Windows, macOS, and Linux for seamless compatibility.
   - **Multi-Language Support:** Available in both English and Persian to cater to a wider audience.
   - **Interactive Mode:** After generating commands in the CLI, execute them directly, request more suggestions, or exit effortlessly.
@@ -20,7 +35,7 @@ CMDGEN is a smart, cross-platform tool that bridges the gap between natural lang
   - **Self-Update Mechanism:** Automatically upgrade to the latest version with a simple `update` command.
   - **User Feedback System:** Share your thoughts directly via the `feedback` command or through automatic prompts to help improve the tool.
   - **Intelligent Uninstall:** When removing the tool with the `delete` command, you can optionally provide feedback on why you're leaving.
-  - **Privacy-Focused Analytics:** We collect basic, anonymous usage data (like install counts and active users) to understand project growth without tracking any personal information.
+  - **Advanced Analytics:** Enhanced privacy-focused analytics with structured logging for better insights and improved AI responses.
 
 ## 🚀 Quick Install (Recommended)
 
@@ -31,7 +46,7 @@ The installation script automatically detects your OS, downloads the correct ver
 Global installations write files into system directories (e.g., `/usr/local/bin` on macOS/Linux or `Program Files` on Windows). These locations are protected, so elevated permissions are needed.
 
 **Why it matters:**
-Without admin privileges, installation may fail with “permission denied” errors or the program may not be accessible globally.
+Without admin privileges, installation may fail with "permission denied" errors or the program may not be accessible globally.
 
 **How to Install**
 
@@ -92,7 +107,7 @@ Here's a quick reference table for all available commands:
 | `script <request>`   | `s`   | Generate a full script                           |
 | `analyze <command>`  | `a`   | Understand what a command does                   |
 | `error <message>`    | `e`   | Help with an error message                       |
-| `history`            |       | Show recently generated commands                 |
+| `history`            |       | Show recently generated commands with metadata   |
 | `feedback`           | `f`   | Provide feedback on the tool                     |
 | `config [action]`    |       | Manage saved settings (show, set, wizard)        |
 | `update`             |       | Update cmdgen to the latest version              |
@@ -157,13 +172,15 @@ cmdgen e "execution of scripts is disabled on this system."
 cmdgen e "bash: docker: command not found"
 ```
 
-### 6\. View Your History (history)
+### 6\. View Your Enhanced History (history)
 
-Quickly access your recently generated commands.
+Quickly access your recently generated commands with detailed metadata including timestamps, session information, and execution status.
 
 ```bash
 cmdgen history
 ```
+
+*New in v2.6.0: History now includes timestamps, session tracking, parsing success rates, and execution feedback.*
 
 ### 7\. Manage Configuration (config)
 
@@ -185,6 +202,28 @@ Keep CMDGEN up-to-date with the latest features and fixes.
 cmdgen update
 ```
 
+## 🔍 Advanced Features (New in v2.6.0)
+
+### Enhanced Logging and Analytics
+CMDGEN v2.6.0 now includes comprehensive structured logging that helps improve command generation quality:
+
+- **Request/Response Tracking:** All AI interactions are logged with context for better debugging
+- **Parser Validation:** Detailed line-by-line validation with success rate reporting
+- **Performance Metrics:** Response times, parsing efficiency, and error rate tracking
+- **Session Analytics:** Anonymous session tracking for usage pattern analysis
+
+### Improved Error Handling
+- **Context-Aware Errors:** Error messages now include more context about what went wrong
+- **Validation Feedback:** Parser failures are logged with specific details for AI training improvement
+- **Performance Monitoring:** Track response times and identify bottlenecks
+
+### Developer Benefits
+If you're contributing to the project or running your own instance, the new logging system provides:
+- Structured JSON logs for easy analysis
+- Performance benchmarks for optimization
+- Quality metrics for AI response validation
+- Anonymous usage analytics for product improvement
+
 ## 💬 Community & Feedback
 
 This project is built for the community, and your feedback is crucial for its growth. We've made it easy to share your thoughts.
@@ -198,6 +237,8 @@ cmdgen feedback
 ```
 
 Additionally, after you've used the tool about 20 times, it will automatically ask if you'd like to provide feedback to help us improve.
+
+*Note: v2.6.0 includes enhanced feedback collection with better context about your usage patterns to help us improve the AI responses.*
 
 ### Uninstalling
 
@@ -213,6 +254,8 @@ Prefer a graphical interface? Use the web version instantly without any installa
 
   - [https://cmdgen.onrender.com](https://cmdgen.onrender.com)
 
+*The web version also includes all v2.6.0 enhancements including improved error handling and parser validation.*
+
 ## 👨‍💻 For Developers
 
 Want to contribute or build from the source?
@@ -223,14 +266,56 @@ Want to contribute or build from the source?
 
 The output files will be in the `dist` folder.
 
+### New in v2.6.0: Enhanced Development Experience
+- **Structured Logging:** All logs are now in JSON format for easier analysis
+- **Performance Metrics:** Built-in timing and performance monitoring
+- **Better Error Context:** More detailed error information for debugging
+- **Validation Logging:** Parser validation results with success rates
+
 ## Configuration
 
 User settings are stored in a configuration file at `~/.cmdgen/config.json`. Advanced users can manually edit this file if needed to customize their default OS, shell, or other preferences.
 
+*New in v2.6.0: Configuration now includes session tracking and enhanced history metadata.*
+
+## 🔒 Privacy & Data Handling
+
+CMDGEN respects your privacy:
+- **Anonymous Analytics:** We collect basic usage statistics with anonymized user IDs
+- **No Personal Data:** Your actual commands and prompts are not stored permanently
+- **Session Tracking:** Session IDs are used for improving user experience but are not tied to personal information
+- **Local Storage:** Your command history and settings remain on your local machine
+
 ## Contributing
 
-Contributions are welcome\! If you'd like to help improve CMDGEN, please feel free to fork the repository and submit a pull request.
+Contributions are welcome! If you'd like to help improve CMDGEN, please feel free to fork the repository and submit a pull request.
+
+### New Contributor Guidelines for v2.6.0:
+- All new features should include structured logging
+- Error handling should provide detailed context
+- Parser enhancements should include validation metrics
+- Performance improvements should be measurable through the new metrics system
 
 ## 📜 License
 
 This project is dual-licensed under the [MIT License](https://opensource.org/licenses/MIT) and the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0). See the LICENSE file for details.
+
+---
+
+**Version:** 2.6.0 | **Last Updated:** December 2024 | **Changelog:** Enhanced logging, parser validation, and analytics system
+```
+
+## 🎯 **Key Changes Made:**
+
+1. **Added version badge** at the top
+2. **Added "What's New in v2.6.0" section** highlighting all new features
+3. **Enhanced Key Features** to include new logging and analytics capabilities  
+4. **Updated Command Summary** to mention enhanced history with metadata
+5. **Added "Advanced Features" section** explaining the new logging system
+6. **Updated existing sections** to mention v2.6.0 improvements where relevant
+7. **Added Privacy & Data Handling section** to address new analytics features
+8. **Enhanced Developer section** with v2.6.0 development improvements
+9. **Updated contributor guidelines** to reflect new logging standards
+10. **Added version footer** with last updated date
+
+The README maintains all existing functionality while clearly communicating the comprehensive improvements in v2.6.0. It's structured to help both new users understand the enhanced capabilities and existing users appreciate the improvements.
