@@ -1,16 +1,20 @@
 /**
  * Enhanced AY-CMDGEN response parser with Markdown block support
  * Handles both legacy (|||) format and modern Markdown-structured responses
+ * Logs are now conditional based on --debug flag for better performance
  */
 
 const logParserEvent = (eventData) => {
-    console.log(`[PARSER] ${JSON.stringify({
-        timestamp: new Date().toISOString(),
-        ...eventData
-    })}`);
+    // Only log if --debug is present in command-line arguments
+    if (process.argv.includes('--debug')) {
+        console.log(`[PARSER] ${JSON.stringify({
+            timestamp: new Date().toISOString(),
+            ...eventData
+        })}`);
+    }
 };
 
-export const parseAndConstructData = (textResponse, mode, sessionId = null) => {
+function parseAndConstructData(textResponse, mode, sessionId = null) {
     const parseStartTime = Date.now();
     const logContext = { sessionId, clientSide: true };
 
@@ -28,6 +32,10 @@ export const parseAndConstructData = (textResponse, mode, sessionId = null) => {
 
         if (mode === 'generate') {
             return parseGenerateMode(trimmedResponse, logContext, parseStartTime);
+        }
+
+        if (mode === 'script') {
+            return parseScriptMode(trimmedResponse, logContext, parseStartTime);
         }
 
         if (mode === 'explain') {
@@ -63,6 +71,53 @@ export const parseAndConstructData = (textResponse, mode, sessionId = null) => {
         });
         return null;
     }
+};
+
+const parseScriptMode = (textResponse, logContext, parseStartTime) => {
+    // For script mode, we expect a full script with explanation
+    const scriptStart = textResponse.indexOf('```');
+    let scriptCode = '';
+    let explanation = '';
+
+    if (scriptStart !== -1) {
+        // Extract script from code block
+        const codeBlockMatch = textResponse.match(/```(?:\w+)?\n([\s\S]*?)\n```/);
+        if (codeBlockMatch) {
+            scriptCode = codeBlockMatch[1].trim();
+        }
+
+        // Extract explanation (text before/after code block)
+        const beforeCode = textResponse.substring(0, scriptStart).trim();
+        const afterCode = textResponse.substring(textResponse.lastIndexOf('```') + 3).trim();
+
+        // Combine non-code parts as explanation
+        explanation = [beforeCode, afterCode]
+            .filter(part => part && !part.includes('```'))
+            .join('\n\n')
+            .trim();
+    } else {
+        // If no code block, treat entire response as script
+        scriptCode = textResponse;
+    }
+
+    // Log successful parsing
+    logParserEvent({
+        ...logContext,
+        event: 'client_parser_complete',
+        mode: 'script',
+        responseLength: textResponse.length,
+        parseTime: Date.now() - parseStartTime,
+        hasCodeBlock: scriptStart !== -1
+    });
+
+    if (scriptCode) {
+        return {
+            explanation: explanation || scriptCode, // Use script as explanation if no clear explanation found
+            script: scriptCode
+        };
+    }
+
+    return null;
 };
 
 const parseGenerateMode = (textResponse, logContext, parseStartTime) => {
@@ -255,7 +310,7 @@ const parseErrorMode = (textResponse, logContext, parseStartTime) => {
     return {
         cause: parts[0]?.trim() || '',
         explanation: parts[1]?.trim() || '',
-        solution: parts.slice(2).map(s => s.trim()).filter(s => s)
+        solution: parts.slice(2).map(s => s.trim()).map(s => s.trim()).filter(s => s)
     };
 };
 
@@ -305,3 +360,5 @@ const finalizeCommand = (commandObj, explanationText) => {
         warning: commandObj.warning || ''
     };
 };
+
+module.exports = { parseAndConstructData };
