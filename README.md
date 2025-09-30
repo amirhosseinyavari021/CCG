@@ -2,13 +2,13 @@
 # CMDGEN - Your Intelligent Command-Line Assistant
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
-[![Version](https://img.shields.io/badge/Version-2.6.4-brightgreen.svg)](https://github.com/amirhosseinyavari021/ay-cmdgen/releases)
+[![Version](https://img.shields.io/badge/Version-2.6.5-brightgreen.svg)](https://github.com/amirhosseinyavari021/ay-cmdgen/releases)
 
 Generate, analyze, script, and debug command-line instructions with an AI-powered assistant, right in your terminal.
 
 CMDGEN is a smart, cross-platform tool that bridges the gap between natural language and the command line. Whether you're a seasoned sysadmin, a developer, or just starting out, CMDGEN helps you master the terminal with ease. This project features both a powerful Command-Line Tool (CLI) and a user-friendly Web Application.
 
-🎉 What's New in Version 2.6.4 – Debug Flag & Performance Improvements
+🎉 What's New in Version 2.6.5 – Debug Flag & Performance Improvements & installing and updating bug fixed
 
 This version introduces a new `--debug` flag for optional detailed logging, conditional parser logs for reduced console clutter, and overall code optimizations for better maintainability and efficiency.
 
