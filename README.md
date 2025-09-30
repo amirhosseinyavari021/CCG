@@ -173,7 +173,7 @@ cmdgen update
 
 🔍 Advanced Features (Updated in v2.6.4)
 Enhanced Logging and Analytics
-CMDGEN v2.6.4 builds on v2.6.0's logging with conditional debug output:
+CMDGEN v2.6.5 builds on v2.6.0's logging with conditional debug output:
 - Request/Response Tracking: All AI interactions are logged with context for better debugging.
 - Parser Validation: Detailed line-by-line validation with success rate reporting.
 - Performance Metrics: Response times, parsing efficiency, and error rate tracking.
@@ -213,7 +213,7 @@ cmdgen delete
 Prefer a graphical interface? Use the web version instantly without any installation.
 - https://cmdgen.onrender.com
 
-The web version also includes all v2.6.4 enhancements including improved error handling, parser validation, and debug capabilities.
+The web version also includes all v2.6.5 enhancements including improved error handling, parser validation, and debug capabilities.
 
 👨‍💻 For Developers
 Want to contribute or build from the source?
@@ -223,7 +223,7 @@ Want to contribute or build from the source?
 
 The output files will be in the dist folder.
 
-New in v2.6.4: Enhanced Development Experience
+New in v2.6.5: Enhanced Development Experience
 - Structured Logging: All logs are now in JSON format for easier analysis.
 - Performance Metrics: Built-in timing and performance monitoring.
 - Better Error Context: More detailed error information for debugging.
@@ -240,12 +240,12 @@ CMDGEN respects your privacy:
 - No Personal Data: Your actual commands and prompts are not stored permanently.
 - Session Tracking: Session IDs are used for improving user experience but are not tied to personal information.
 - Local Storage: Your command history and settings remain on your local machine.
-- **New in v2.6.4**: Debug logs are optional and only enabled on demand, ensuring no extra data collection in normal use.
+- **New in v2.6.5**: Debug logs are optional and only enabled on demand, ensuring no extra data collection in normal use.
 
 Contributing
 Contributions are welcome! If you'd like to help improve CMDGEN, please feel free to fork the repository and submit a pull request.
 
-New Contributor Guidelines for v2.6.4:
+New Contributor Guidelines for v2.6.5:
 - All new features should include structured logging.
 - Error handling should provide detailed context.
 - Parser enhancements should include validation metrics.
@@ -255,4 +255,4 @@ New Contributor Guidelines for v2.6.4:
 📜 License
 This project is dual-licensed under the MIT License and the Apache License 2.0. See the LICENSE file for details.
 
-Version: 2.6.4 | Last Updated: September 2025 | Changelog: Added debug flag, conditional logging, and performance optimizations
+Version: 2.6.5 | Last Updated: September 2025 | Changelog: Added debug flag, conditional logging, and performance optimizations and installing and updating bug fixed 
