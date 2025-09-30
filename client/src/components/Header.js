@@ -4,8 +4,7 @@ import { translations } from '../constants/translations';
 
 const Header = ({ lang, theme, onThemeChange, onAboutClick, onMenuClick, onLangChange }) => {
     const t = translations[lang];
-    // Updated the fallback version to 2.3.0
-    const appVersion = process.env.REACT_APP_VERSION || '2.4.0';
+    const appVersion = process.env.REACT_APP_VERSION || '2.6.5';
 
     return (
         <header className="bg-white dark:bg-gray-900 shadow-sm sticky top-0 z-40">
