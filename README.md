@@ -1,28 +1,28 @@
 
 # CMDGEN - Your Intelligent Command-Line Assistant
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
-[![Version](https://img.shields.io/badge/Version-2.6.5-brightgreen.svg)](https://github.com/amirhosseinyavari021/ay-cmdgen/releases)
+[![Version](https://img.shields.io/badge/Version-2.6.9-brightgreen.svg)](https://github.com/amirhosseinyavari021/ay-cmdgen/releases)
 [![Website](https://img.shields.io/website?up_message=online&url=https%3A%2F%2Fcmdgen.onrender.com)](https://cmdgen.onrender.com)
 
 Generate, analyze, script, and debug command-line instructions with an AI-powered assistant, right in your terminal.
 
 CMDGEN is a smart, cross-platform tool that bridges the gap between natural language and the command line. Whether you're a seasoned sysadmin, a developer, or just starting out, CMDGEN helps you master the terminal with ease. This project features both a powerful Command-Line Tool (CLI) and a user-friendly Web Application.
 
-🎉 What's New in Version 2.6.5 – Debug Flag & Performance Improvements & installing and updating bug fixed
+🎉 What's New in Version 2.6.9 – Enhanced Multi-Language Support & Improved CLI Help
 
-This version introduces a new `--debug` flag for optional detailed logging, conditional parser logs for reduced console clutter, and overall code optimizations for better maintainability and efficiency.
+This version emphasizes and refines the **Persian language support** across both the CLI and Web application, making CMDGEN accessible to a broader audience. It also significantly improves the in-tool documentation by officially adding the `--lang` option to the help menu and enhancing the initial setup wizard.
 
-New Features:
-- 🔍 **Debug Flag**: Added `--debug` option to enable detailed `[PARSER]` logs for troubleshooting parser behavior. Use it with any command, e.g., `cmdgen generate "list files" --debug`.
-- 📊 **Conditional Logging**: Parser logs now only appear when `--debug` is enabled, improving performance and user experience in normal usage.
+New Features & Highlights:
+- 🌐 **Enhanced Multi-Language Support**: Full and improved support for both **English** and **Persian (Farsi)**. Users can now seamlessly interact with the tool in their preferred language, including command generation and explanations. The `--lang` flag (e.g., `--lang fa`) is now officially documented and supported in all relevant commands.
+- 📝 **CLI Help Menu Update**: The `--lang` option is now clearly listed in the `cmdgen --help` output, showing its purpose and default value, making multi-language capabilities more discoverable.
+- 🛠️ **Setup Wizard Enhancement**: The initial configuration wizard (`cmdgen config wizard`) now includes a prompt for users to select their preferred response language (including Persian), setting it as the default for future sessions.
 
 Changes & Improvements:
-- 🛠️ **Code Quality Enhancements**: Streamlined variable naming, added more comments, and optimized logging logic in `responseParser-cli.js` for better readability and efficiency.
-- ⏱️ **Performance Optimizations**: Reduced unnecessary console outputs in non-debug mode, making the CLI faster and cleaner.
-- 📈 **Help Menu Update**: Added `--debug` to the help menu for easier discovery.
-
-These build on v2.6.0's logging system, making debugging more flexible while keeping the tool lightweight.
+- 🔧 **i18n Refinements**: Improved the internalization (i18n) system based on user feedback, ensuring more accurate and context-aware translations.
+- 🌐 **Persian Translations**: Updated and expanded Persian translations for UI elements, prompts, and error messages based on the `fa` locale in `translations.js`.
+- 📚 **Documentation Update**: Added a note about multi-language support, including Persian, in the main README and usage instructions.
 
 ✨ Key Features
 
@@ -32,9 +32,9 @@ These build on v2.6.0's logging system, making debugging more flexible while kee
 - Error Debugging: Got an error? CMDGEN analyzes it and gives you a step-by-step solution.
 - Enhanced Command History: Access your 20 most recently generated commands with detailed metadata including timestamps, session information, and execution status.
 - Cross-Platform Support: Natively works on Windows, macOS, and Linux for seamless compatibility.
-- Multi-Language Support: Available in both English and Persian to cater to a wider audience.
+- **Multi-Language Support**: **Available in both English and Persian (فارسی) to cater to a wider audience.** (Emphasized)
 - Interactive Mode: After generating commands in the CLI, execute them directly, request more suggestions, or exit effortlessly.
-- Configuration Management: Easily manage default settings (like OS and shell) using the intuitive config command.
+- Configuration Management: Easily manage default settings (like OS, shell, and language) using the intuitive config command.
 - Self-Update Mechanism: Automatically upgrade to the latest version with a simple update command.
 - User Feedback System: Share your thoughts directly via the feedback command or through automatic prompts to help improve the tool.
 - Intelligent Uninstall: When removing the tool with the delete command, you can optionally provide feedback on why you're leaving.
@@ -104,7 +104,7 @@ Here's a quick reference table for all available commands:
 | update               |       | Update cmdgen to the latest version              |
 
 1. First-Time Setup
-The first time you run a command, CMDGEN will launch a quick setup wizard to learn about your OS and preferred shell. This ensures all future suggestions are perfectly tailored for your system.
+The first time you run a command, CMDGEN will launch a quick setup wizard to learn about your OS, preferred shell, and language. This ensures all future suggestions are perfectly tailored for your system and preferred language.
 ```
 # Just run any command to start the wizard
 cmdgen g "list files"
@@ -119,6 +119,10 @@ cmdgen g "list the top 5 processes by memory usage in MB" --os windows --shell p
 ```
 # Find large files on Linux
 cmdgen g "find all files larger than 1GB in my home directory" --os linux --shell bash
+```
+```
+# Generate a command in Persian (if AI supports it)
+cmdgen g "فهرست فایل‌های موجود را نمایش بده" --lang fa
 ```
 
 3. Create Scripts (s)
@@ -159,7 +163,7 @@ New in v2.6.0: History now includes timestamps, session tracking, parsing succes
 7. Manage Configuration (config)
 Run the setup wizard or view/manage your settings.
 ```
-# Run the setup wizard to configure default OS and shell
+# Run the setup wizard to configure default OS, shell, and language
 cmdgen config wizard
 # View current saved settings
 cmdgen config show
@@ -256,4 +260,4 @@ New Contributor Guidelines for v2.6.5:
 📜 License
 This project is dual-licensed under the MIT License and the Apache License 2.0. See the LICENSE file for details.
 
-Version: 2.6.5 | Last Updated: September 2025 | Changelog: Added debug flag, conditional logging, and performance optimizations and installing and updating bug fixed 
+Version: 2.6.9 | Last Updated: September 2025 | Changelog: Enhanced multi-language support (especially Persian), officially added `--lang` option to CLI help, improved setup wizard, and refined i18n system.
