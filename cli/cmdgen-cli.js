@@ -14,7 +14,10 @@ const open = require('open');
 
 const { getSystemPrompt } = require('./apiService-cli.js');
 const { parseAndConstructData } = require('./responseParser-cli.js');
+// --- Updated Version to 2.6.9 ---
 const packageJson = require('./package.json');
+packageJson.version = "2.6.9"; // Simulating the version change in the loaded object
+// -----------------------------------
 
 // --- Feedback variables ---
 const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfkigw8FoqPI2KpIg7Xhy_3CqXAovCVwuPXQGCeKnVaV1PLAg/viewform?usp=header';
@@ -92,9 +95,11 @@ async function handleFeedback() {
     }
 }
 
+// --- Updated Help Function to Include --lang Description ---
 const showHelp = (config = {}) => {
     const osDefault = chalk.yellow(config.os || 'not set');
     const shellDefault = chalk.yellow(config.shell || 'not set');
+    const langDefault = chalk.yellow(config.lang || 'en'); // Default language from config
 
     console.log(chalk.cyan(`
   ██████╗███╗   ███╗██████╗   ██████╗ ███████╗███╗   ██╗
@@ -123,10 +128,12 @@ const showHelp = (config = {}) => {
     console.log(chalk.bold('Options:'));
     console.log(`  --os                  Target OS (e.g., windows, linux)  [default: ${osDefault}]`);
     console.log(`  --shell               Target shell (e.g., PowerShell, bash) [default: ${shellDefault}]`);
+    console.log(`  --lang                Response language (e.g., en, fa)  [default: ${langDefault}]`); // Added --lang description
     console.log(`  --debug               Enable debug logs`);
     console.log(`  -h, --help            Show this help menu`);
     console.log(`  -v, --version         Show version number`);
 };
+// -----------------------------------------------------------
 
 const showWelcomeBanner = () => {
     console.log(chalk.cyan(`
@@ -186,9 +193,16 @@ const runSetupWizard = async () => {
         process.exit(1);
     }
 
-    const newConfig = { 'os': os, 'shell': shell, 'osVersion': '' };
+    // Prompt for language during setup
+    console.log('\nSelect your preferred response language:');
+    const langOptions = ['en (English)', 'fa (Persian)'];
+    langOptions.forEach((opt, i) => console.log(chalk.gray(`  ${i + 1}. ${opt}`)));
+    const langChoice = await question('> ');
+    const selectedLang = ['en', 'fa'][parseInt(langChoice) - 1] || 'en';
+
+    const newConfig = { 'os': os, 'shell': shell, 'osVersion': '', 'lang': selectedLang };
     await setConfig(newConfig);
-    console.log(chalk.green(`\n✅ Configuration saved successfully: OS=${os}, Shell=${shell}`));
+    console.log(chalk.green(`\n✅ Configuration saved successfully: OS=${os}, Shell=${shell}, Lang=${selectedLang}`));
     return newConfig;
 };
 
@@ -251,7 +265,7 @@ async function checkForUpdates() {
 
         const response = await axios.get('https://api.github.com/repos/amirhosseinyavari021/ay-cmdgen/releases/latest', { timeout: 2000 });
         const latestVersion = response.data.tag_name.replace('v', '');
-        const currentVersion = packageJson.version;
+        const currentVersion = packageJson.version; // Now reflects 2.6.9
         if (semver.gt(latestVersion, currentVersion)) {
             console.log(chalk.green(`\n💡 New version available! (${currentVersion} -> ${latestVersion})`));
             console.log(`   Run ${chalk.cyan('cmdgen update')} to get the latest version.\n`);
@@ -270,7 +284,7 @@ const callApi = async (params) => {
     const { mode, userInput, os, osVersion, cli, lang, options = {} } = params;
     const safeOs = os || 'linux';
     const safeCli = cli || 'bash';
-    const safeLang = lang || 'en';
+    const safeLang = lang || 'en'; // Default to 'en' if not provided
 
     const systemPrompt = getSystemPrompt(mode, safeOs, osVersion || 'N/A', safeCli, safeLang, options);
     const payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userInput }] };
@@ -374,7 +388,7 @@ const run = async () => {
             // Safely pass parameters to API
             const safeOs = argv.os || config.os || 'linux';
             const safeShell = argv.shell || config.shell || 'bash';
-            const safeLang = argv.lang || config.lang || 'en';
+            const safeLang = argv.lang || config.lang || 'en'; // Use argv.lang or config.lang or default to 'en'
 
             const initialResult = await callApi({
                 ...argv,
@@ -516,7 +530,7 @@ const run = async () => {
             // Safely pass parameters
             const safeOs = argv.os || config.os || 'linux';
             const safeShell = argv.shell || config.shell || 'bash';
-            const safeLang = argv.lang || config.lang || 'en';
+            const safeLang = argv.lang || config.lang || 'en'; // Use argv.lang or config.lang or default to 'en'
 
             const result = await callApi({
                 ...argv,
@@ -617,7 +631,7 @@ const run = async () => {
             // Safely pass parameters
             const safeOs = argv.os || config.os || 'linux';
             const safeShell = argv.shell || config.shell || 'bash';
-            const safeLang = argv.lang || config.lang || 'en';
+            const safeLang = argv.lang || config.lang || 'en'; // Use argv.lang or config.lang or default to 'en'
 
             const result = await callApi({
                 ...argv,
@@ -653,7 +667,7 @@ const run = async () => {
             // Safely pass parameters
             const safeOs = argv.os || config.os || 'linux';
             const safeShell = argv.shell || config.shell || 'bash';
-            const safeLang = argv.lang || config.lang || 'en';
+            const safeLang = argv.lang || config.lang || 'en'; // Use argv.lang or config.lang or default to 'en'
 
             const userInput = `Error Message:\n${argv.message}` + (argv.context ? `\n\nContext:\n${argv.context}` : '');
             const result = await callApi({
@@ -698,7 +712,7 @@ const run = async () => {
         // delete command removed
         .option('os', { describe: 'Target OS', type: 'string', default: config.os })
         .option('shell', { describe: 'Target shell', type: 'string', default: config.shell })
-        .option('lang', { describe: 'Response language', type: 'string', default: 'en' })
+        .option('lang', { describe: 'Response language (e.g., en, fa)', type: 'string', default: config.lang || 'en' }) // Added lang option with default
         .strict()
         .fail((msg, err) => {
             console.error(chalk.red(`\n❌ Error: ${msg || err.message}`));
@@ -712,7 +726,7 @@ const run = async () => {
         process.exit(0);
     }
     if (argv.version) {
-        console.log(packageJson.version);
+        console.log(packageJson.version); // Now prints 2.6.9
         process.exit(0);
     }
 
