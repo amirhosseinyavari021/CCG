@@ -14,11 +14,11 @@ const Header = ({ lang, theme, onThemeChange, onAboutClick, onMenuClick, onLangC
                     <button onClick={onMenuClick} className="md:hidden p-1.5 text-gray-600 dark:text-gray-300">
                         <Menu size={20} />
                     </button>
-                    <div className="flex items-center gap-2"> {/* تغییر از items-baseline به items-center برای تراز کردن لوگو و متن */}
+                    <div className="flex items-center gap-2"> {/* تغییر از items-baseline به items-center */}
                         {/* اضافه کردن لوگو */}
                         <img
                             src="%PUBLIC_URL%/logo.svg" // مسیر فایل SVG از پوشه public
-                            alt=""
+                            alt="AY-CMDGEN Logo"
                             className="h-8 w-auto" // ارتفاع بزرگ‌تر (مثلاً 8 = 2rem = 32px) و عرض متناسب
                         />
                         {/* نام و نسخه */}
