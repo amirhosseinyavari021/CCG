@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Version](https://img.shields.io/badge/Version-2.6.9-brightgreen.svg)](https://github.com/amirhosseinyavari021/ay-cmdgen/releases)
-[![Website](https://img.shields.io/website?up_message=online&url=https%3A%2F%2Fcmdgen.onrender.com)](https://cmdgen.onrender.com)
+[![Website](https://img.shields.io/website?up_message=online)](https://cmdgen.onrender.com)
 
 Generate, analyze, script, and debug command-line instructions with an AI-powered assistant, right in your terminal.
 
