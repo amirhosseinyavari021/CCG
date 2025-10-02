@@ -1,6 +1,6 @@
 {
   "name": "ay-cmdgen-server",
-  "version": "2.6.7",
+  "version": "2.6.8",
   "private": true,
   "description": "The server and web component for AY-CMDGEN",
   "main": "server.js",
