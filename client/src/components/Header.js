@@ -1,6 +1,8 @@
 import React from 'react';
 import { Sun, Moon, Info, Menu } from 'lucide-react';
 import { translations } from '../constants/translations';
+// Import لوگو
+import logo from '../assets/logo.png'; // فرض بر این است که فایل لوگو در این مسیر قرار دارد
 
 const Header = ({ lang, theme, onThemeChange, onAboutClick, onMenuClick, onLangChange }) => {
     const t = translations[lang];
@@ -14,7 +16,9 @@ const Header = ({ lang, theme, onThemeChange, onAboutClick, onMenuClick, onLangC
                     <button onClick={onMenuClick} className="md:hidden p-1.5 text-gray-600 dark:text-gray-300">
                         <Menu size={20} />
                     </button>
-                    <div className="flex items-baseline gap-2">
+                    <div className="flex items-center gap-2"> {/* تغییر از items-baseline به items-center */}
+                        {/* اضافه کردن لوگو */}
+                        <img src={logo} alt="AY-CMDGEN Logo" className="h-6 w-auto" /> {/* ارتفاع مناسب برای هدر */}
                         <h1 className="text-xl font-bold text-cyan-600 dark:text-cyan-400">AY-CMDGEN</h1>
                         <span className="text-xs font-mono text-gray-400 dark:text-gray-500">v{appVersion}</span>
                     </div>
