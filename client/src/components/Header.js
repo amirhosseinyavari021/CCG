@@ -18,7 +18,7 @@ const Header = ({ lang, theme, onThemeChange, onAboutClick, onMenuClick, onLangC
                         {/* اضافه کردن لوگو */}
                         <img
                             src="%PUBLIC_URL%/logo.svg" // مسیر فایل SVG از پوشه public
-                            alt="AY-CMDGEN Logo"
+                            alt=""
                             className="h-8 w-auto" // ارتفاع بزرگ‌تر (مثلاً 8 = 2rem = 32px) و عرض متناسب
                         />
                         {/* نام و نسخه */}
