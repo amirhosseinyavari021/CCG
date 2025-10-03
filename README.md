@@ -5,7 +5,7 @@
 [![Version](https://img.shields.io/badge/v2.6.9-%E2%9A%A1-8a2be2)](https://github.com/amirhosseinyavari021/ay-cmdgen/releases)
 [![Website](https://img.shields.io/badge/Demo-%F0%9F%9A%80-00c896?logo=vercel&logoColor=white)](https://cmdgen.onrender.com)
 [![TheGeeks.ir](https://img.shields.io/badge/Featured-%F0%9F%8C%9F-ff6b35?logo=hashnode&logoColor=white)](https://thegeeks.ir/amirhosseinyavari021/AY-CMDGEN)
-[![Libraries.io](https://img.shields.io/badge/Dependencies-%E2%80%A2-4a6fa5?logo=dependabot&logoColor=white)](https://libraries.io/npm/@amirhosseinyavari/ay-cmdgen)
+[![Libraries.io](https://img.shields.io/badge/Explore-4a6fa5?logo=librariesdotio&logoColor=white)](https://libraries.io/npm/@amirhosseinyavari/ay-cmdgen)
 [![npm](https://img.shields.io/badge/npm-%E2%86%92-dd1100?logo=npm&logoColor=white)](https://www.npmjs.com/package/@amirhosseinyavari/ay-cmdgen)
 
 Generate, analyze, script, and debug command-line instructions with an AI-powered assistant, right in your terminal.
