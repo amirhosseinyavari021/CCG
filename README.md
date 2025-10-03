@@ -1,9 +1,12 @@
-## CMDGEN - Your Intelligent Command-Line Assistant
+# CMDGEN - Your Intelligent Command-Line Assistant
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-success.svg)](https://opensource.org/licenses/MIT)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
-[![Version](https://img.shields.io/badge/Version-2.6.9-blueviolet.svg)](https://github.com/amirhosseinyavari021/ay-cmdgen/releases)
-[![Website](https://img.shields.io/badge/Website-Click-brightgreen.svg)](https://cmdgen.onrender.com)
+[![License: MIT](https://img.shields.io/badge/MIT%20License-%E2%9C%93-00d4aa?logo=opensourceinitiative&logoColor=white)](https://opensource.org/licenses/MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/Apache%202.0-%E2%9C%93-3498db?logo=apache&logoColor=white)](https://www.apache.org/licenses/LICENSE-2.0)
+[![Version](https://img.shields.io/badge/v2.6.9-%E2%9A%A1-8a2be2)](https://github.com/amirhosseinyavari021/ay-cmdgen/releases)
+[![Website](https://img.shields.io/badge/Demo-%F0%9F%9A%80-00c896?logo=vercel&logoColor=white)](https://cmdgen.onrender.com)
+[![TheGeeks.ir](https://img.shields.io/badge/Featured-%F0%9F%8C%9F-ff6b35?logo=hashnode&logoColor=white)](https://thegeeks.ir/amirhosseinyavari021/AY-CMDGEN)
+[![Libraries.io](https://img.shields.io/badge/Dependencies-%E2%80%A2-4a6fa5?logo=dependabot&logoColor=white)](https://libraries.io/npm/@amirhosseinyavari/ay-cmdgen)
+[![npm](https://img.shields.io/badge/npm-%E2%86%92-dd1100?logo=npm&logoColor=white)](https://www.npmjs.com/package/@amirhosseinyavari/ay-cmdgen)
 
 Generate, analyze, script, and debug command-line instructions with an AI-powered assistant, right in your terminal.
 
@@ -302,12 +305,6 @@ cmdgen feedback
 Additionally, after you've used the tool about 20 times, it will automatically ask if you'd like to provide feedback to help us improve.  
 *Note: v2.6.0 includes enhanced feedback collection with better context about your usage patterns to help us improve the AI responses.*
 
-**Uninstalling**  
-We're sad to see you go, but if you need to uninstall CMDGEN, you can use the delete command. This command will ask for confirmation and give you an option to share your reason for leaving, which helps us understand what we can do better.
-```bash
-cmdgen delete
-```
-
 💻 **Web Version**  
 Prefer a graphical interface? Use the web version instantly without any installation.  
 → [https://cmdgen.onrender.com](https://cmdgen.onrender.com)  
@@ -363,3 +360,111 @@ Contributions are welcome! If you'd like to help improve CMDGEN, please feel fre
 This project is dual-licensed under the MIT License and the Apache License 2.0. See the LICENSE file for details.
 
 Version: 2.6.9 | Last Updated: September 2025 | Changelog: Enhanced multi-language support (especially Persian), officially added `--lang` option to CLI help, improved setup wizard, and refined i18n system.
+
+
+---
+
+## 🧑‍💻 About the Creator
+
+I'm **Amirhossein Yavari**, born in 2008, an IT enthusiast passionate about building helpful tools that simplify complex tasks. CMDGEN is one of my personal projects designed to bridge the gap between natural language and the command line — making terminal usage faster, safer, and more accessible for everyone, especially beginners and non-English speakers.
+
+> “If you can describe what you want to do, CMDGEN will give you the exact command — no guesswork needed.”
+
+This project reflects my belief that technology should empower users, not confuse them. Whether you're automating deployments, managing Git repositories, or debugging Docker containers — CMDGEN is here to help.
+
+---
+
+## 🌐 Community & Support
+
+CMDGEN has been featured, reviewed, or supported by several platforms and communities. Here are some of them:
+
+- 🔗 [**TheGeeks.ir**](https://thegeeks.ir/amirhosseinyavari021/AY-CMDGEN) — A Persian tech community that highlighted CMDGEN as a powerful AI-powered CLI tool for developers.
+- 🌐 [**cmdgen.onrender.com**](https://cmdgen.onrender.com) — Official web interface for CMDGEN, allowing instant access without installation.
+- 📦 [**npm Package**](https://www.npmjs.com/package/@amirhosseinyavari/ay-cmdgen) — Published on npm for easy global installation via Node.js.
+- 📚 [**Libraries.io**](https://libraries.io/npm/@amirhosseinyavari/ay-cmdgen) — Listed as an open-source CLI tool with MIT/Apache licenses.
+
+---
+
+## 🖼️ Screenshots & Demos
+
+### Web Interface (v2.6.9)
+
+<img width="1919" height="912" alt="Screenshot 2025-10-03 011855" src="https://github.com/user-attachments/assets/59d46a44-cd69-40e6-8310-3e100857bcc3" />
+
+> *Ask a question to get practical, real-world commands — available in English and Persian.*
+
+---
+
+### CLI in Action (Windows Terminal)
+
+<img width="1919" height="1017" alt="Screenshot 2025-10-03 140449" src="https://github.com/user-attachments/assets/cc0524a3-cd58-4ec5-b0a0-82f4b65a5be9" />
+
+
+> *Generate, explain, or execute commands directly from your terminal — with safety warnings and interactive prompts.*
+
+---
+
+### TheGeeks.ir Project Page
+![TheGeeks.ir Preview](https://github.com/user-attachments/assets/e23ba24c-08e7-4ea8-bd6d-857473deb537)
+
+> *Featured on TheGeeks.ir — showcasing use cases like Git, Docker, and Kubernetes automation.*
+
+
+---
+
+## ❓ Frequently Asked Questions (FAQ)
+
+### Q1: How does CMDGEN work?  
+CMDGEN uses AI to interpret your natural language requests and generates accurate, ready-to-run terminal commands tailored to your operating system and shell (e.g., Bash, PowerShell). All processing is done securely—your prompts never leave your device in the CLI version, and the web version uses a privacy-respecting proxy.
+
+---
+
+### Q2: Is CMDGEN safe and private?  
+Yes. CMDGEN is **100% open-source**, **telemetry-free**, and **privacy-first**.  
+- Your commands, file paths, and system details are **never sent to any server** (in CLI mode).  
+- The web version ([cmdgen.onrender.com](https://cmdgen.onrender.com)) does **not store your prompts**.  
+- Full source code is publicly available on [GitHub](https://github.com/amirhosseinyavari021/ay-cmdgen).  
+- Licensed under **MIT + Apache 2.0** for full transparency and legal clarity.
+
+---
+
+### Q3: Can I use CMDGEN without installing it?  
+Absolutely! Visit the **web version** at [https://cmdgen.onrender.com](https://cmdgen.onrender.com) to use all core features instantly—no installation, no setup, no admin rights required.
+
+---
+
+### Q4: How do I use multi-language support (e.g., Persian)?  
+In the CLI, use the `--lang` flag:  
+```bash
+cmdgen generate "فهرست فایل‌ها را نشان بده" --lang fa
+```  
+In the web app, select your preferred language from the dropdown menu at the top of the page. CMDGEN fully supports **English (`en`)** and **Persian/Farsi (`fa`)**.
+
+---
+
+### Q5: What if I don’t have admin/root privileges?  
+You can still use CMDGEN via `npx` (included with Node.js):  
+```bash
+npx @amirhosseinyavari/ay-cmdgen generate "list all files"
+```  
+This runs the tool temporarily without global installation or elevated permissions.
+
+---
+
+### Q6: How can I contribute or report an issue?  
+We welcome contributions!  
+- Report bugs or suggest features via GitHub Issues.  
+- Submit pull requests for improvements.  
+- Or simply run:  
+  ```bash
+  cmdgen feedback
+  ```  
+  to share your thoughts directly from the CLI.
+
+---
+
+### Q7: Does CMDGEN work on Windows, macOS, and Linux?  
+Yes! CMDGEN is **cross-platform** and supports:  
+- **Windows** (PowerShell, CMD)  
+- **macOS** (Bash, Zsh)  
+- **Linux** (Bash, Zsh, and other POSIX shells)
