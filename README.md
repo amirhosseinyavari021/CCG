@@ -1,12 +1,13 @@
 # CMDGEN - Your Intelligent Command-Line Assistant
 
-[![License: MIT](https://img.shields.io/badge/MIT%20License-%E2%9C%93-00d4aa?logo=opensourceinitiative&logoColor=white)](https://opensource.org/licenses/MIT)
-[![License: Apache 2.0](https://img.shields.io/badge/Apache%202.0-%E2%9C%93-3498db?logo=apache&logoColor=white)](https://www.apache.org/licenses/LICENSE-2.0)
-[![Version](https://img.shields.io/badge/v2.6.9-%E2%9A%A1-8a2be2)](https://github.com/amirhosseinyavari021/ay-cmdgen/releases)
-[![Website](https://img.shields.io/badge/Demo-%F0%9F%9A%80-00c896?logo=vercel&logoColor=white)](https://cmdgen.onrender.com)
-[![TheGeeks.ir](https://img.shields.io/badge/Featured-%F0%9F%8C%9F-ff6b35?logo=hashnode&logoColor=white)](https://thegeeks.ir/amirhosseinyavari021/AY-CMDGEN)
-[![Libraries.io](https://img.shields.io/badge/Explore-4a6fa5?logo=librariesdotio&logoColor=white)](https://libraries.io/npm/@amirhosseinyavari/ay-cmdgen)
-[![npm](https://img.shields.io/badge/npm-%E2%86%92-dd1100?logo=npm&logoColor=white)](https://www.npmjs.com/package/@amirhosseinyavari/ay-cmdgen)
+[![License: MIT](https://img.shields.io/badge/MIT%20License-00d4aa)](https://opensource.org/licenses/MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/Apache-3498db)](https://www.apache.org/licenses/LICENSE-2.0)
+[![Version](https://img.shields.io/badge/v2.6.9-8a2be2)](https://github.com/amirhosseinyavari021/ay-cmdgen/releases)
+[![Website](https://img.shields.io/badge/website-FFD700)](https://cmdgen.onrender.com)
+[![TheGeeks.ir](https://img.shields.io/badge/Featured_on_TheGeeks.ir-ff6b35)](https://thegeeks.ir/amirhosseinyavari021/AY-CMDGEN)
+[![Libraries.io](https://img.shields.io/badge/Libraries.io-4a6fa5)](https://libraries.io/npm/@amirhosseinyavari/ay-cmdgen)
+[![npm](https://img.shields.io/badge/npm-dd1100)](https://www.npmjs.com/package/@amirhosseinyavari/ay-cmdgen)
+
 
 Generate, analyze, script, and debug command-line instructions with an AI-powered assistant, right in your terminal.
 
