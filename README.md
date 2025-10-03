@@ -1,13 +1,12 @@
 # CMDGEN - Your Intelligent Command-Line Assistant
 
-[![License: MIT](https://img.shields.io/badge/MIT%20License-00d4aa)](https://opensource.org/licenses/MIT)
-[![License: Apache 2.0](https://img.shields.io/badge/Apache-3498db)](https://www.apache.org/licenses/LICENSE-2.0)
-[![Version](https://img.shields.io/badge/v2.6.9-8a2be2)](https://github.com/amirhosseinyavari021/ay-cmdgen/releases)
-[![Website](https://img.shields.io/badge/website-FFD700)](https://cmdgen.onrender.com)
-[![TheGeeks.ir](https://img.shields.io/badge/Featured_on_TheGeeks.ir-ff6b35)](https://thegeeks.ir/amirhosseinyavari021/AY-CMDGEN)
-[![Libraries.io](https://img.shields.io/badge/Libraries.io-4a6fa5)](https://libraries.io/npm/@amirhosseinyavari/ay-cmdgen)
-[![npm](https://img.shields.io/badge/npm-dd1100)](https://www.npmjs.com/package/@amirhosseinyavari/ay-cmdgen)
-
+[![License: MIT](https://img.shields.io/badge/License-MIT-00d4aa)](https://opensource.org/licenses/MIT)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-3498db)](https://www.apache.org/licenses/LICENSE-2.0)
+[![Version](https://img.shields.io/badge/Release-v2.6.9-8a2be2)](https://github.com/amirhosseinyavari021/ay-cmdgen/releases)
+[![Website](https://img.shields.io/badge/Live_Demo-click-FFC107)](https://cmdgen.onrender.com)
+[![TheGeeks.ir](https://img.shields.io/badge/Featured_on-TheGeeks.ir-ff6b35)](https://thegeeks.ir/amirhosseinyavari021/AY-CMDGEN)
+[![Libraries.io](https://img.shields.io/badge/Listed_on-Libraries.io-4a6fa5)](https://libraries.io/npm/@amirhosseinyavari/ay-cmdgen)
+[![npm](https://img.shields.io/badge/Published_on-npm-dd1100)](https://www.npmjs.com/package/@amirhosseinyavari/ay-cmdgen)
 
 Generate, analyze, script, and debug command-line instructions with an AI-powered assistant, right in your terminal.
 
