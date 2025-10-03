@@ -4,7 +4,7 @@ import { translations } from '../constants/translations';
 
 const FeedbackCard = ({ lang, onDismiss }) => {
     const t = translations[lang];
-    const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSdt_16-wZOgOViET55XwQYAsetfWxQWDW1DBb4yks6AgtOI9g/viewform?usp=header';
+    const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfkigw8FoqPI2KpIg7Xhy_3CqXAovCVwuPXQGCeKnVaV1PLAg/viewform?usp=header';
 
     const handleProvideFeedback = () => {
         window.open(FEEDBACK_URL, '_blank');
@@ -32,3 +32,4 @@ const FeedbackCard = ({ lang, onDismiss }) => {
 };
 
 export default FeedbackCard;
+
