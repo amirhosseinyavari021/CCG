@@ -1,4 +1,4 @@
-# CMDGEN - Your Intelligent Command-Line Assistant
+# AY-CMDGEN - Your Intelligent Command-Line Assistant
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-00d4aa)](https://opensource.org/licenses/MIT)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-3498db)](https://www.apache.org/licenses/LICENSE-2.0)
@@ -375,13 +375,16 @@ This project reflects my belief that technology should empower users, not confus
 
 ## 🌐 Community & Support
 
-CMDGEN has been featured, reviewed, or supported by several platforms and communities. Here are some of them:
+AY-CMDGEN has been featured, reviewed, or supported by several platforms and communities. Here are some of them:
 
-- 🔗 [**TheGeeks.ir**](https://thegeeks.ir/amirhosseinyavari021/AY-CMDGEN) — A Persian tech community that highlighted CMDGEN as a powerful AI-powered CLI tool for developers.
 - 🌐 [**cmdgen.onrender.com**](https://cmdgen.onrender.com) — Official web interface for CMDGEN, allowing instant access without installation.
 - 📦 [**npm Package**](https://www.npmjs.com/package/@amirhosseinyavari/ay-cmdgen) — Published on npm for easy global installation via Node.js.
 - 📚 [**Libraries.io**](https://libraries.io/npm/@amirhosseinyavari/ay-cmdgen) — Listed as an open-source CLI tool with MIT/Apache licenses.
 
+- 🌐 [**Dev.to Article**](https://dev.to/amirhosseinyavari/ay-cmdgen-the-only-ai-cli-tool-you-need-no-api-key-required-just-start-coding-27k3) — A detailed guide on using CMDGEN.
+- 🌐 [**Hashnode Article**](https://ay-cmdgen.hashnode.dev/ay-cmdgen-the-only-ai-cli-tool-you-need-no-api-key-required-just-start-coding) — Another comprehensive article on the tool.
+
+- 🔗 [**TheGeeks.ir**](https://thegeeks.ir/amirhosseinyavari021/AY-CMDGEN) — A Persian tech community that highlighted CMDGEN as a powerful AI-powered CLI tool for developers.
 ---
 
 ## 🖼️ Screenshots & Demos
@@ -400,25 +403,31 @@ CMDGEN has been featured, reviewed, or supported by several platforms and commun
 
 
 > *Generate, explain, or execute commands directly from your terminal — with safety warnings and interactive prompts.*
+### Image of the article on hashnode.com
+<img width="1899" height="907" alt="image" src="https://github.com/user-attachments/assets/8d3f974d-0559-4f11-98f1-1a1793f195f2" />
 
----
+> Amirhossein Yavari's published article about AY-CMDGEN in order to introduce the tool and point out the ability to use the tool for free and without API for everyone.*
 
+### Image of the article on dev.to
+<img width="1885" height="967" alt="Screenshot 2025-10-03 192649" src="https://github.com/user-attachments/assets/5d70e213-b24c-483b-88ee-b83094a1c054" />
+
+> *Amirhossein Yavari's published article about AY-CMDGEN in order to introduce the tool and point out the ability to use the tool for free and without API for everyone.*
 ### TheGeeks.ir Project Page
 ![TheGeeks.ir Preview](https://github.com/user-attachments/assets/e23ba24c-08e7-4ea8-bd6d-857473deb537)
 
-> *Featured on TheGeeks.ir — showcasing use cases like Git, Docker, and Kubernetes automation.*
+> *Featured and reviewed on TheGeeks.ir - showcasing use cases such as Git automation, Docker, and Kubernetes.*
 
 
 ---
 
 ## ❓ Frequently Asked Questions (FAQ)
 
-### Q1: How does CMDGEN work?  
+### Q1: How does AY-CMDGEN work?  
 CMDGEN uses AI to interpret your natural language requests and generates accurate, ready-to-run terminal commands tailored to your operating system and shell (e.g., Bash, PowerShell). All processing is done securely—your prompts never leave your device in the CLI version, and the web version uses a privacy-respecting proxy.
 
 ---
 
-### Q2: Is CMDGEN safe and private?  
+### Q2: Is AY-CMDGEN safe and private?  
 Yes. CMDGEN is **100% open-source**, **telemetry-free**, and **privacy-first**.  
 - Your commands, file paths, and system details are **never sent to any server** (in CLI mode).  
 - The web version ([cmdgen.onrender.com](https://cmdgen.onrender.com)) does **not store your prompts**.  
@@ -427,7 +436,7 @@ Yes. CMDGEN is **100% open-source**, **telemetry-free**, and **privacy-first**.
 
 ---
 
-### Q3: Can I use CMDGEN without installing it?  
+### Q3: Can I use AY-CMDGEN without installing it?  
 Absolutely! Visit the **web version** at [https://cmdgen.onrender.com](https://cmdgen.onrender.com) to use all core features instantly—no installation, no setup, no admin rights required.
 
 ---
@@ -462,7 +471,7 @@ We welcome contributions!
 
 ---
 
-### Q7: Does CMDGEN work on Windows, macOS, and Linux?  
+### Q7: Does AY-CMDGEN work on Windows, macOS, and Linux?  
 Yes! CMDGEN is **cross-platform** and supports:  
 - **Windows** (PowerShell, CMD)  
 - **macOS** (Bash, Zsh)  
