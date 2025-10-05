@@ -3,9 +3,9 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import './index.css';
 import Header from './components/Header';
 import Form from './components/Form';
-// تغییر ایمپورت callApi: از named import استفاده می‌کنیم
+// ایمپورت callApi: حالا از apiService ایمپورت می‌شود
 import { callApi } from './api/apiService'; // ایمپورت callApi به عنوان named export
-// تغییر ایمپورت: استفاده از named import
+// ایمپورت: استفاده از named import
 import { t } from './constants/translations'; // ایمپورت t به عنوان named export
 
 // لیزی لود کردن کامپوننت‌هایی که در ابتدا نیاز نیستند
@@ -19,13 +19,13 @@ const GeneratedCommandCard = ({ command, explanation, warning, lang }) => {
   const currentTranslations = t[lang] || t['en'];
   return (
     <div className="card bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md w-full max-w-lg">
-      <h3 className="text-xl font-semibold text-cyan-600 dark:text-cyan-400 mb-4">{currentTranslations.generatedCommandTitle || "Generated Command"}</h3>
+      <h3 className="text-xl font-semibold text-cyan-600 dark:text-cyan-400 mb-4">{currentTranslations.generatedCommandTitle || currentTranslations.generateCommands || "Generated Command"}</h3>
       <pre className="bg-gray-800 text-green-400 p-4 rounded overflow-x-auto whitespace-pre-wrap break-words">
         {command}
       </pre>
       {explanation && (
         <div className="mt-4">
-          <h4 className="font-medium text-gray-700 dark:text-gray-300">{currentTranslations.explanation || "Explanation"}</h4>
+          <h4 className="font-medium text-gray-700 dark:text-gray-300">{currentTranslations.explanation || currentTranslations.explanationTitle || "Explanation"}</h4>
           <div
             className="prose prose-sm dark:prose-invert mt-1 text-gray-600 dark:text-gray-400"
             dangerouslySetInnerHTML={{ __html: explanation.replace(/\n/g, '<br />') }}
@@ -71,7 +71,7 @@ const ScriptCard = ({ filename, script_lines = [], lang }) => {
 
   return (
     <div className="card bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md w-full max-w-lg">
-      <h3 className="text-xl font-semibold text-cyan-600 dark:text-cyan-400 mb-4">{currentTranslations.scriptTitle || "Generated Script"}</h3>
+      <h3 className="text-xl font-semibold text-cyan-600 dark:text-cyan-400 mb-4">{currentTranslations.scriptTitle || currentTranslations.generateScript || "Generated Script"}</h3>
       <div className="flex justify-between items-center mb-2">
         <span className="text-sm text-gray-500 dark:text-gray-400">{filename || 'script.sh'}</span>
         <button
@@ -143,7 +143,7 @@ function App() { // تغییر نام تابع به App اگر این کامپو
   const handleApiCall = async (mode, formData) => {
     resetStateForNewRequest();
     try {
-      const result = await callApi({ // استفاده از تابع callApi که به صورت named export شده
+      const result = await callApi({ // استفاده از تابع callApi که الان تعریف شده
         mode,
         userInput: formData.userInput,
         os: formData.os,
@@ -151,7 +151,10 @@ function App() { // تغییر نام تابع به App اگر این کامپو
         cli: formData.cli,
         lang
       }, (stage) => {
-        setLoadingMessage(stage === 'fetching' ? currentTranslations.fetching : currentTranslations.connecting); // فرض بر این است که apiService ترجمه‌ها را نیز ارسال می‌کند یا اینجا تعریف شده‌اند
+        // ترجمه‌های 'fetching' و 'connecting' در فایل t وجود ندارند، پس مقدار پیش‌فرض انگلیسی استفاده می‌شود
+        // اگر بخواید این پیام‌ها هم ترجمه بشن، باید به فایل t اضافه بشه
+        setLoadingMessage(stage === 'fetching' ? 'Fetching data...' : 'Connecting...');
+        // یا استفاده از ترجمه اگر وجود داشته باشه: setLoadingMessage(currentTranslations[stage] || (stage === 'fetching' ? 'Fetching data...' : 'Connecting...'));
       });
 
       // بر اساس حالت (mode) نتیجه را پردازش کن
@@ -186,7 +189,7 @@ function App() { // تغییر نام تابع به App اگر این کامپو
   // توابع هندلر برای هر تب
   const handleGenerate = (formData) => handleApiCall('generate', formData);
   const handleExplain = (formData) => handleApiCall('explain', formData);
-  const handleAnalyze = (formData) => handleApiCall('analyze', formData);
+  const handleAnalyze = (formData) => handleApiCall('analyze', formData); // تحلیل مثل توضیح عمل می‌کند
   const handleScript = (formData) => handleApiCall('script', formData);
 
   return (
