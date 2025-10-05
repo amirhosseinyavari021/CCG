@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next'; // Correct import
-import FeedbackCard from './FeedbackCard';
+import { useTranslation } from 'react-i18next';
 import MobileDrawer from './MobileDrawer';
-import logo from '../../assets/logo.svg'; // Adjust path if needed
 
 const Header = ({ onLanguageChange, currentLanguage, usageCount, onFeedbackOpen }) => {
-    const { t } = useTranslation(); // Use hook
+    const { t } = useTranslation();
 
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -20,7 +18,7 @@ const Header = ({ onLanguageChange, currentLanguage, usageCount, onFeedbackOpen 
     return (
         <header className="bg-gray-900 text-white p-4 flex justify-between items-center relative z-10 md:relative">
             <div className="flex items-center space-x-4">
-                <img src={logo} alt="AY-CMDGEN Logo" className="h-8 w-8" />
+                <img src="/logo.svg" alt="AY-CMDGEN Logo" className="h-8 w-8" />
                 <h1 className="text-xl font-bold hidden md:block">AY-CMDGEN v2.6.9</h1>
                 <h1 className="text-xl font-bold md:hidden">CMDGEN</h1>
             </div>
