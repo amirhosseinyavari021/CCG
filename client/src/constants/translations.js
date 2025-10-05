@@ -1,4 +1,5 @@
-export const translations = {
+// Default export for easier import in App.js
+export default {
   en: {
     translation: {
       os: 'Operating System *',
