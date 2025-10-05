@@ -1,200 +1,162 @@
-// client/src/App.js
-import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { Toaster } from 'react-hot-toast';
-import { callApi } from './api/apiService';
+import React, { useState, useEffect } from 'react';
+import { useTranslation, initReactI18next } from 'i18next';
+import i18n from 'i18next';
+import Backend from 'i18next-http-backend';
+import { osOptions } from './constants/osDetails';
 import { translations } from './constants/translations';
-
-// Components
 import Header from './components/Header';
 import Form from './components/Form';
-import LoadingSpinner from './components/common/LoadingSpinner';
+import CommandCard from './components/CommandCard';
+import ErrorAnalysis from './components/ErrorAnalysis';
+import AboutModal from './components/AboutModal';
+import FeedbackCard from './components/FeedbackCard';
+import './index.css';
 
-// Lazy load components
-const AboutModal = lazy(() => import('./components/AboutModal'));
-const MobileDrawer = lazy(() => import('./components/MobileDrawer'));
-const FeedbackCard = lazy(() => import('./components/FeedbackCard'));
-const { GeneratedCommandCard, ExplanationCard, ScriptCard } = lazy(() => import('./components/CommandCard'));
-const ErrorAnalysis = lazy(() => import('./components/ErrorAnalysis')); // Assuming this might be used later
-
-function App() {
-  const [lang, setLang] = useState('en');
-  const [theme, setTheme] = useState('dark');
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('');
-  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [showFeedback, setShowFeedback] = useState(false);
-
-  // CHANGED: Consolidated state for results
-  const [results, setResults] = useState([]);
-  const [currentMode, setCurrentMode] = useState(null); // 'generate', 'explain', 'script'
-
-  const currentTranslations = translations[lang];
-
-  useEffect(() => {
-    // Theme initialization
-    const savedTheme = localStorage.getItem('theme') || 'dark';
-    setTheme(savedTheme);
-    document.documentElement.className = savedTheme;
-
-    // Language initialization
-    const savedLang = localStorage.getItem('lang') || 'en';
-    setLang(savedLang);
-
-    // Feedback prompt logic
-    const usageCount = parseInt(localStorage.getItem('usageCount') || '0', 10);
-    const feedbackRequested = localStorage.getItem('feedbackRequested') === 'true';
-    if (usageCount > 20 && !feedbackRequested) {
-      setShowFeedback(true);
-      localStorage.setItem('feedbackRequested', 'true');
+// Initialize i18next
+i18n
+  .use(Backend)
+  .use(initReactI18next)
+  .init({
+    resources: translations,
+    lng: 'en',
+    fallbackLng: 'en',
+    interpolation: {
+      escapeValue: false
     }
+  });
+
+const App = () => {
+  const { t, i18n } = useTranslation();
+  const [os, setOs] = useState('linux');
+  const [osVersion, setOsVersion] = useState('');
+  const [shell, setShell] = useState('bash');
+  const [request, setRequest] = useState('');
+  const [response, setResponse] = useState(null);
+  const [mode, setMode] = useState('generate'); // 'generate', 'script', 'explain'
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [currentLanguage, setCurrentLanguage] = useState('en');
+  const [usageCount, setUsageCount] = useState(0);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+
+  // Load usage count from localStorage
+  useEffect(() => {
+    const savedUsage = localStorage.getItem('cmdgenUsageCount') || 0;
+    setUsageCount(parseInt(savedUsage, 10));
+    i18n.changeLanguage(localStorage.getItem('cmdgenLanguage') || 'en');
   }, []);
 
-  const handleLangChange = (newLang) => {
-    setLang(newLang);
-    localStorage.setItem('lang', newLang);
-    document.documentElement.dir = newLang === 'fa' ? 'rtl' : 'ltr';
+  // Save language change
+  const handleLanguageChange = (lang) => {
+    i18n.changeLanguage(lang);
+    setCurrentLanguage(lang);
+    localStorage.setItem('cmdgenLanguage', lang);
   };
 
-  const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
-    document.documentElement.className = newTheme;
+  // Track usage
+  const incrementUsage = () => {
+    const newCount = usageCount + 1;
+    setUsageCount(newCount);
+    localStorage.setItem('cmdgenUsageCount', newCount.toString());
   };
 
-  const resetStateForNewRequest = () => {
-    setResults([]);
-    setCurrentMode(null);
+  // API call handler
+  const callApi = async (selectedMode) => {
+    if (!request.trim()) return;
     setIsLoading(true);
-    setLoadingMessage(currentTranslations.loading);
-  };
-
-  const handleApiCall = async (mode, formData) => {
-    resetStateForNewRequest();
-    setCurrentMode(mode); // Set the current mode
-
+    setError(null);
     try {
-      const result = await callApi(
-        { ...formData, mode, lang },
-        (stage) => {
-          setLoadingMessage(stage === 'fetching' ? currentTranslations.fetching : currentTranslations.connecting);
-        }
-      );
-
-      // NEW: Handle response based on mode
-      if (result && result.finalData) {
-        switch (mode) {
-          case 'generate':
-            setResults(result.finalData.commands || []);
-            break;
-          case 'explain':
-            setResults(result.finalData.explanation ? [result.finalData] : []);
-            break;
-          case 'script':
-            setResults(result.finalData.script_lines ? [result.finalData] : []);
-            break;
-          default:
-            setResults([]);
-        }
-      } else {
-        // Handle cases where parsing might fail or return nothing
-        setResults([{ error: currentTranslations.errorParse }]);
+      // Simulate API call (replace with actual apiService call)
+      // For now, mock response based on mode
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate delay
+      const mockResponse = {
+        commands: selectedMode === 'generate' ? ['ls -la'] : selectedMode === 'script' ? ['#!/bin/bash\necho "Hello"'] : ['This command lists files'],
+        explanations: ['Lists all files'],
+        warnings: ['Be careful with permissions']
+      };
+      setResponse({
+        ...mockResponse,
+        mode: selectedMode
+      });
+      incrementUsage();
+      if (usageCount + 1 >= 20) {
+        setIsFeedbackOpen(true); // Auto-open after 20 uses
       }
-    } catch (error) {
-      console.error(`Error in ${mode} mode:`, error);
-      setResults([{ error: error.message || currentTranslations.errorGeneral }]);
+    } catch (err) {
+      setError(t('apiError'));
     } finally {
       setIsLoading(false);
-      // Increment usage count after a successful call
-      const usage = parseInt(localStorage.getItem('usageCount') || '0', 10);
-      localStorage.setItem('usageCount', (usage + 1).toString());
     }
   };
 
-  const handleGenerate = (formData) => handleApiCall('generate', formData);
-  const handleExplain = (formData) => handleApiCall('explain', formData);
-  const handleScript = (formData) => handleApiCall('script', formData);
+  const onGenerateCommand = () => {
+    setMode('generate');
+    callApi('generate');
+  };
 
-  // NEW: Render results based on currentMode
-  const renderResults = () => {
-    if (results.length === 0) return null;
+  const onGenerateScript = () => {
+    setMode('script');
+    callApi('script');
+  };
 
-    // Handle errors first
-    if (results[0].error) {
-      return <div className="text-red-500 text-center p-4">{results[0].error}</div>;
-    }
+  const onExplainCommand = () => {
+    setMode('explain');
+    callApi('explain');
+  };
 
-    switch (currentMode) {
-      case 'generate':
-        return results.map((cmd, idx) => (
-          <GeneratedCommandCard key={idx} lang={lang} {...cmd} />
-        ));
-      case 'explain':
-        return <ExplanationCard lang={lang} explanation={results[0].explanation} />;
-      case 'script':
-        return <ScriptCard lang={lang} {...results[0]} />;
-      default:
-        return null;
-    }
+  const handleFeedbackOpen = () => {
+    setIsFeedbackOpen(true);
   };
 
   return (
-    <div className={`min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 font-sans transition-colors duration-300 ${lang === 'fa' ? 'font-vazir' : 'font-inter'}`}>
-      <Toaster position="top-center" reverseOrder={false} />
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col">
       <Header
-        lang={lang}
-        theme={theme}
-        onThemeChange={toggleTheme}
-        onAboutClick={() => setIsAboutModalOpen(true)}
-        onMenuClick={() => setIsDrawerOpen(true)}
-        onLangChange={handleLangChange}
-        onFeedbackClick={() => setShowFeedback(true)} // NEW: Prop for feedback button
+        onLanguageChange={handleLanguageChange}
+        currentLanguage={currentLanguage}
+        usageCount={usageCount}
+        onFeedbackOpen={handleFeedbackOpen}
       />
-
-      <main className="container mx-auto px-4 py-8 md:py-12 flex flex-col items-center">
-        <div className="w-full max-w-3xl text-center">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white">CMDGEN</h1>
-          <p className="mt-4 text-lg text-gray-600 dark:text-gray-300">{currentTranslations.subtitle}</p>
-        </div>
-
-        <div className="w-full max-w-3xl mt-8">
-          <Form
-            onSubmit={handleGenerate}
-            onExplain={handleExplain}
-            onScript={handleScript} // Pass the script handler
-            isLoading={isLoading}
-            loadingMessage={loadingMessage}
-            lang={lang}
-          />
-        </div>
-
-        <div className="w-full max-w-3xl mt-8 space-y-4">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center p-8">
-              <LoadingSpinner />
-              <p className="mt-4 text-cyan-500">{loadingMessage}</p>
-            </div>
-          ) : (
-            <Suspense fallback={<LoadingSpinner />}>
-              {renderResults()}
-            </Suspense>
-          )}
-        </div>
+      <main className="flex-1 p-4 flex flex-col items-center justify-center">
+        <Form
+          os={os}
+          setOs={setOs}
+          osVersion={osVersion}
+          setOsVersion={setOsVersion}
+          shell={shell}
+          setShell={setShell}
+          request={request}
+          setRequest={setRequest}
+          onGenerateCommand={onGenerateCommand}
+          onGenerateScript={onGenerateScript}
+          onExplainCommand={onExplainCommand}
+          isLoading={isLoading}
+          currentLanguage={currentLanguage}
+        />
+        {error && <ErrorAnalysis error={error} />}
+        {response && (
+          <div className="mt-8 w-full max-w-2xl space-y-4">
+            {response.commands.map((cmd, idx) => (
+              <CommandCard
+                key={idx}
+                command={cmd}
+                explanation={response.explanations[idx]}
+                warning={response.warnings[idx]}
+                mode={mode}
+                index={idx}
+              />
+            ))}
+          </div>
+        )}
       </main>
-
-      <footer className="text-center py-6 text-sm text-gray-500 dark:text-gray-400">
-        <p>All rights reserved. &copy;</p>
-        <p>Created by Amirhossein Yavari</p>
-      </footer>
-
-      <Suspense fallback={<div />}>
-        {isAboutModalOpen && <AboutModal isOpen={isAboutModalOpen} onClose={() => setIsAboutModalOpen(false)} lang={lang} />}
-        {isDrawerOpen && <MobileDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} lang={lang} onLangChange={handleLangChange} />}
-        {showFeedback && <FeedbackCard isOpen={showFeedback} onClose={() => setShowFeedback(false)} lang={lang} />}
-      </Suspense>
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
+      <FeedbackCard
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+        usageCount={usageCount}
+      />
     </div>
   );
-}
+};
 
 export default App;

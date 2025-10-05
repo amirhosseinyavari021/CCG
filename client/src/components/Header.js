@@ -1,58 +1,71 @@
-// client/src/components/Header.js
-import React from 'react';
-import { Sun, Moon, Menu, MessageSquareQuote } from 'lucide-react'; // Added Feedback Icon
-import { translations } from '../constants/translations';
+import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import FeedbackCard from './FeedbackCard';
+import MobileDrawer from './MobileDrawer';
+import logo from '../assets/logo.svg';
 
-const Header = ({ lang, theme, onThemeChange, onAboutClick, onMenuClick, onLangChange, onFeedbackClick }) => {
-    const t = translations[lang];
+const Header = ({ onLanguageChange, currentLanguage, usageCount, onFeedbackOpen }) => {
+    const { t } = useTranslation();
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+    const toggleMobileMenu = () => {
+        setIsMobileMenuOpen(!isMobileMenuOpen);
+    };
+
+    const closeMobileMenu = () => {
+        setIsMobileMenuOpen(false);
+    };
 
     return (
-        <header className="sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-lg border-b border-gray-200 dark:border-gray-800">
-            <div className="container mx-auto px-4">
-                <div className="flex items-center justify-between h-16">
-                    <div className="flex items-center">
-                        {/* Logo could go here */}
-                        <span className="text-xl font-bold text-gray-800 dark:text-white">AY-CMDGEN</span>
-                    </div>
-
-                    <div className="hidden md:flex items-center space-x-6">
-                        <button onClick={onAboutClick} className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-cyan-500 dark:hover:text-cyan-400 transition-colors">
-                            {t.about}
-                        </button>
-
-                        {/* NEW: Feedback button in header */}
-                        <button onClick={onFeedbackClick} className="flex items-center text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-cyan-500 dark:hover:text-cyan-400 transition-colors">
-                            <MessageSquareQuote className="w-4 h-4 mr-1" />
-                            {t.feedback}
-                        </button>
-
-                        <div className="flex items-center space-x-4">
-                            <select
-                                value={lang}
-                                onChange={onLangChange}
-                                className="bg-transparent text-sm font-medium text-gray-600 dark:text-gray-300 focus:outline-none"
-                            >
-                                <option value="en">EN</option>
-                                <option value="fa">FA</option>
-                            </select>
-
-                            <button onClick={onThemeChange} aria-label="Toggle theme">
-                                {theme === 'light' ? (
-                                    <Moon className="w-5 h-5 text-gray-600 hover:text-cyan-500" />
-                                ) : (
-                                    <Sun className="w-5 h-5 text-gray-300 hover:text-cyan-400" />
-                                )}
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="md:hidden">
-                        <button onClick={onMenuClick} aria-label="Open menu">
-                            <Menu className="w-6 h-6 text-gray-600 dark:text-gray-300" />
-                        </button>
-                    </div>
-                </div>
+        <header className="bg-gray-900 text-white p-4 flex justify-between items-center relative z-10 md:relative">
+            <div className="flex items-center space-x-4">
+                <img src={logo} alt="AY-CMDGEN Logo" className="h-8 w-8" />
+                <h1 className="text-xl font-bold hidden md:block">AY-CMDGEN v2.6.9</h1>
+                <h1 className="text-xl font-bold md:hidden">CMDGEN</h1>
             </div>
+
+            <div className="hidden md:flex items-center space-x-4">
+                <select
+                    onChange={(e) => onLanguageChange(e.target.value)}
+                    value={currentLanguage}
+                    className="bg-gray-800 text-white px-3 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                    <option value="en">EN</option>
+                    <option value="fa">FA</option>
+                </select>
+                <button
+                    onClick={onFeedbackOpen}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors duration-200 flex items-center space-x-2"
+                >
+                    <span>💬</span>
+                    <span>{t('feedback')}</span>
+                </button>
+                <button
+                    onClick={() => window.open('https://github.com/amirhosseinyavari021/ay-cmdgen', '_blank')}
+                    className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-md transition-colors duration-200"
+                >
+                    {t('about')}
+                </button>
+            </div>
+
+            {/* Mobile Menu Button */}
+            <button
+                onClick={toggleMobileMenu}
+                className="md:hidden text-white p-2"
+            >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+            </button>
+
+            {/* Mobile Drawer */}
+            <MobileDrawer
+                isOpen={isMobileMenuOpen}
+                onClose={closeMobileMenu}
+                onLanguageChange={onLanguageChange}
+                currentLanguage={currentLanguage}
+                onFeedbackOpen={onFeedbackOpen}
+            />
         </header>
     );
 };
