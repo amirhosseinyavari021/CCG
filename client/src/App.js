@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useTranslation, initReactI18next } from 'i18next';
+import { useTranslation } from 'react-i18next';
 import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
 import Backend from 'i18next-http-backend';
 import { osOptions } from './constants/osDetails';
 import { translations } from './constants/translations';
