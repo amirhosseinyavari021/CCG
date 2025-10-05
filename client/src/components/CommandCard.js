@@ -1,9 +1,9 @@
 import React from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next'; // Correct import
 import CommandDisplay from './common/CommandDisplay';
 
 const CommandCard = ({ command, explanation, warning, mode, index }) => {
-    const { t } = useTranslation();
+    const { t } = useTranslation(); // Use hook
 
     // Color schemes based on mode to avoid eye strain (soft, accessible colors)
     const getModeStyles = () => {
