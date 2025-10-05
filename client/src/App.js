@@ -3,7 +3,6 @@ import { ChakraProvider, Box, Flex, useColorModeValue, useColorMode } from '@cha
 import './index.css';
 import Header from './components/Header';
 import Form from './components/Form';
-import CommandDisplay from './components/CommandDisplay';
 import LoadingSpinner from './components/LoadingSpinner';
 import { callApi } from './api/apiService';
 import { t } from './constants/translations';
@@ -174,12 +173,19 @@ function AppContent() {
           ) : (
             <>
               {commandList.length > 0 && (
-                <CommandDisplay
-                  commands={commandList}
-                  explanation={explanation}
-                  lang={lang}
-                  theme={theme}
-                />
+                <Box
+                  bg={useColorModeValue('green.50', 'green.900')}
+                  p={6}
+                  borderRadius="lg"
+                  shadow="md"
+                  maxW="lg"
+                  w="full"
+                >
+                  <h3 className="text-xl font-semibold text-green-800 dark:text-green-200 mb-4">Generated Command/Script</h3>
+                  <pre className="bg-gray-800 text-green-400 p-4 rounded overflow-x-auto">
+                    {commandList.map((cmd, idx) => <div key={idx}>{cmd}</div>)}
+                  </pre>
+                </Box>
               )}
               {explanation && commandList.length === 0 && (
                 <Box
