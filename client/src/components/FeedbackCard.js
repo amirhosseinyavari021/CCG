@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next'; // Correct import
 
 const FEEDBACK_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfkigw8FoqPI2KpIg7Xhy_3CqXAovCVwuPXQGCeKnVaV1PLAg/viewform?usp=header';
 
 const FeedbackCard = ({ onClose, usageCount }) => {
-    const { t } = useTranslation();
+    const { t } = useTranslation(); // Use hook
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleSubmit = () => {

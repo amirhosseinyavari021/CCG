@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next'; // Correct import
 import FeedbackCard from './FeedbackCard';
 import MobileDrawer from './MobileDrawer';
-import logo from '../assets/logo.svg';
+import logo from '../../assets/logo.svg'; // Adjust path if needed
 
 const Header = ({ onLanguageChange, currentLanguage, usageCount, onFeedbackOpen }) => {
-    const { t } = useTranslation();
+    const { t } = useTranslation(); // Use hook
+
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
     const toggleMobileMenu = () => {

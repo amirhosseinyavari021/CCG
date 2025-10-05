@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from 'react-i18next'; // Correct import for useTranslation
 import CustomSelect from './common/CustomSelect';
 import CustomInput from './common/CustomInput';
 import LoadingSpinner from './common/LoadingSpinner';
-import { osOptions, shellOptions } from '../constants/osDetails';
+import { osOptions, shellOptions } from '../../constants/osDetails'; // Adjust path if needed
 
 const Form = ({
   os,
@@ -20,7 +20,7 @@ const Form = ({
   isLoading,
   currentLanguage
 }) => {
-  const { t } = useTranslation();
+  const { t } = useTranslation(); // Use hook, not direct import from translations
 
   const handleGenerateCommand = () => {
     onGenerateCommand();
