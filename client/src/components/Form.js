@@ -4,9 +4,10 @@ import CustomSelect from './common/CustomSelect'; // اطمینان حاصل ک�
 import CustomInput from './common/CustomInput'; // اطمینان حاصل کنید که این فایل وجود دارد
 // حذف Chakra UI
 // import { Button, Flex, Text, VStack, useColorModeValue } from '@chakra-ui/react';
-// تغییر ایمپورت: استفاده از named import
+// تغییر ایمپورت: استفاده از named import برای t
 import { t } from '../constants/translations'; // ایمپورت t به عنوان named export
-import osDetails from '../constants/osDetails';
+// تغییر ایمپورت: استفاده از named import برای osDetails
+import { osDetails } from '../constants/osDetails'; // ایمپورت osDetails به عنوان named export
 
 const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab, onTabChange }) => { // تغییر نام prop از setActiveTab به onTabChange
   const [os, setOs] = useState('linux');
@@ -69,8 +70,8 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab,
         <button
           onClick={() => onTabChange('generate')} // استفاده از onTabChange
           className={`px-4 py-2 text-sm rounded-md ${activeTab === 'generate'
-              ? 'bg-teal-600 text-white'
-              : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+            ? 'bg-teal-600 text-white'
+            : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
             }`}
         >
           {currentTranslations.generateCommands}
@@ -78,8 +79,8 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab,
         <button
           onClick={() => onTabChange('script')} // استفاده از onTabChange
           className={`px-4 py-2 text-sm rounded-md ${activeTab === 'script'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+            ? 'bg-blue-600 text-white'
+            : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
             }`}
         >
           {currentTranslations.generateScript}
@@ -87,8 +88,8 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab,
         <button
           onClick={() => onTabChange('analyze')} // استفاده از onTabChange
           className={`px-4 py-2 text-sm rounded-md ${activeTab === 'analyze'
-              ? 'bg-orange-600 text-white'
-              : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+            ? 'bg-orange-600 text-white'
+            : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
             }`}
         >
           {currentTranslations.analyzeCommand}
@@ -96,8 +97,8 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab,
         <button
           onClick={() => onTabChange('explain')} // استفاده از onTabChange
           className={`px-4 py-2 text-sm rounded-md ${activeTab === 'explain'
-              ? 'bg-purple-600 text-white'
-              : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+            ? 'bg-purple-600 text-white'
+            : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
             }`}
         >
           {currentTranslations.explainCommand}
