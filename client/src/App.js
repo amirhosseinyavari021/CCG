@@ -4,8 +4,8 @@ import './index.css';
 import Header from './components/Header';
 import Form from './components/Form';
 import { callApi } from './api/apiService';
-// ایمپورت ترجمه‌ها مستقیم از constants
-import translations from './constants/translations'; // ترجمه‌ها
+// تغییر ایمپورت: استفاده از named import
+import { t } from './constants/translations'; // ایمپورت t به عنوان named export
 
 // لیزی لود کردن کامپوننت‌هایی که در ابتدا نیاز نیستند
 const AboutModal = lazy(() => import('./components/AboutModal'));
@@ -14,16 +14,17 @@ const FeedbackCard = lazy(() => import('./components/FeedbackCard'));
 
 // کامپوننت نمایش کارت کامند (ساده شده برای نمایش در اینجا)
 const GeneratedCommandCard = ({ command, explanation, warning, lang }) => {
-  const t = translations[lang] || translations['en']; // استفاده از ترجمه مربوط به زبان یا پیش‌فرض انگلیسی
+  // استفاده مستقیم از t[lang]
+  const currentTranslations = t[lang] || t['en'];
   return (
     <div className="card bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md w-full max-w-lg">
-      <h3 className="text-xl font-semibold text-cyan-600 dark:text-cyan-400 mb-4">{t.generatedCommandTitle || "Generated Command"}</h3>
+      <h3 className="text-xl font-semibold text-cyan-600 dark:text-cyan-400 mb-4">{currentTranslations.generatedCommandTitle || "Generated Command"}</h3>
       <pre className="bg-gray-800 text-green-400 p-4 rounded overflow-x-auto whitespace-pre-wrap break-words">
         {command}
       </pre>
       {explanation && (
         <div className="mt-4">
-          <h4 className="font-medium text-gray-700 dark:text-gray-300">{t.explanation || "Explanation"}</h4>
+          <h4 className="font-medium text-gray-700 dark:text-gray-300">{currentTranslations.explanation || "Explanation"}</h4>
           <div
             className="prose prose-sm dark:prose-invert mt-1 text-gray-600 dark:text-gray-400"
             dangerouslySetInnerHTML={{ __html: explanation.replace(/\n/g, '<br />') }}
@@ -39,10 +40,10 @@ const GeneratedCommandCard = ({ command, explanation, warning, lang }) => {
 
 // کامپوننت نمایش توضیح (ساده شده برای نمایش در اینجا)
 const ExplanationCard = ({ explanation, lang }) => {
-  const t = translations[lang] || translations['en'];
+  const currentTranslations = t[lang] || t['en'];
   return (
     <div className="card bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md w-full max-w-lg">
-      <h3 className="text-xl font-semibold text-cyan-600 dark:text-cyan-400 mb-4">{t.explanationTitle || "Explanation"}</h3>
+      <h3 className="text-xl font-semibold text-cyan-600 dark:text-cyan-400 mb-4">{currentTranslations.explanationTitle || "Explanation"}</h3>
       <div
         className="prose prose-sm dark:prose-invert text-gray-600 dark:text-gray-400"
         dangerouslySetInnerHTML={{ __html: explanation.replace(/\n/g, '<br />') }}
@@ -53,7 +54,7 @@ const ExplanationCard = ({ explanation, lang }) => {
 
 // کامپوننت نمایش اسکریپت (ساده شده برای نمایش در اینجا)
 const ScriptCard = ({ filename, script_lines = [], lang }) => {
-  const t = translations[lang] || translations['en'];
+  const currentTranslations = t[lang] || t['en'];
   const fullScript = script_lines.join('\n');
   const downloadScript = () => {
     const blob = new Blob([fullScript], { type: 'text/plain' });
@@ -69,14 +70,14 @@ const ScriptCard = ({ filename, script_lines = [], lang }) => {
 
   return (
     <div className="card bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md w-full max-w-lg">
-      <h3 className="text-xl font-semibold text-cyan-600 dark:text-cyan-400 mb-4">{t.scriptTitle || "Generated Script"}</h3>
+      <h3 className="text-xl font-semibold text-cyan-600 dark:text-cyan-400 mb-4">{currentTranslations.scriptTitle || "Generated Script"}</h3>
       <div className="flex justify-between items-center mb-2">
         <span className="text-sm text-gray-500 dark:text-gray-400">{filename || 'script.sh'}</span>
         <button
           onClick={downloadScript}
           className="text-sm bg-cyan-600 text-white px-3 py-1 rounded hover:bg-cyan-700 transition-colors"
         >
-          {t.download || "Download"}
+          {currentTranslations.download || "Download"}
         </button>
       </div>
       <pre className="bg-gray-800 text-green-400 p-4 rounded overflow-x-auto whitespace-pre-wrap break-words">
@@ -99,7 +100,7 @@ function App() { // تغییر نام تابع به App اگر این کامپو
   const [showFeedback, setShowFeedback] = useState(false); // وضعیت کارت فیدبک
   const [activeTab, setActiveTab] = useState('generate'); // تب فعال (generate, explain, script, analyze)
 
-  const t = translations[lang] || translations['en']; // ترجمه‌های فعلی
+  const currentTranslations = t[lang] || t['en']; // ترجمه‌های فعلی
 
   useEffect(() => {
     // بارگذاری تنظیمات ذخیره شده
@@ -135,7 +136,7 @@ function App() { // تغییر نام تابع به App اگر این کامپو
     setExplanation(null);
     setScriptData(null); // ریست کردن اسکریپت
     setIsLoading(true);
-    setLoadingMessage(t.loading || "Loading...");
+    setLoadingMessage(currentTranslations.loading || "Loading...");
   };
 
   const handleApiCall = async (mode, formData) => {
@@ -149,7 +150,7 @@ function App() { // تغییر نام تابع به App اگر این کامپو
         cli: formData.cli,
         lang
       }, (stage) => {
-        setLoadingMessage(stage === 'fetching' ? t.fetching : t.connecting);
+        setLoadingMessage(stage === 'fetching' ? currentTranslations.fetching : currentTranslations.connecting); // فرض بر این است که apiService ترجمه‌ها را نیز ارسال می‌کند یا اینجا تعریف شده‌اند
       });
 
       // بر اساس حالت (mode) نتیجه را پردازش کن
@@ -157,16 +158,23 @@ function App() { // تغییر نام تابع به App اگر این کامپو
         setCommandList(result.finalData.commands || []);
         setExplanation(result.finalData.explanation || null);
       } else if (mode === 'explain' || mode === 'analyze') {
-         setCommandList([]); // حالت توضیح نباید کامند نشان دهد
-         setExplanation(result.finalData.explanation || null);
+        setCommandList([]); // حالت توضیح نباید کامند نشان دهد
+        setExplanation(result.finalData.explanation || null);
       } else if (mode === 'script') {
-         setScriptData(result.finalData); // فرض بر این است که finalData شامل script_lines و filename است
-         setCommandList([]); // حالت اسکریپت نباید کامند جداگانه نشان دهد
-         setExplanation(result.finalData.explanation || null); // ممکن است توضیح داشته باشد
+        setScriptData(result.finalData); // فرض بر این است که finalData شامل script_lines و filename است
+        setCommandList([]); // حالت اسکریپت نباید کامند جداگانه نشان دهد
+        setExplanation(result.finalData.explanation || null); // ممکن است توضیح داشته باشد
       }
     } catch (error) {
       console.error(`Error in ${mode} mode:`, error);
-      setExplanation(t[`error${mode.charAt(0).toUpperCase() + mode.slice(1)}`] || t.errorGeneral); // استفاده از ترجمه خاص هر حالت یا ترجمه عمومی
+      // استفاده از ترجمه خاص هر حالت یا ترجمه عمومی
+      let errorMessageKey = 'errorGeneral';
+      if (mode === 'generate') errorMessageKey = 'errorGenerating';
+      else if (mode === 'analyze') errorMessageKey = 'errorAnalyzing';
+      else if (mode === 'explain') errorMessageKey = 'errorExplaining';
+      else if (mode === 'script') errorMessageKey = 'errorGenerating'; // یا یک ترجمه خاص اسکریپت اضافه کنید
+
+      setExplanation(currentTranslations[errorMessageKey] || currentTranslations.errorGeneral || "An error occurred."); // استفاده از ترجمه خاص هر حالت یا ترجمه عمومی
       setCommandList([]);
       setScriptData(null);
     } finally {
@@ -195,15 +203,15 @@ function App() { // تغییر نام تابع به App اگر این کامپو
       <main className="container mx-auto px-4 py-8 flex flex-col items-center gap-6">
         <div className="text-center mb-6">
           <h1 className="text-4xl font-bold text-cyan-600 dark:text-cyan-400">CMDGEN</h1>
-          <p className="text-lg text-gray-600 dark:text-gray-400 mt-2">{t.subtitle}</p>
+          <p className="text-lg text-gray-600 dark:text-gray-400 mt-2">{currentTranslations.subtitle}</p>
         </div>
 
         <div className="w-full max-w-lg">
           <Form
             onSubmit={
               activeTab === 'generate' ? handleGenerate :
-              activeTab === 'explain' ? handleExplain :
-              activeTab === 'analyze' ? handleAnalyze : handleScript
+                activeTab === 'explain' ? handleExplain :
+                  activeTab === 'analyze' ? handleAnalyze : handleScript
             }
             onExplain={handleExplain} // اگر فرم نیاز به تابع جداگانه explain داشته باشد
             isLoading={isLoading}

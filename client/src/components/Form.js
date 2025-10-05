@@ -4,7 +4,8 @@ import CustomSelect from './common/CustomSelect'; // اطمینان حاصل ک�
 import CustomInput from './common/CustomInput'; // اطمینان حاصل کنید که این فایل وجود دارد
 // حذف Chakra UI
 // import { Button, Flex, Text, VStack, useColorModeValue } from '@chakra-ui/react';
-import translations from '../constants/translations'; // تغییر نام ایمپورت برای تطبیق با App.js
+// تغییر ایمپورت: استفاده از named import
+import { t } from '../constants/translations'; // ایمپورت t به عنوان named export
 import osDetails from '../constants/osDetails';
 
 const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab, onTabChange }) => { // تغییر نام prop از setActiveTab به onTabChange
@@ -16,7 +17,8 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab,
   const [customOsName, setCustomOsName] = useState('');
   const [customOsVersion, setCustomOsVersion] = useState('');
 
-  const t = translations[lang] || translations['en']; // استفاده از ترجمه مربوط به زبان
+  // استفاده مستقیم از t[lang]
+  const currentTranslations = t[lang] || t['en'];
 
   useEffect(() => {
     if (osDetails[os]) {
@@ -32,11 +34,11 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab,
 
   const validateAndSubmit = (handler) => {
     const newErrors = {};
-    if (!userInput.trim()) newErrors.userInput = t.fieldRequired;
+    if (!userInput.trim()) newErrors.userInput = currentTranslations.fieldRequired;
 
     if (os === 'other') {
-      if (!customOsName.trim()) newErrors.customOsName = t.fieldRequired;
-      if (!customOsVersion.trim()) newErrors.customOsVersion = t.fieldRequired;
+      if (!customOsName.trim()) newErrors.customOsName = currentTranslations.fieldRequired;
+      if (!customOsVersion.trim()) newErrors.customOsVersion = currentTranslations.fieldRequired;
     }
 
     setFormErrors(newErrors);
@@ -59,7 +61,7 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab,
   return (
     <div className="w-full flex flex-col gap-6"> {/* جایگزین VStack */}
       <h2 className="text-lg font-bold text-gray-700 dark:text-gray-200"> {/* جایگزین Text */}
-        {t.formTitle}
+        {currentTranslations.formTitle}
       </h2>
 
       {/* Tabs */}
@@ -71,7 +73,7 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab,
               : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
             }`}
         >
-          {t.generateCommands}
+          {currentTranslations.generateCommands}
         </button>
         <button
           onClick={() => onTabChange('script')} // استفاده از onTabChange
@@ -80,7 +82,7 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab,
               : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
             }`}
         >
-          {t.generateScript}
+          {currentTranslations.generateScript}
         </button>
         <button
           onClick={() => onTabChange('analyze')} // استفاده از onTabChange
@@ -89,7 +91,7 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab,
               : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
             }`}
         >
-          {t.analyzeCommand}
+          {currentTranslations.analyzeCommand}
         </button>
         <button
           onClick={() => onTabChange('explain')} // استفاده از onTabChange
@@ -98,17 +100,17 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab,
               : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
             }`}
         >
-          {t.explainCommand}
+          {currentTranslations.explainCommand}
         </button>
       </div>
 
       <CustomSelect
-        label={t.osLabel}
+        label={currentTranslations.osLabel}
         value={os}
         onChange={(e) => setOs(e.target.value)}
         options={osOptions.map(opt => ({
           value: opt,
-          label: opt === 'other' ? t.osOther : opt.charAt(0).toUpperCase() + opt.slice(1)
+          label: opt === 'other' ? currentTranslations.osOther : opt.charAt(0).toUpperCase() + opt.slice(1)
         }))}
         error={formErrors.os}
       />
@@ -116,23 +118,23 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab,
       {os === 'other' ? (
         <>
           <CustomInput
-            label={t.customOsNameLabel}
+            label={currentTranslations.customOsNameLabel}
             value={customOsName}
             onChange={(e) => setCustomOsName(e.target.value)}
-            placeholder={t.customOsNamePlaceholder}
+            placeholder={currentTranslations.customOsNamePlaceholder}
             error={formErrors.customOsName}
           />
           <CustomInput
-            label={t.customOsVersionLabel}
+            label={currentTranslations.customOsVersionLabel}
             value={customOsVersion}
             onChange={(e) => setCustomOsVersion(e.target.value)}
-            placeholder={t.customOsVersionPlaceholder}
+            placeholder={currentTranslations.customOsVersionPlaceholder}
             error={formErrors.customOsVersion}
           />
         </>
       ) : (
         <CustomSelect
-          label={t.osVersionLabel}
+          label={currentTranslations.osVersionLabel}
           value={osVersion}
           onChange={(e) => setOsVersion(e.target.value)}
           options={osDetails[os]?.versions.map(ver => ({ value: ver, label: ver })) || []}
@@ -141,7 +143,7 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab,
       )}
 
       <CustomSelect
-        label={t.cliLabel}
+        label={currentTranslations.cliLabel}
         value={cli}
         onChange={(e) => setCli(e.target.value)}
         options={
@@ -153,10 +155,10 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab,
       />
 
       <CustomInput
-        label={t.requestLabel}
+        label={currentTranslations.requestLabel}
         value={userInput}
         onChange={(e) => setUserInput(e.target.value)}
-        placeholder={t.requestPlaceholder}
+        placeholder={currentTranslations.requestPlaceholder}
         error={formErrors.userInput}
         isTextarea={true} // اطمینان از اینکه textarea است
       />
@@ -171,9 +173,9 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab,
           {isLoading && loadingMessage ? (
             <span>{loadingMessage}</span> // نمایش پیام لودینگ در دکمه
           ) : (
-            activeTab === 'generate' ? t.generateButton :
-              activeTab === 'script' ? t.scriptButton :
-                activeTab === 'analyze' ? t.analyzeButton : t.explainButton
+            activeTab === 'generate' ? currentTranslations.generateButton :
+              activeTab === 'script' ? currentTranslations.scriptButton :
+                activeTab === 'analyze' ? currentTranslations.analyzeButton : currentTranslations.explainButton
           )}
         </button>
       </div>
