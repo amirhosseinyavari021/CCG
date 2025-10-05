@@ -5,21 +5,14 @@ import Header from './components/Header';
 import Form from './components/Form';
 import CommandDisplay from './components/CommandDisplay';
 import LoadingSpinner from './components/LoadingSpinner';
-import AboutModal from './components/AboutModal';
-import MobileDrawer from './components/MobileDrawer';
-import FeedbackCard from './components/FeedbackCard';
-import ErrorAnalysis from './components/ErrorAnalysis';
 import { callApi } from './api/apiService';
 import { t } from './constants/translations';
 
-// Lazy load components that are not needed on initial render
-const AboutModal = lazy(() => import('./components/AboutModal'));
-const ErrorAnalysis = lazy(() => import('./components/ErrorAnalysis'));
-const MobileDrawer = lazy(() => import('./components/MobileDrawer'));
-const FeedbackCard = lazy(() => import('./components/FeedbackCard'));
+const AboutModalLazy = lazy(() => import('./components/AboutModal'));
+const MobileDrawerLazy = lazy(() => import('./components/MobileDrawer'));
+const FeedbackCardLazy = lazy(() => import('./components/FeedbackCard'));
 
 function AppContent() {
-  // تغییر مقدار پیش‌فرض از 'fa' به 'en'
   const [lang, setLang] = useState('en');
   const [theme, setTheme] = useState('dark');
   const [commandList, setCommandList] = useState([]);
@@ -29,18 +22,14 @@ function AppContent() {
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
-  const [activeTab, setActiveTab] = useState('generate'); // Add state for active tab
+  const [activeTab, setActiveTab] = useState('generate');
 
   useEffect(() => {
-    // بارگذاری theme از localStorage
     const savedTheme = localStorage.getItem('theme') || 'dark';
     setTheme(savedTheme);
-    // بارگذاری lang از localStorage، و اگر وجود نداشت، استفاده از مقدار پیش‌فرض ('en')
-    // تغییر اصلی اینجا است:|| 'en' تضمین می‌کند که اگر localStorage خالی بود، 'en' استفاده شود
     const savedLang = localStorage.getItem('lang') || 'en';
     setLang(savedLang);
 
-    // Check for feedback request after usage
     const usageCount = parseInt(localStorage.getItem('usageCount') || '0', 10);
     const feedbackRequested = localStorage.getItem('feedbackRequested') === 'true';
     if (usageCount >= 20 && !feedbackRequested) {
@@ -99,7 +88,7 @@ function AppContent() {
         cli,
         lang
       });
-      setCommandList([result.finalData.scriptCode]); // For script, we usually get one big script
+      setCommandList([result.finalData.scriptCode || ""]);
       setExplanation(result.finalData.explanation || null);
     } catch (error) {
       console.error('Error generating script:', error);
@@ -120,7 +109,7 @@ function AppContent() {
         cli,
         lang
       });
-      setCommandList([]); // No commands to display for analyze
+      setCommandList([]);
       setExplanation(result.finalData.explanation || null);
     } catch (error) {
       console.error('Error analyzing command:', error);
@@ -209,9 +198,9 @@ function AppContent() {
           )}
 
           <Suspense fallback={<div>Loading...</div>}>
-            <AboutModal isOpen={isAboutModalOpen} onClose={() => setIsAboutModalOpen(false)} lang={lang} />
-            <MobileDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} lang={lang} />
-            <FeedbackCard isOpen={showFeedback} onClose={() => setShowFeedback(false)} lang={lang} />
+            <AboutModalLazy isOpen={isAboutModalOpen} onClose={() => setIsAboutModalOpen(false)} lang={lang} />
+            <MobileDrawerLazy isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} lang={lang} />
+            <FeedbackCardLazy isOpen={showFeedback} onClose={() => setShowFeedback(false)} lang={lang} />
           </Suspense>
         </Flex>
       </Box>
