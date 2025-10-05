@@ -1,5 +1,7 @@
 // client/src/components/common/CustomInput.js
 import React from 'react';
+// حذف: import { translations } from '../constants/translations'; // این وجود نداره
+// استفاده از t: import { t } from '../constants/translations'; // اگر نیاز بود، ولی این کامپوننت معمولاً نیاز نداره
 
 const CustomInput = ({ label, value, onChange, placeholder, error, isTextarea = false }) => {
   const inputElement = isTextarea ? (
@@ -7,9 +9,8 @@ const CustomInput = ({ label, value, onChange, placeholder, error, isTextarea = 
       value={value}
       onChange={onChange}
       placeholder={placeholder}
-      className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 ${
-        error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-      } bg-white dark:bg-gray-700 text-gray-900 dark:text-white`}
+      className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 ${error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+        } bg-white dark:bg-gray-700 text-gray-900 dark:text-white`}
       rows={4} // یا هر تعدادی که مناسب باشه
     />
   ) : (
@@ -18,9 +19,8 @@ const CustomInput = ({ label, value, onChange, placeholder, error, isTextarea = 
       value={value}
       onChange={onChange}
       placeholder={placeholder}
-      className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 ${
-        error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-      } bg-white dark:bg-gray-700 text-gray-900 dark:text-white`}
+      className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 ${error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+        } bg-white dark:bg-gray-700 text-gray-900 dark:text-white`}
     />
   );
 
