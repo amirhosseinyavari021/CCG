@@ -3,7 +3,8 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import './index.css';
 import Header from './components/Header';
 import Form from './components/Form';
-import { callApi } from './api/apiService';
+// تغییر ایمپورت callApi: از default import استفاده می‌کنیم
+import callApi from './api/apiService'; // ایمپورت callApi به عنوان default export
 // تغییر ایمپورت: استفاده از named import
 import { t } from './constants/translations'; // ایمپورت t به عنوان named export
 
@@ -142,7 +143,7 @@ function App() { // تغییر نام تابع به App اگر این کامپو
   const handleApiCall = async (mode, formData) => {
     resetStateForNewRequest();
     try {
-      const result = await callApi({
+      const result = await callApi({ // استفاده از تابع callApi که به صورت default export شده
         mode,
         userInput: formData.userInput,
         os: formData.os,
