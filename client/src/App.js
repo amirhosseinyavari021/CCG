@@ -3,7 +3,6 @@ import { ChakraProvider, Box, Flex, useColorModeValue, useColorMode } from '@cha
 import './index.css';
 import Header from './components/Header';
 import Form from './components/Form';
-import LoadingSpinner from './components/LoadingSpinner';
 import { callApi } from './api/apiService';
 import { t } from './constants/translations';
 
@@ -169,7 +168,10 @@ function AppContent() {
           </Box>
 
           {isLoading ? (
-            <LoadingSpinner message={loadingMessage} />
+            <div className="flex justify-center items-center h-16">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+              <span className="ml-3 text-gray-700 dark:text-gray-300">{loadingMessage}</span>
+            </div>
           ) : (
             <>
               {commandList.length > 0 && (
