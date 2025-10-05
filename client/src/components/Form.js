@@ -1,11 +1,13 @@
+// client/src/components/Form.js
 import React, { useState, useEffect } from 'react';
-import CustomSelect from './common/CustomSelect';
-import CustomInput from './common/CustomInput';
-import { Button, Flex, Text, VStack, useColorModeValue } from '@chakra-ui/react';
-import { t } from '../constants/translations';
+import CustomSelect from './common/CustomSelect'; // اطمینان حاصل کنید که این فایل وجود دارد
+import CustomInput from './common/CustomInput'; // اطمینان حاصل کنید که این فایل وجود دارد
+// حذف Chakra UI
+// import { Button, Flex, Text, VStack, useColorModeValue } from '@chakra-ui/react';
+import translations from '../constants/translations'; // تغییر نام ایمپورت برای تطبیق با App.js
 import osDetails from '../constants/osDetails';
 
-const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab, setActiveTab }) => {
+const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab, onTabChange }) => { // تغییر نام prop از setActiveTab به onTabChange
   const [os, setOs] = useState('linux');
   const [osVersion, setOsVersion] = useState('');
   const [cli, setCli] = useState('');
@@ -13,6 +15,8 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab,
   const [formErrors, setFormErrors] = useState({});
   const [customOsName, setCustomOsName] = useState('');
   const [customOsVersion, setCustomOsVersion] = useState('');
+
+  const t = translations[lang] || translations['en']; // استفاده از ترجمه مربوط به زبان
 
   useEffect(() => {
     if (osDetails[os]) {
@@ -24,7 +28,7 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab,
       setCli(osDetails.other.clis[0]);
       setOsVersion(''); // Clear version when switching to other
     }
-  }, [os]);
+  }, [os, osDetails]);
 
   const validateAndSubmit = (handler) => {
     const newErrors = {};
@@ -53,46 +57,50 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab,
   const osOptions = [...Object.keys(osDetails).filter(k => k !== 'other'), 'other'];
 
   return (
-    <VStack spacing={6} w="full">
-      <Text fontSize="lg" fontWeight="bold" color={useColorModeValue('gray.700', 'gray.200')}>
+    <div className="w-full flex flex-col gap-6"> {/* جایگزین VStack */}
+      <h2 className="text-lg font-bold text-gray-700 dark:text-gray-200"> {/* جایگزین Text */}
         {t.formTitle}
-      </Text>
+      </h2>
 
       {/* Tabs */}
-      <Flex gap={2} mb={4}>
-        <Button
-          onClick={() => setActiveTab('generate')}
-          colorScheme={activeTab === 'generate' ? 'teal' : 'gray'}
-          variant={activeTab === 'generate' ? 'solid' : 'outline'}
-          size="sm"
+      <div className="flex gap-2 mb-4 flex-wrap"> {/* جایگزین Flex */}
+        <button
+          onClick={() => onTabChange('generate')} // استفاده از onTabChange
+          className={`px-4 py-2 text-sm rounded-md ${activeTab === 'generate'
+              ? 'bg-teal-600 text-white'
+              : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+            }`}
         >
           {t.generateCommands}
-        </Button>
-        <Button
-          onClick={() => setActiveTab('script')}
-          colorScheme={activeTab === 'script' ? 'blue' : 'gray'}
-          variant={activeTab === 'script' ? 'solid' : 'outline'}
-          size="sm"
+        </button>
+        <button
+          onClick={() => onTabChange('script')} // استفاده از onTabChange
+          className={`px-4 py-2 text-sm rounded-md ${activeTab === 'script'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+            }`}
         >
           {t.generateScript}
-        </Button>
-        <Button
-          onClick={() => setActiveTab('analyze')}
-          colorScheme={activeTab === 'analyze' ? 'orange' : 'gray'}
-          variant={activeTab === 'analyze' ? 'solid' : 'outline'}
-          size="sm"
+        </button>
+        <button
+          onClick={() => onTabChange('analyze')} // استفاده از onTabChange
+          className={`px-4 py-2 text-sm rounded-md ${activeTab === 'analyze'
+              ? 'bg-orange-600 text-white'
+              : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+            }`}
         >
           {t.analyzeCommand}
-        </Button>
-        <Button
-          onClick={() => setActiveTab('explain')}
-          colorScheme={activeTab === 'explain' ? 'purple' : 'gray'}
-          variant={activeTab === 'explain' ? 'solid' : 'outline'}
-          size="sm"
+        </button>
+        <button
+          onClick={() => onTabChange('explain')} // استفاده از onTabChange
+          className={`px-4 py-2 text-sm rounded-md ${activeTab === 'explain'
+              ? 'bg-purple-600 text-white'
+              : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+            }`}
         >
           {t.explainCommand}
-        </Button>
-      </Flex>
+        </button>
+      </div>
 
       <CustomSelect
         label={t.osLabel}
@@ -150,22 +158,26 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang, activeTab,
         onChange={(e) => setUserInput(e.target.value)}
         placeholder={t.requestPlaceholder}
         error={formErrors.userInput}
-        isTextarea
+        isTextarea={true} // اطمینان از اینکه textarea است
       />
 
-      <Flex gap={4} w="full">
-        <Button
+      <div className="flex gap-4 w-full"> {/* جایگزین Flex */}
+        <button
           onClick={() => validateAndSubmit(onSubmit)}
-          colorScheme={activeTab === 'generate' ? 'teal' : activeTab === 'script' ? 'blue' : activeTab === 'analyze' ? 'orange' : 'purple'}
-          isLoading={isLoading}
-          loadingText={loadingMessage}
-          isDisabled={isLoading}
-          w="full"
+          disabled={isLoading}
+          className={`w-full bg-cyan-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-cyan-700 disabled:bg-gray-400 flex items-center justify-center min-h-[48px] transition-colors ${isLoading ? 'opacity-75 cursor-not-allowed' : ''
+            }`}
         >
-          {activeTab === 'generate' ? t.generateButton : activeTab === 'script' ? t.scriptButton : activeTab === 'analyze' ? t.analyzeButton : t.explainButton}
-        </Button>
-      </Flex>
-    </VStack>
+          {isLoading && loadingMessage ? (
+            <span>{loadingMessage}</span> // نمایش پیام لودینگ در دکمه
+          ) : (
+            activeTab === 'generate' ? t.generateButton :
+              activeTab === 'script' ? t.scriptButton :
+                activeTab === 'analyze' ? t.analyzeButton : t.explainButton
+          )}
+        </button>
+      </div>
+    </div>
   );
 };
 
