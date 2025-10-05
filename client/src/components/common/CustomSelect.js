@@ -1,28 +1,27 @@
-// client/src/components/common/CustomSelect.js
 import React from 'react';
-// حذف: import { translations } from '../constants/translations'; // این وجود نداره
-// استفاده از t: import { t } from '../constants/translations'; // اگر نیاز بود، ولی این کامپوننت معمولاً نیاز نداره
+import { ChevronDown } from 'lucide-react';
 
-const CustomSelect = ({ label, value, onChange, options, placeholder, error }) => {
-    return (
-        <div className="mb-4">
-            {label && <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{label}</label>}
+const CustomSelect = ({ label, value, onChange, options, placeholder, lang, error, isObjectOptions = false }) => (
+    <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
+            {label}&nbsp;<span className="text-red-500">*</span>
+        </label>
+        <div className="relative">
             <select
                 value={value}
-                onChange={onChange}
-                className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 ${error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
-                    } bg-white dark:bg-gray-700 text-gray-900 dark:text-white`}
+                onChange={e => onChange(e.target.value)}
+                className="w-full appearance-none bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500"
             >
-                {placeholder && <option value="">{placeholder}</option>}
-                {options.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                        {opt.label}
-                    </option>
-                ))}
+                <option value="" disabled>{placeholder}</option>
+                {isObjectOptions
+                    ? options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)
+                    : options.map(opt => <option key={opt} value={opt}>{opt}</option>)
+                }
             </select>
-            {error && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>}
+            <ChevronDown className={`w-5 h-5 absolute text-gray-500 dark:text-gray-400 pointer-events-none ${lang === 'fa' ? 'left-2' : 'right-2'} top-1/2 -translate-y-1/2`} />
         </div>
-    );
-};
+        {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+    </div>
+);
 
 export default CustomSelect;

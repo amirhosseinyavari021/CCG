@@ -1,57 +1,46 @@
-// client/src/components/MobileDrawer.js
 import React from 'react';
-import { t } from '../constants/translations';
+import { X, Info } from 'lucide-react';
+import { translations } from '../constants/translations';
 
-const MobileDrawer = ({ isOpen, onClose, lang, onLangChange }) => {
-    if (!isOpen) return null;
+const MobileDrawer = ({ isOpen, onClose, lang, onLangChange, onAboutClick }) => {
+    const t = translations[lang];
 
-    const currentTranslations = t[lang] || t['en'];
+    const handleContentClick = (e) => e.stopPropagation();
 
     return (
-        <div className="fixed inset-0 z-40 md:hidden">
-            <div className="absolute inset-0 bg-black bg-opacity-50" onClick={onClose}></div>
-            <div className="absolute top-0 left-0 h-full w-64 bg-gray-900 shadow-lg transform transition-transform duration-300 ease-in-out">
-                <div className="p-4">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-bold text-cyan-400">{currentTranslations.settings}</h2>
-                        <button onClick={onClose} className="text-gray-400 text-2xl">
-                            &times;
-                        </button>
-                    </div>
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-1">
-                                {currentTranslations.language}
-                            </label>
-                            <select
-                                value={lang}
-                                onChange={(e) => onLangChange(e.target.value)}
-                                className="w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 border-gray-600 bg-gray-800 text-white"
-                            >
-                                <option value="en">{currentTranslations.english}</option>
-                                <option value="fa">{currentTranslations.persian}</option>
-                            </select>
-                        </div>
-                        <div>
-                            <button
-                                onClick={onClose} // یا تابعی برای نمایش مودال درباره
-                                className="w-full text-left px-3 py-2 text-gray-300 hover:bg-gray-800 rounded-md"
-                            >
-                                {currentTranslations.about}
-                            </button>
-                        </div>
-                        <div>
-                            <button
-                                onClick={onClose} // یا تابعی برای نمایش کارت فیدبک
-                                className="w-full text-left px-3 py-2 text-gray-300 hover:bg-gray-800 rounded-md"
-                            >
-                                {currentTranslations.feedback}
-                            </button>
+        <>
+            {/* Overlay */}
+            <div 
+                onClick={onClose} 
+                className={`fixed inset-0 bg-black/50 z-50 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            />
+            {/* Drawer */}
+            <div 
+                className={`fixed top-0 bottom-0 ${lang === 'fa' ? 'right-0' : 'left-0'} w-64 bg-white dark:bg-gray-800 shadow-lg z-50 transform transition-transform duration-300 ${isOpen ? 'translate-x-0' : (lang === 'fa' ? 'translate-x-full' : '-translate-x-full')}`}
+                onClick={handleContentClick}
+            >
+                <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+                    <h2 className="text-lg font-bold text-cyan-600 dark:text-cyan-400">Menu</h2>
+                    <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
+                        <X size={20} />
+                    </button>
+                </div>
+                <div className="p-4 space-y-4">
+                    <button onClick={onAboutClick} className="w-full flex items-center gap-3 text-left p-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <Info size={18} />
+                        <span>{t.about}</span>
+                    </button>
+                    
+                    <div className="pt-2">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 px-2 mb-2">Language</p>
+                         <div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5">
+                            <button onClick={() => onLangChange('en')} className={`flex-1 text-center px-3 py-1 rounded-full text-xs ${lang === 'en' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>EN</button>
+                            <button onClick={() => onLangChange('fa')} className={`flex-1 text-center px-3 py-1 rounded-full text-xs ${lang === 'fa' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>FA</button>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </>
     );
 };
 
