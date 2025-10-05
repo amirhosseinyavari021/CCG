@@ -1,115 +1,95 @@
-// client/src/components/Form.js
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import CustomSelect from './common/CustomSelect';
 import CustomInput from './common/CustomInput';
-import { osDetails } from '../constants/osDetails';
-import { translations } from '../constants/translations';
-import { Bot, FileCode, HelpCircle } from 'lucide-react'; // Icons for buttons
+import LoadingSpinner from './common/LoadingSpinner';
+import { osOptions, shellOptions } from '../constants/osDetails';
 
-const Form = ({ onSubmit, onExplain, onScript, isLoading, lang }) => {
-  const [os, setOs] = useState('linux');
-  const [osVersion, setOsVersion] = useState('');
-  const [cli, setCli] = useState('');
-  const [userInput, setUserInput] = useState('');
-  const currentTranslations = translations[lang];
+const Form = ({
+  os,
+  setOs,
+  osVersion,
+  setOsVersion,
+  shell,
+  setShell,
+  request,
+  setRequest,
+  onGenerateCommand,
+  onGenerateScript,
+  onExplainCommand,
+  isLoading,
+  currentLanguage
+}) => {
+  const { t } = useTranslation();
 
-  useEffect(() => {
-    // Auto-select first available version and cli when OS changes
-    if (os && osDetails[os]) {
-      const details = osDetails[os];
-      if (details.versions.length > 0) {
-        setOsVersion(details.versions[0]);
-      } else {
-        setOsVersion('');
-      }
-      if (details.clis.length > 0) {
-        setCli(details.clis[0]);
-      } else {
-        setCli('');
-      }
-    }
-  }, [os]);
-
-  const validateAndSubmit = (handler) => {
-    if (!userInput.trim()) {
-      alert(currentTranslations.fieldRequired);
-      return;
-    }
-    handler({ os, osVersion, cli, userInput });
+  const handleGenerateCommand = () => {
+    onGenerateCommand();
   };
 
-  const osOptions = Object.keys(osDetails).map(opt => ({
-    value: opt,
-    label: opt.charAt(0).toUpperCase() + opt.slice(1)
-  }));
+  const handleGenerateScript = () => {
+    onGenerateScript();
+  };
 
-  const versionOptions = osDetails[os] ? osDetails[os].versions.map(v => ({ value: v, label: v })) : [];
-  const cliOptions = osDetails[os] ? osDetails[os].clis.map(c => ({ value: c, label: c })) : [];
+  const handleExplainCommand = () => {
+    onExplainCommand();
+  };
 
   return (
-    <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm p-6 md:p-8 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 w-full">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="bg-gray-800 p-6 rounded-lg shadow-lg max-w-md w-full mx-auto md:max-w-2xl">
+      <div className="space-y-4">
         <CustomSelect
-          label={currentTranslations.os}
+          label={t('os')}
           value={os}
-          onChange={(e) => setOs(e.target.value)}
+          onChange={setOs}
           options={osOptions}
         />
         <CustomSelect
-          label={currentTranslations.osVersion}
+          label={t('osVersion')}
           value={osVersion}
-          onChange={(e) => setOsVersion(e.target.value)}
-          options={versionOptions}
-          disabled={!versionOptions.length}
+          onChange={setOsVersion}
+          options={osOptions.find(opt => opt.value === os)?.versions || []}
+          disabled={!os}
         />
         <CustomSelect
-          label={currentTranslations.cli}
-          value={cli}
-          onChange={(e) => setCli(e.target.value)}
-          options={cliOptions}
-          disabled={!cliOptions.length}
+          label={t('shell')}
+          value={shell}
+          onChange={setShell}
+          options={shellOptions}
         />
-      </div>
-
-      <div className="mt-6">
         <CustomInput
-          label={currentTranslations.yourRequest}
-          value={userInput}
-          onChange={(e) => setUserInput(e.target.value)}
-          placeholder={currentTranslations.placeholder}
-          isTextarea={true}
+          label={t('request')}
+          value={request}
+          onChange={setRequest}
+          placeholder={t('requestPlaceholder')}
+          multiline
+          rows={3}
         />
-      </div>
-
-      {/* CHANGED: Updated button layout and added Script button */}
-      <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <button
-          onClick={() => validateAndSubmit(onSubmit)}
-          disabled={isLoading}
-          className="flex items-center justify-center w-full px-4 py-3 font-semibold text-white bg-cyan-600 rounded-lg hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-        >
-          <Bot className="w-5 h-5 mr-2" />
-          {currentTranslations.generate}
-        </button>
-
-        {/* NEW: Script Button with a different color */}
-        <button
-          onClick={() => validateAndSubmit(onScript)}
-          disabled={isLoading}
-          className="flex items-center justify-center w-full px-4 py-3 font-semibold text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-        >
-          <FileCode className="w-5 h-5 mr-2" />
-          {currentTranslations.script}
-        </button>
-
-        <button
-          onClick={() => validateAndSubmit(onExplain)}
-          disabled={isLoading}
-          className="flex items-center justify-center w-full px-4 py-3 font-semibold text-white bg-sky-600 rounded-lg hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-        >
-          <HelpCircle className="w-5 h-5 mr-2" />
-          {currentTranslations.explain}
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2 pt-2">
+          <button
+            onClick={handleGenerateCommand}
+            disabled={isLoading || !request.trim()}
+            className="bg-green-600 hover:bg-green-700 disabled:bg-gray-500 text-white px-6 py-3 rounded-md transition-colors duration-200 flex-1 flex items-center justify-center space-x-2"
+          >
+            {isLoading && <LoadingSpinner size="small" />}
+            <span>{t('generateCommand')}</span>
+          </button>
+          <button
+            onClick={handleGenerateScript}
+            disabled={isLoading || !request.trim()}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-500 text-white px-6 py-3 rounded-md transition-colors duration-200 flex-1 flex items-center justify-center space-x-2"
+          >
+            {isLoading && <LoadingSpinner size="small" />}
+            <span>{t('generateScript')}</span>
+          </button>
+          <button
+            onClick={handleExplainCommand}
+            disabled={isLoading || !request.trim()}
+            className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-500 text-white px-6 py-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
+          >
+            {isLoading && <LoadingSpinner size="small" />}
+            <span>{t('explainCommand')}</span>
+          </button>
+        </div>
       </div>
     </div>
   );
