@@ -1,70 +1,42 @@
-import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import MobileDrawer from './MobileDrawer';
+import React from 'react';
+import { Sun, Moon, Info, Menu } from 'lucide-react';
+import { translations } from '../constants/translations';
 
-const Header = ({ onLanguageChange, currentLanguage, usageCount, onFeedbackOpen }) => {
-    const { t } = useTranslation();
-
-    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
-    const toggleMobileMenu = () => {
-        setIsMobileMenuOpen(!isMobileMenuOpen);
-    };
-
-    const closeMobileMenu = () => {
-        setIsMobileMenuOpen(false);
-    };
+const Header = ({ lang, theme, onThemeChange, onAboutClick, onMenuClick, onLangChange }) => {
+    const t = translations[lang];
+    // Updated the fallback version to 2.3.0
+    const appVersion = process.env.REACT_APP_VERSION || '2.6.9';
 
     return (
-        <header className="bg-gray-900 text-white p-4 flex justify-between items-center relative z-10 md:relative">
-            <div className="flex items-center space-x-4">
-                <img src="/logo.svg" alt="AY-CMDGEN Logo" className="h-8 w-8" />
-                <h1 className="text-xl font-bold hidden md:block">AY-CMDGEN v2.6.9</h1>
-                <h1 className="text-xl font-bold md:hidden">CMDGEN</h1>
+        <header className="bg-white dark:bg-gray-900 shadow-sm sticky top-0 z-40">
+            <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                    {/* Menu button for mobile */}
+                    <button onClick={onMenuClick} className="md:hidden p-1.5 text-gray-600 dark:text-gray-300">
+                        <Menu size={20} />
+                    </button>
+                    <div className="flex items-baseline gap-2">
+                        <h1 className="text-xl font-bold text-cyan-600 dark:text-cyan-400">AY-CMDGEN</h1>
+                        <span className="text-xs font-mono text-gray-400 dark:text-gray-500">v{appVersion}</span>
+                    </div>
+                </div>
+                <div className="flex items-center gap-3">
+                    {/* Desktop buttons */}
+                    <div className="hidden md:flex items-center gap-3">
+                        <button onClick={onAboutClick} className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">
+                            <Info size={16} /> {t.about}
+                        </button>
+                        <div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5">
+                            <button onClick={() => onLangChange('en')} className={`px-2.5 py-1 rounded-full text-xs ${lang === 'en' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>EN</button>
+                            <button onClick={() => onLangChange('fa')} className={`px-2.5 py-1 rounded-full text-xs ${lang === 'fa' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>FA</button>
+                        </div>
+                    </div>
+                    {/* Theme toggle */}
+                    <button onClick={onThemeChange} className="p-1.5 text-gray-600 dark:text-gray-300 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
+                        {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                    </button>
+                </div>
             </div>
-
-            <div className="hidden md:flex items-center space-x-4">
-                <select
-                    onChange={(e) => onLanguageChange(e.target.value)}
-                    value={currentLanguage}
-                    className="bg-gray-800 text-white px-3 py-1 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                    <option value="en">EN</option>
-                    <option value="fa">FA</option>
-                </select>
-                <button
-                    onClick={onFeedbackOpen}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors duration-200 flex items-center space-x-2"
-                >
-                    <span>💬</span>
-                    <span>{t('feedback')}</span>
-                </button>
-                <button
-                    onClick={() => window.open('https://github.com/amirhosseinyavari021/ay-cmdgen', '_blank')}
-                    className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-md transition-colors duration-200"
-                >
-                    {t('about')}
-                </button>
-            </div>
-
-            {/* Mobile Menu Button */}
-            <button
-                onClick={toggleMobileMenu}
-                className="md:hidden text-white p-2"
-            >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-            </button>
-
-            {/* Mobile Drawer */}
-            <MobileDrawer
-                isOpen={isMobileMenuOpen}
-                onClose={closeMobileMenu}
-                onLanguageChange={onLanguageChange}
-                currentLanguage={currentLanguage}
-                onFeedbackOpen={onFeedbackOpen}
-            />
         </header>
     );
 };

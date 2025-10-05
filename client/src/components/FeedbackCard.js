@@ -1,47 +1,32 @@
-import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next'; // Correct import
+import React from 'react';
+import Card from './common/Card';
+import { translations } from '../constants/translations';
 
-const FEEDBACK_FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfkigw8FoqPI2KpIg7Xhy_3CqXAovCVwuPXQGCeKnVaV1PLAg/viewform?usp=header';
+const FeedbackCard = ({ lang, onDismiss }) => {
+    const t = translations[lang];
+    const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSdt_16-wZOgOViET55XwQYAsetfWxQWDW1DBb4yks6AgtOI9g/viewform?usp=header';
 
-const FeedbackCard = ({ onClose, usageCount }) => {
-    const { t } = useTranslation(); // Use hook
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    const handleSubmit = () => {
-        setIsSubmitting(true);
-        // Open the Google Form in a new tab
-        window.open(FEEDBACK_FORM_URL, '_blank');
-        setIsSubmitting(false);
-        onClose(); // Close the modal after opening the form
+    const handleProvideFeedback = () => {
+        window.open(FEEDBACK_URL, '_blank');
+        onDismiss(); // Hide the card after opening the link
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
-                <h2 className="text-xl font-bold mb-4">{t('feedbackTitle')}</h2>
-                <p className="text-gray-600 mb-4">{t('feedbackDescription')}</p>
-                <div className="flex justify-end space-x-2">
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                    >
-                        {t('cancel')}
-                    </button>
-                    <button
-                        onClick={handleSubmit}
-                        disabled={isSubmitting}
-                        className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-md transition-colors"
-                    >
-                        {isSubmitting ? t('openingForm') : t('openForm')}
-                    </button>
+        <div className="mt-8">
+            <Card lang={lang}>
+                <div className="text-center">
+                    <h3 className="text-lg font-semibold text-cyan-600 dark:text-cyan-400">{t.feedbackTitle}</h3>
+                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{t.feedbackSubheader}</p>
+                    <div className="mt-4 flex gap-4 justify-center">
+                        <button onClick={handleProvideFeedback} className="bg-cyan-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-cyan-700">
+                            {t.feedbackAction}
+                        </button>
+                        <button onClick={onDismiss} className="bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600">
+                            {t.feedbackDismiss}
+                        </button>
+                    </div>
                 </div>
-                {usageCount >= 20 && (
-                    <p className="text-sm text-gray-600 mt-4 italic">
-                        {t('feedbackPrompt')}
-                    </p>
-                )}
-            </div>
+            </Card>
         </div>
     );
 };

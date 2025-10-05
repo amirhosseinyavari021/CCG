@@ -1,98 +1,137 @@
-import React, { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import React, { useState, useEffect } from 'react';
+import { Wand2, Search } from 'lucide-react';
+import { translations } from '../constants/translations';
+import { osDetails } from '../constants/osDetails';
+import Card from './common/Card';
 import CustomSelect from './common/CustomSelect';
-import CustomInput from './common/CustomInput';
 import LoadingSpinner from './common/LoadingSpinner';
-import { osOptions, shellOptions } from '../constants/osDetails'; // Fixed path: from components/ to constants/ is up one level
 
-const Form = ({
-  os,
-  setOs,
-  osVersion,
-  setOsVersion,
-  shell,
-  setShell,
-  request,
-  setRequest,
-  onGenerateCommand,
-  onGenerateScript,
-  onExplainCommand,
-  isLoading,
-  currentLanguage
-}) => {
-  const { t } = useTranslation();
-
-  const handleGenerateCommand = () => {
-    onGenerateCommand();
-  };
-
-  const handleGenerateScript = () => {
-    onGenerateScript();
-  };
-
-  const handleExplainCommand = () => {
-    onExplainCommand();
-  };
-
-  return (
-    <div className="bg-gray-800 p-6 rounded-lg shadow-lg max-w-md w-full mx-auto md:max-w-2xl">
-      <div className="space-y-4">
-        <CustomSelect
-          label={t('os')}
-          value={os}
-          onChange={setOs}
-          options={osOptions}
+const CustomInput = ({ label, value, onChange, placeholder, error }) => (
+    <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
+            {label}&nbsp;<span className="text-red-500">*</span>
+        </label>
+        <input
+            type="text"
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            placeholder={placeholder}
+            className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500"
         />
-        <CustomSelect
-          label={t('osVersion')}
-          value={osVersion}
-          onChange={setOsVersion}
-          options={osOptions.find(opt => opt.value === os)?.versions || []}
-          disabled={!os}
-        />
-        <CustomSelect
-          label={t('shell')}
-          value={shell}
-          onChange={setShell}
-          options={shellOptions}
-        />
-        <CustomInput
-          label={t('request')}
-          value={request}
-          onChange={setRequest}
-          placeholder={t('requestPlaceholder')}
-          multiline
-          rows={3}
-        />
-        <div className="flex flex-col sm:flex-row gap-2 pt-2">
-          <button
-            onClick={handleGenerateCommand}
-            disabled={isLoading || !request.trim()}
-            className="bg-green-600 hover:bg-green-700 disabled:bg-gray-500 text-white px-6 py-3 rounded-md transition-colors duration-200 flex-1 flex items-center justify-center space-x-2"
-          >
-            {isLoading && <LoadingSpinner size="small" />}
-            <span>{t('generateCommand')}</span>
-          </button>
-          <button
-            onClick={handleGenerateScript}
-            disabled={isLoading || !request.trim()}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-500 text-white px-6 py-3 rounded-md transition-colors duration-200 flex-1 flex items-center justify-center space-x-2"
-          >
-            {isLoading && <LoadingSpinner size="small" />}
-            <span>{t('generateScript')}</span>
-          </button>
-          <button
-            onClick={handleExplainCommand}
-            disabled={isLoading || !request.trim()}
-            className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-500 text-white px-6 py-3 rounded-md transition-colors duration-200 flex items-center justify-center space-x-2"
-          >
-            {isLoading && <LoadingSpinner size="small" />}
-            <span>{t('explainCommand')}</span>
-          </button>
-        </div>
-      </div>
+        {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
     </div>
-  );
+);
+
+const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang }) => {
+    const t = translations[lang];
+    
+    const [os, setOs] = useState('linux');
+    const [osVersion, setOsVersion] = useState('');
+    const [cli, setCli] = useState('');
+    const [userInput, setUserInput] = useState('');
+    const [formErrors, setFormErrors] = useState({});
+
+    const [customOsName, setCustomOsName] = useState('');
+    const [customOsVersion, setCustomOsVersion] = useState('');
+
+    useEffect(() => {
+        if (os !== 'other') {
+            setOsVersion(osDetails[os].versions[0]);
+            setCli(osDetails[os].clis[0]);
+            setCustomOsName('');
+            setCustomOsVersion('');
+        } else {
+            setCli(osDetails.other.clis[0]);
+            setOsVersion(''); // Clear version when switching to other
+        }
+    }, [os]);
+
+    const validateAndSubmit = (handler) => {
+        const newErrors = {};
+        if (!userInput.trim()) newErrors.userInput = t.fieldRequired;
+
+        let finalOs = os;
+        let finalOsVersion = osVersion;
+
+        if (os === 'other') {
+            if (!customOsName.trim()) newErrors.customOsName = t.fieldRequired;
+            if (!customOsVersion.trim()) newErrors.customOsVersion = t.fieldRequired;
+            finalOs = customOsName.trim();
+            finalOsVersion = customOsVersion.trim();
+        } else {
+            if (!os) newErrors.os = t.fieldRequired;
+            if (!osVersion) newErrors.osVersion = t.fieldRequired;
+        }
+        
+        if (!cli) newErrors.cli = t.fieldRequired;
+        
+        setFormErrors(newErrors);
+        
+        if (Object.keys(newErrors).length === 0) {
+            handler({ os: finalOs, osVersion: finalOsVersion, cli, userInput });
+        }
+    };
+    
+    const osOptions = [...Object.keys(osDetails).filter(k => k !== 'other'), 'other'];
+
+    return (
+        <div>
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2 text-center">CMDGEN</h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-8 text-center text-md">{t.generateSubheader}</p>
+
+            <Card lang={lang}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                    <CustomSelect
+                        label={t.os}
+                        value={os}
+                        onChange={setOs}
+                        options={osOptions.map(opt => ({
+                            value: opt,
+                            label: opt === 'other' ? t.osOther : opt.charAt(0).toUpperCase() + opt.slice(1)
+                        }))}
+                        placeholder={t.os}
+                        lang={lang}
+                        error={formErrors.os}
+                        isObjectOptions={true}
+                    />
+
+                    {os !== 'other' ? (
+                        <>
+                            <CustomSelect label={t.osVersion} value={osVersion} onChange={setOsVersion} options={osDetails[os]?.versions || []} placeholder={t.selectVersion} lang={lang} error={formErrors.osVersion} />
+                            <CustomSelect label={t.cli} value={cli} onChange={setCli} options={osDetails[os]?.clis || []} placeholder={t.selectCli} lang={lang} error={formErrors.cli} />
+                        </>
+                    ) : (
+                       <>
+                            <CustomInput label={t.customOsLabel} value={customOsName} onChange={setCustomOsName} placeholder={t.customOsPlaceholder} error={formErrors.customOsName} />
+                            <CustomInput label={t.customOsVersionLabel} value={customOsVersion} onChange={setCustomOsVersion} placeholder={t.customOsVersionPlaceholder} error={formErrors.customOsVersion} />
+                       </>
+                    )}
+                </div>
+
+                {os === 'other' && (
+                    <div className="mb-4">
+                        <CustomSelect label={t.cli} value={cli} onChange={setCli} options={osDetails.other.clis} placeholder={t.selectCli} lang={lang} error={formErrors.cli} />
+                    </div>
+                )}
+
+                <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.questionLabel}</label>
+                    <textarea value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder={t.questionPlaceholder} className="w-full h-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-cyan-500 resize-none" />
+                    {formErrors.userInput && <p className="text-red-500 text-xs mt-1">{formErrors.userInput}</p>}
+                </div>
+
+                <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button onClick={() => validateAndSubmit(onSubmit)} disabled={isLoading} className="w-full bg-cyan-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-cyan-700 disabled:bg-gray-400 flex items-center justify-center min-h-[48px] transition-colors">
+                        {isLoading ? <LoadingSpinner/> : <><Wand2 size={18} /><span className="ml-2">{t.generate}</span></>}
+                    </button>
+                    <button onClick={() => validateAndSubmit(onExplain)} disabled={isLoading} className="w-full bg-sky-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-sky-700 disabled:bg-gray-400 flex items-center justify-center min-h-[48px] transition-colors">
+                        {isLoading ? <LoadingSpinner/> : <><Search size={18} /><span className="ml-2">{t.explain}</span></>}
+                    </button>
+                </div>
+                {isLoading && <p className="text-center text-sm text-gray-500 mt-2">{loadingMessage}</p>}
+            </Card>
+        </div>
+    );
 };
 
 export default Form;
