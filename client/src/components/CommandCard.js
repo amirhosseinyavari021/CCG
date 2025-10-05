@@ -1,73 +1,85 @@
-import React from 'react';
-import { Bot, FileCode2, Terminal } from 'lucide-react';
-import Card from './common/Card';
-import CommandDisplay from './common/CommandDisplay';
+// client/src/components/CommandCard.js
+import React, { useState } from 'react';
+import { Copy, Download, Check } from 'lucide-react';
 import { translations } from '../constants/translations';
+import { toast } from 'react-hot-toast';
 
-// For "Generate" mode
-export const GeneratedCommandCard = ({ command, explanation, warning, lang }) => {
+// Helper component for copying
+const CopyButton = ({ text, lang }) => {
+    const [copied, setCopied] = useState(false);
+    const handleCopy = () => {
+        navigator.clipboard.writeText(text);
+        setCopied(true);
+        toast.success(translations[lang].copied);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
     return (
-        <Card lang={lang}>
-            <div className="flex justify-between items-center mb-3">
-                <h4 className="flex items-center gap-2 text-lg font-semibold text-cyan-600 dark:text-cyan-400">
-                    <Terminal size={18} /> Command
-                </h4>
-            </div>
-            <CommandDisplay command={command} lang={lang} />
-            {explanation && <p className="mt-3 text-gray-600 dark:text-gray-300 text-sm">{explanation}</p>}
-            {warning && warning.trim() !== '' && <p className="mt-2 text-xs text-amber-600 dark:text-amber-400 italic">{warning}</p>}
-        </Card>
+        <button onClick={handleCopy} className="absolute top-3 right-3 p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md transition-all">
+            {copied ? <Check size={16} className="text-green-400" /> : <Copy size={16} />}
+        </button>
     );
 };
 
-// For "Explain" mode
-export const ExplanationCard = ({ explanation, lang }) => {
-    const t = translations[lang];
-    return (
-        <div className="mt-6 max-w-2xl mx-auto">
-            <Card lang={lang}>
-                <h3 className="text-lg font-bold text-cyan-600 dark:text-cyan-400 flex items-center gap-2 mb-4">
-                    <Bot size={18} /> {t.detailedExplanation}
-                </h3>
-                <div 
-                    className="prose prose-sm dark:prose-invert text-gray-700 dark:text-gray-300 max-w-none" 
-                    dangerouslySetInnerHTML={{ __html: explanation.replace(/\n/g, '<br />').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} 
-                />
-            </Card>
-        </div>
-    );
-};
+// Card for "Generate" mode
+export const GeneratedCommandCard = ({ command, explanation, warning, lang }) => (
+    <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 relative text-left">
+        <pre className="text-sm text-green-300 bg-black/30 p-3 rounded-md overflow-x-auto">
+            <code>{command}</code>
+        </pre>
+        <CopyButton text={command} lang={lang} />
+        <p className="mt-3 text-sm text-gray-300">{explanation}</p>
+        {warning && warning.trim() !== '' && (
+            <p className="mt-2 text-xs text-amber-400 italic border-l-2 border-amber-400 pl-2">
+                <span className="font-bold">{translations[lang].warning}:</span> {warning}
+            </p>
+        )}
+    </div>
+);
 
-// For "Script" mode
-export const ScriptCard = ({ filename, script_lines = [], lang }) => {
-    const t = translations[lang];
+// Card for "Explain" mode
+export const ExplanationCard = ({ explanation, lang }) => (
+    <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 relative text-left prose prose-invert prose-sm max-w-none">
+        <div dangerouslySetInnerHTML={{ __html: explanation.replace(/\n/g, '<br />').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+    </div>
+);
+
+// Card for "Script" mode
+export const ScriptCard = ({ script_lines = [], explanation, lang }) => {
     const fullScript = script_lines.join('\n');
-  
+    const t = translations[lang];
+
     const downloadScript = () => {
         const blob = new Blob([fullScript], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = filename;
+        a.download = `script-${Date.now()}.sh`; // Generic filename
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        toast.success(t.downloaded);
     };
 
     return (
-        <div className="mt-6 max-w-2xl mx-auto">
-            <Card lang={lang}>
-                <div className="flex justify-between items-center mb-3">
-                    <h4 className="flex items-center gap-2 text-lg font-semibold text-cyan-600 dark:text-cyan-400">
-                        <FileCode2 size={18} /> {filename}
-                    </h4>
-                    <button onClick={downloadScript} className="flex items-center gap-1 text-sm text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 transition-colors">
-                        {t.downloadScript}
-                    </button>
-                </div>
-                <CommandDisplay command={fullScript} lang={lang} />
-            </Card>
+        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 relative text-left">
+            <div className="flex justify-between items-center mb-2">
+                <h3 className="font-semibold text-lg">{t.generatedScript}</h3>
+                <button onClick={downloadScript} className="flex items-center px-3 py-1.5 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 rounded-md transition-colors">
+                    <Download size={14} className="mr-1.5" />
+                    {t.download}
+                </button>
+            </div>
+            <p className="text-sm text-gray-300 mb-3">{explanation}</p>
+            <div className="relative">
+                <pre className="text-sm text-green-300 bg-black/30 p-3 rounded-md overflow-x-auto max-h-80">
+                    <code>{fullScript}</code>
+                </pre>
+                <CopyButton text={fullScript} lang={lang} />
+            </div>
         </div>
     );
 };
+
+export default { GeneratedCommandCard, ExplanationCard, ScriptCard };
