@@ -1,5 +1,7 @@
 // client/src/components/common/CustomSelect.js
 import React from 'react';
+// حذف: import { translations } from '../constants/translations'; // این وجود نداره
+// استفاده از t: import { t } from '../constants/translations'; // اگر نیاز بود، ولی این کامپوننت معمولاً نیاز نداره
 
 const CustomSelect = ({ label, value, onChange, options, placeholder, error }) => {
     return (

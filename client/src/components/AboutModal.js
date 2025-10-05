@@ -1,42 +1,34 @@
+// client/src/components/AboutModal.js
 import React from 'react';
-import { X } from 'lucide-react';
-import { translations } from '../constants/translations';
+// حذف: import { translations } from '../constants/translations'; // این وجود نداره
+// ایمپورت t:
+import { t } from '../constants/translations';
 
-const AboutModal = ({ lang, onClose, onLangChange }) => {
-    const t = translations[lang];
+const AboutModal = ({ isOpen, onClose, lang }) => {
+    if (!isOpen) return null;
 
-    // Prevent modal close when clicking inside the card
-    const handleModalContentClick = (e) => e.stopPropagation();
+    const currentTranslations = t[lang] || t['en'];
 
     return (
-        <div 
-            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" 
-            onClick={onClose}
-        >
-            <div 
-                className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-sm p-5 shadow-lg" 
-                onClick={handleModalContentClick}
-            >
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">About CMDGEN</h2>
-                    <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
-                        <X size={18} />
-                    </button>
-                </div>
-                <div className="space-y-4 text-gray-700 dark:text-gray-300">
-                    <div>
-                        <h3 className="font-medium text-cyan-600 dark:text-cyan-400">{t.aboutMeTitle}</h3>
-                        <p className="text-sm">{t.aboutMeText}</p>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+                <div className="p-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-2xl font-bold text-cyan-600 dark:text-cyan-400">{currentTranslations.about}</h2>
+                        <button
+                            onClick={onClose}
+                            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-2xl"
+                        >
+                            &times;
+                        </button>
                     </div>
-                    <div>
-                        <h3 className="font-medium text-cyan-600 dark:text-cyan-400">{t.aboutToolTitle}</h3>
-                        <p className="text-sm">{t.aboutToolText}</p>
-                    </div>
-                    <div className="flex items-center justify-center pt-2">
-                        <div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5">
-                            <button onClick={() => onLangChange('en')} className={`px-3 py-1 rounded-full text-xs ${lang === 'en' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>EN</button>
-                            <button onClick={() => onLangChange('fa')} className={`px-3 py-1 rounded-full text-xs ${lang === 'fa' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>FA</button>
-                        </div>
+                    <div className="prose prose-sm dark:prose-invert text-gray-700 dark:text-gray-300">
+                        <p>AY-CMDGEN v2.6.9</p>
+                        <p>{currentTranslations.version}: 2.6.9</p>
+                        <p>{currentTranslations.license}: MIT & Apache 2.0</p>
+                        <p>{currentTranslations.website}: <a href="https://cmdgen.onrender.com" className="text-cyan-600 dark:text-cyan-400 hover:underline">https://cmdgen.onrender.com</a></p>
+                        <p>{currentTranslations.sourceCode}: <a href="https://github.com/amirhosseinyavari021/ay-cmdgen" className="text-cyan-600 dark:text-cyan-400 hover:underline">https://github.com/amirhosseinyavari021/ay-cmdgen</a></p>
+                        <p className="mt-4">{currentTranslations.thankYou}</p>
                     </div>
                 </div>
             </div>
