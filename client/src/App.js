@@ -3,8 +3,8 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import './index.css';
 import Header from './components/Header';
 import Form from './components/Form';
-// تغییر ایمپورت callApi: از default import استفاده می‌کنیم
-import callApi from './api/apiService'; // ایمپورت callApi به عنوان default export
+// تغییر ایمپورت callApi: از named import استفاده می‌کنیم
+import { callApi } from './api/apiService'; // ایمپورت callApi به عنوان named export
 // تغییر ایمپورت: استفاده از named import
 import { t } from './constants/translations'; // ایمپورت t به عنوان named export
 
@@ -88,7 +88,7 @@ const ScriptCard = ({ filename, script_lines = [], lang }) => {
   );
 };
 
-function App() { // تغییر نام تابع به App اگر این کامپوننت اصلی است
+function App() { // تغییر نام تابع به App اگر این کامپورنت اصلی است
   const [lang, setLang] = useState('en'); // زبان پیش‌فرض
   const [theme, setTheme] = useState('dark'); // تم پیش‌فرض
   const [commandList, setCommandList] = useState([]); // لیست کامندها
@@ -143,7 +143,7 @@ function App() { // تغییر نام تابع به App اگر این کامپو
   const handleApiCall = async (mode, formData) => {
     resetStateForNewRequest();
     try {
-      const result = await callApi({ // استفاده از تابع callApi که به صورت default export شده
+      const result = await callApi({ // استفاده از تابع callApi که به صورت named export شده
         mode,
         userInput: formData.userInput,
         os: formData.os,
@@ -276,4 +276,4 @@ function App() { // تغییر نام تابع به App اگر این کامپو
   );
 }
 
-export default App; 
+export default App; // تغییر نام export اگر لازم بود
