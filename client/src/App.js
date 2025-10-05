@@ -1,14 +1,16 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { BrowserRouter } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
-import { translations } from './constants/translations';
-import { callApi } from './api/promptService';
-
+import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { ChakraProvider, Box, Flex, useColorModeValue, useColorMode } from '@chakra-ui/react';
+import './index.css';
 import Header from './components/Header';
 import Form from './components/Form';
-import { GeneratedCommandCard, ExplanationCard } from './components/CommandCard';
-import { PlusCircle, Github } from 'lucide-react';
-import LoadingSpinner from './components/common/LoadingSpinner';
+import CommandDisplay from './components/CommandDisplay';
+import LoadingSpinner from './components/LoadingSpinner';
+import AboutModal from './components/AboutModal';
+import MobileDrawer from './components/MobileDrawer';
+import FeedbackCard from './components/FeedbackCard';
+import ErrorAnalysis from './components/ErrorAnalysis';
+import { callApi } from './api/apiService';
+import { t } from './constants/translations';
 
 // Lazy load components that are not needed on initial render
 const AboutModal = lazy(() => import('./components/AboutModal'));
@@ -20,214 +22,201 @@ function AppContent() {
   // تغییر مقدار پیش‌فرض از 'fa' به 'en'
   const [lang, setLang] = useState('en');
   const [theme, setTheme] = useState('dark');
-
   const [commandList, setCommandList] = useState([]);
   const [explanation, setExplanation] = useState(null);
-
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
-  const [moreCommandsCount, setMoreCommandsCount] = useState(0);
-
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-
-  const [formState, setFormState] = useState({});
-
   const [showFeedback, setShowFeedback] = useState(false);
-
-  const t = translations[lang];
+  const [activeTab, setActiveTab] = useState('generate'); // Add state for active tab
 
   useEffect(() => {
     // بارگذاری theme از localStorage
     const savedTheme = localStorage.getItem('theme') || 'dark';
     setTheme(savedTheme);
-
     // بارگذاری lang از localStorage، و اگر وجود نداشت، استفاده از مقدار پیش‌فرض ('en')
-    // تغییر اصلی اینجا است: || 'en' تضمین می‌کند که اگر localStorage خالی بود، 'en' استفاده شود
+    // تغییر اصلی اینجا است:|| 'en' تضمین می‌کند که اگر localStorage خالی بود، 'en' استفاده شود
     const savedLang = localStorage.getItem('lang') || 'en';
     setLang(savedLang);
-    document.body.dir = savedLang === 'fa' ? 'rtl' : 'ltr';
 
+    // Check for feedback request after usage
     const usageCount = parseInt(localStorage.getItem('usageCount') || '0', 10);
     const feedbackRequested = localStorage.getItem('feedbackRequested') === 'true';
-    if (usageCount >= 15 && !feedbackRequested) {
+    if (usageCount >= 20 && !feedbackRequested) {
       setShowFeedback(true);
+      localStorage.setItem('feedbackRequested', 'true');
     }
   }, []);
 
   const handleLangChange = (newLang) => {
     setLang(newLang);
     localStorage.setItem('lang', newLang);
-    document.body.dir = newLang === 'fa' ? 'rtl' : 'ltr';
-    setIsAboutModalOpen(false);
-    setIsDrawerOpen(false);
   };
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
     localStorage.setItem('theme', newTheme);
-    document.documentElement.className = newTheme;
   };
 
   const resetStateForNewRequest = () => {
     setCommandList([]);
     setExplanation(null);
-    setMoreCommandsCount(0);
     setIsLoading(true);
+    setLoadingMessage(t.loading);
   };
 
-  const incrementUsageCount = () => {
-    const currentCount = parseInt(localStorage.getItem('usageCount') || '0', 10);
-    const newCount = currentCount + 1;
-    localStorage.setItem('usageCount', newCount);
-    if (newCount >= 15 && localStorage.getItem('feedbackRequested') !== 'true') {
-      setShowFeedback(true);
-    }
-  };
-
-  const handleGenerate = async (formData) => {
+  const handleGenerate = async ({ os, osVersion, cli, userInput }) => {
     resetStateForNewRequest();
-    setFormState(formData);
-
-    const apiResult = await callApi(
-      { ...formData, lang, mode: 'generate' },
-      (stage) => setLoadingMessage(stage === 'fetching' ? t.fetching : t.connecting)
-    );
-
-    if (apiResult?.data?.commands) {
-      setCommandList(apiResult.data.commands);
-      incrementUsageCount();
+    try {
+      const result = await callApi({
+        mode: 'generate',
+        userInput,
+        os,
+        osVersion,
+        cli,
+        lang
+      });
+      setCommandList(result.finalData.commands || []);
+      setExplanation(result.finalData.explanation || null);
+    } catch (error) {
+      console.error('Error generating command:', error);
+      setExplanation(t.errorGenerating);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
-  const handleExplain = async (formData) => {
+  const handleScript = async ({ os, osVersion, cli, userInput }) => {
     resetStateForNewRequest();
-    setFormState(formData);
-
-    const apiResult = await callApi(
-      { ...formData, lang, mode: 'explain' },
-      (stage) => setLoadingMessage(stage === 'fetching' ? t.fetching : t.connecting)
-    );
-
-    if (apiResult?.data?.explanation) {
-      setExplanation(apiResult.data.explanation);
-      incrementUsageCount();
+    try {
+      const result = await callApi({
+        mode: 'script',
+        userInput,
+        os,
+        osVersion,
+        cli,
+        lang
+      });
+      setCommandList([result.finalData.scriptCode]); // For script, we usually get one big script
+      setExplanation(result.finalData.explanation || null);
+    } catch (error) {
+      console.error('Error generating script:', error);
+      setExplanation(t.errorGenerating);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
-  const handleMoreCommands = async () => {
-    setIsLoadingMore(true);
-    const iteration = moreCommandsCount + 1;
-    const existing = commandList.map(c => c.command);
-
-    const apiResult = await callApi({ ...formState, lang, mode: 'generate', iteration, existingCommands: existing });
-
-    if (apiResult?.data?.commands) {
-      setCommandList(prev => [...prev, ...apiResult.data.commands]);
-      setMoreCommandsCount(iteration);
+  const handleAnalyze = async ({ os, osVersion, cli, userInput }) => {
+    resetStateForNewRequest();
+    try {
+      const result = await callApi({
+        mode: 'analyze',
+        userInput,
+        os,
+        osVersion,
+        cli,
+        lang
+      });
+      setCommandList([]); // No commands to display for analyze
+      setExplanation(result.finalData.explanation || null);
+    } catch (error) {
+      console.error('Error analyzing command:', error);
+      setExplanation(t.errorAnalyzing);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoadingMore(false);
   };
 
-  const dismissFeedback = () => {
-    setShowFeedback(false);
-    localStorage.setItem('feedbackRequested', 'true');
+  const handleExplain = async ({ os, osVersion, cli, userInput }) => {
+    resetStateForNewRequest();
+    try {
+      const result = await callApi({
+        mode: 'explain',
+        userInput,
+        os,
+        osVersion,
+        cli,
+        lang
+      });
+      setCommandList([]);
+      setExplanation(result.finalData.explanation || null);
+    } catch (error) {
+      console.error('Error explaining command:', error);
+      setExplanation(t.errorExplaining);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200" style={{ fontFamily: lang === 'fa' ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }}>
-      <Toaster
-        position="top-center"
-        reverseOrder={false}
-        toastOptions={{
-          className: 'dark:bg-gray-700 dark:text-white',
-        }}
-      />
-
-      <Suspense fallback={<div />}>
-        {isAboutModalOpen && <AboutModal lang={lang} onClose={() => setIsAboutModalOpen(false)} onLangChange={handleLangChange} />}
-        <MobileDrawer
-          isOpen={isDrawerOpen}
-          lang={lang}
-          onClose={() => setIsDrawerOpen(false)}
+    <ChakraProvider>
+      <Box bg={useColorModeValue('gray.50', 'gray.900')} minHeight="100vh">
+        <Header
           onLangChange={handleLangChange}
-          onAboutClick={() => {
-            setIsAboutModalOpen(true);
-            setIsDrawerOpen(false);
-          }}
+          onToggleTheme={toggleTheme}
+          onOpenAbout={() => setIsAboutModalOpen(true)}
+          onOpenDrawer={() => setIsDrawerOpen(true)}
+          lang={lang}
+          theme={theme}
         />
-      </Suspense>
+        <Flex direction="column" align="center" p={8} gap={6}>
+          <Box textAlign="center" mb={6}>
+            <h1 className="text-4xl font-bold text-white">CMDGEN</h1>
+            <p className="text-lg text-gray-300 mt-2">{t.subtitle}</p>
+          </Box>
 
-      <Header
-        lang={lang}
-        theme={theme}
-        onThemeChange={toggleTheme}
-        onAboutClick={() => setIsAboutModalOpen(true)}
-        onMenuClick={() => setIsDrawerOpen(true)}
-        onLangChange={handleLangChange}
-      />
+          <Box w="full" maxW="lg" p={6} bg={useColorModeValue('white', 'gray.800')} borderRadius="lg" shadow="lg">
+            <Form
+              onSubmit={activeTab === 'generate' ? handleGenerate : activeTab === 'script' ? handleScript : activeTab === 'analyze' ? handleAnalyze : handleExplain}
+              onExplain={handleExplain}
+              isLoading={isLoading}
+              loadingMessage={loadingMessage}
+              lang={lang}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+            />
+          </Box>
 
-      <main className="container mx-auto px-4 py-8 md:py-12 flex-grow">
-        <div className="max-w-2xl mx-auto">
-          <Form
-            onSubmit={handleGenerate}
-            onExplain={handleExplain}
-            isLoading={isLoading}
-            loadingMessage={loadingMessage}
-            lang={lang}
-          />
-
-          {showFeedback && (
-            <Suspense fallback={<div />}>
-              <FeedbackCard lang={lang} onDismiss={dismissFeedback} />
-            </Suspense>
+          {isLoading ? (
+            <LoadingSpinner message={loadingMessage} />
+          ) : (
+            <>
+              {commandList.length > 0 && (
+                <CommandDisplay
+                  commands={commandList}
+                  explanation={explanation}
+                  lang={lang}
+                  theme={theme}
+                />
+              )}
+              {explanation && commandList.length === 0 && (
+                <Box
+                  bg={useColorModeValue('blue.50', 'blue.900')}
+                  p={6}
+                  borderRadius="lg"
+                  shadow="md"
+                  maxW="lg"
+                  w="full"
+                >
+                  <h3 className="text-xl font-semibold text-blue-800 dark:text-blue-200 mb-4">{t.explanationTitle}</h3>
+                  <div className="prose prose-sm dark:prose-invert" dangerouslySetInnerHTML={{ __html: explanation }} />
+                </Box>
+              )}
+            </>
           )}
 
-          <div className="mt-8 space-y-4">
-            {commandList.map((cmd, index) => (
-              <GeneratedCommandCard key={index} {...cmd} lang={lang} />
-            ))}
-          </div>
-
-          {commandList.length > 0 && !isLoading && (
-            <div className="mt-6 text-center">
-              <button onClick={handleMoreCommands} disabled={isLoadingMore} className="w-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-4 py-2.5 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 flex items-center justify-center gap-2 min-h-[48px] transition-colors">
-                {isLoadingMore ? <><LoadingSpinner /> {t.loadingMore}</> : <><PlusCircle size={18} /> {t.moreCommands}</>}
-              </button>
-            </div>
-          )}
-
-          {explanation && <ExplanationCard explanation={explanation} lang={lang} />}
-
-          {(commandList.length > 0 || explanation) && !isLoading && (
-            <Suspense fallback={<div className="text-center mt-10"><LoadingSpinner /></div>}>
-              <ErrorAnalysis {...formState} lang={lang} />
-            </Suspense>
-          )}
-        </div>
-      </main>
-
-      <footer className="bg-white dark:bg-gray-900 py-4 text-center text-gray-500 dark:text-gray-400 text-xs border-t border-gray-200 dark:border-gray-800">
-        <div className="flex justify-center items-center gap-4 mb-2">
-          <a href="https://github.com/amirhosseinyavari021/AY-CMDGEN/" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
-            <Github size={20} />
-          </a>
-        </div>
-        <p>{t.footerLine1}</p>
-        <p className="mt-1">{t.footerLine2}</p>
-      </footer>
-    </div>
+          <Suspense fallback={<div>Loading...</div>}>
+            <AboutModal isOpen={isAboutModalOpen} onClose={() => setIsAboutModalOpen(false)} lang={lang} />
+            <MobileDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} lang={lang} />
+            <FeedbackCard isOpen={showFeedback} onClose={() => setShowFeedback(false)} lang={lang} />
+          </Suspense>
+        </Flex>
+      </Box>
+    </ChakraProvider>
   );
 }
 
-export default function App() {
-  return (
-    <BrowserRouter>
-      <AppContent />
-    </BrowserRouter>
-  );
-}
+export default AppContent;
