@@ -186,9 +186,8 @@ const runSetupWizard = async () => {
         shell = shellOptions[parseInt(shellChoice) - 1];
     }
 
-    rl.close();
-
     if (!os || !shell) {
+        rl.close();
         console.error(chalk.red('\n❌ Invalid selection. Please run `cmdgen config wizard` again.'));
         process.exit(1);
     }
@@ -199,6 +198,9 @@ const runSetupWizard = async () => {
     langOptions.forEach((opt, i) => console.log(chalk.gray(`  ${i + 1}. ${opt}`)));
     const langChoice = await question('> ');
     const selectedLang = ['en', 'fa'][parseInt(langChoice) - 1] || 'en';
+
+    // FIX: Close readline only after all prompts are complete
+    rl.close();
 
     const newConfig = { 'os': os, 'shell': shell, 'osVersion': '', 'lang': selectedLang };
     await setConfig(newConfig);
