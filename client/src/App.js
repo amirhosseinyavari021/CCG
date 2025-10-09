@@ -6,7 +6,7 @@ import { callApi } from './api/promptService';
 
 import Header from './components/Header';
 import Form from './components/Form';
-import { GeneratedCommandCard, ExplanationCard } from './components/CommandCard';
+import { GeneratedCommandCard, ExplanationCard, ScriptCard } from './components/CommandCard';
 import { PlusCircle, Github } from 'lucide-react';
 import LoadingSpinner from './components/common/LoadingSpinner';
 
@@ -22,6 +22,7 @@ function AppContent() {
   
   const [commandList, setCommandList] = useState([]);
   const [explanation, setExplanation] = useState(null);
+  const [script, setScript] = useState(null);
   
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -70,6 +71,7 @@ function AppContent() {
   const resetStateForNewRequest = () => {
     setCommandList([]);
     setExplanation(null);
+    setScript(null);
     setMoreCommandsCount(0);
     setIsLoading(true);
   };
@@ -110,6 +112,25 @@ function AppContent() {
     
     if (apiResult?.data?.explanation) {
       setExplanation(apiResult.data.explanation);
+      incrementUsageCount();
+    }
+    setIsLoading(false);
+  };
+
+  const handleScript = async (formData) => {
+    resetStateForNewRequest();
+    setFormState(formData);
+
+    const apiResult = await callApi(
+        { ...formData, lang, mode: 'script' },
+        (stage) => setLoadingMessage(stage === 'fetching' ? t.fetching : t.connecting)
+    );
+    
+    if (apiResult?.data?.explanation) {
+      setScript({
+        filename: 'generated_script.sh', // Default filename
+        script_lines: apiResult.data.explanation.split('\n')
+      });
       incrementUsageCount();
     }
     setIsLoading(false);
@@ -172,6 +193,7 @@ function AppContent() {
                 <Form 
                     onSubmit={handleGenerate}
                     onExplain={handleExplain}
+                    onScript={handleScript}
                     isLoading={isLoading}
                     loadingMessage={loadingMessage}
                     lang={lang}
@@ -198,8 +220,9 @@ function AppContent() {
                 )}
                 
                 {explanation && <ExplanationCard explanation={explanation} lang={lang} />}
+                {script && <ScriptCard filename={script.filename} script_lines={script.script_lines} lang={lang} />}
                 
-                {(commandList.length > 0 || explanation) && !isLoading && (
+                {(commandList.length > 0 || explanation || script) && !isLoading && (
                     <Suspense fallback={<div className="text-center mt-10"><LoadingSpinner /></div>}>
                       <ErrorAnalysis {...formState} lang={lang} />
                     </Suspense>
