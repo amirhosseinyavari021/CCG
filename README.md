@@ -4,7 +4,7 @@
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-3498db)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Version](https://img.shields.io/badge/Release-v2.7.1-8a2be2)](https://github.com/amirhosseinyavari021/ay-cmdgen/releases)
 [![Website](https://img.shields.io/badge/Live_Demo-HERE-FFD700)](https://cmdgen.onrender.com)
-[![Libraries.io](https://img.shields.io/badge/Listed_on-Libraries.io-4a6fa5)](https://libraries.io/npm/@amirhosseinyavari/ay-cmdgen)
+[![Libraries.io](https://img.shields.io/badge/Listed_on-Libraries.io-4a6fa5)]([https://libraries.io/npm/@amirhosseinyavari/ay-cmdgen](https://libraries.io/npm/@amirhosseinyavari%2Fay-cmdgen))
 [![npm](https://img.shields.io/badge/Published_on-npm-dd1100)](https://www.npmjs.com/package/@amirhosseinyavari/ay-cmdgen)
 
 Generate, analyze, script, and debug command-line instructions with an AI-powered assistant, right in your terminal.
