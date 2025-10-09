@@ -11,6 +11,10 @@ export const osDetails = {
     versions: ['Sequoia (15)', 'Sonoma (14)'],
     clis: ['Zsh', 'Bash']
   },
+  cisco: {
+    versions: ['IOS', 'IOS-XE', 'NX-OS', 'ASA'],
+    clis: ['CLI']
+  },
   other: {
     versions: [], // No predefined versions
     clis: ['Bash', 'Zsh', 'PowerShell', 'CMD', 'Sh'] // Common shells

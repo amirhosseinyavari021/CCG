@@ -16,7 +16,7 @@ export const parseAndConstructData = (textResponse, mode) => {
                 // Clean the command: remove backticks and any leading numbers/periods.
                 const rawCommand = parts[0]?.trim().replace(/^`|`$/g, '').trim() || '';
                 const cleanedCommand = rawCommand.replace(/^\s*\d+[\.\s]*\s*/, '');
-                
+
                 if (!cleanedCommand) return null; // Ignore if the command is empty after cleaning
 
                 return {
@@ -25,24 +25,37 @@ export const parseAndConstructData = (textResponse, mode) => {
                     warning: parts[2]?.trim() || ''
                 };
             }).filter(Boolean); // Clean up any malformed lines
+
+            // If parsing fails, return at least something to avoid crashing
+            if (commands.length === 0) {
+                return { commands: [{ command: trimmedResponse, explanation: "Could not parse the response.", warning: "" }] };
+            }
+
             return { commands };
         }
 
-        if (mode === 'explain') {
-            // The entire response is the explanation content
+        if (mode === 'explain' || mode === 'script') {
+            // For both explain and script, the entire response is the content
             return { explanation: trimmedResponse };
         }
-        
+
         if (mode === 'error') {
             const parts = trimmedResponse.split('|||');
-            if (parts.length < 3) return null;
+            if (parts.length < 3) {
+                // Fallback for non-compliant error responses
+                return {
+                    cause: 'Analysis Result',
+                    explanation: trimmedResponse,
+                    solution: ['No specific command steps could be parsed, please review the explanation above.']
+                };
+            }
             return {
                 cause: parts[0]?.trim() || '',
                 explanation: parts[1]?.trim() || '',
                 solution: parts.slice(2).map(s => s.trim()).filter(s => s)
             };
         }
-        
+
         return null;
 
     } catch (error) {
