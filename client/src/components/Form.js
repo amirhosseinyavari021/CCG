@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Wand2, Search } from 'lucide-react';
+import { Wand2, Search, FileCode2 } from 'lucide-react';
 import { translations } from '../constants/translations';
 import { osDetails } from '../constants/osDetails';
 import Card from './common/Card';
@@ -22,9 +22,9 @@ const CustomInput = ({ label, value, onChange, placeholder, error }) => (
     </div>
 );
 
-const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang }) => {
+const Form = ({ onSubmit, onExplain, onScript, isLoading, loadingMessage, lang }) => {
     const t = translations[lang];
-    
+
     const [os, setOs] = useState('linux');
     const [osVersion, setOsVersion] = useState('');
     const [cli, setCli] = useState('');
@@ -34,15 +34,18 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang }) => {
     const [customOsName, setCustomOsName] = useState('');
     const [customOsVersion, setCustomOsVersion] = useState('');
 
+    const [deviceType, setDeviceType] = useState('router');
+    const [knowledgeLevel, setKnowledgeLevel] = useState('intermediate');
+
     useEffect(() => {
-        if (os !== 'other') {
+        if (os in osDetails && os !== 'other') {
             setOsVersion(osDetails[os].versions[0]);
             setCli(osDetails[os].clis[0]);
             setCustomOsName('');
             setCustomOsVersion('');
         } else {
             setCli(osDetails.other.clis[0]);
-            setOsVersion(''); // Clear version when switching to other
+            setOsVersion('');
         }
     }, [os]);
 
@@ -60,19 +63,21 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang }) => {
             finalOsVersion = customOsVersion.trim();
         } else {
             if (!os) newErrors.os = t.fieldRequired;
-            if (!osVersion) newErrors.osVersion = t.fieldRequired;
+            if (!osVersion && osDetails[os]?.versions.length > 0) newErrors.osVersion = t.fieldRequired;
         }
-        
+
         if (!cli) newErrors.cli = t.fieldRequired;
-        
+
         setFormErrors(newErrors);
-        
+
         if (Object.keys(newErrors).length === 0) {
-            handler({ os: finalOs, osVersion: finalOsVersion, cli, userInput });
+            handler({ os: finalOs, osVersion: finalOsVersion, cli, userInput, deviceType, knowledgeLevel });
         }
     };
-    
+
     const osOptions = [...Object.keys(osDetails).filter(k => k !== 'other'), 'other'];
+    const deviceOptions = ['router', 'switch', 'firewall'];
+    const knowledgeLevelOptions = ['beginner', 'intermediate', 'expert'];
 
     return (
         <div>
@@ -87,7 +92,7 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang }) => {
                         onChange={setOs}
                         options={osOptions.map(opt => ({
                             value: opt,
-                            label: opt === 'other' ? t.osOther : opt.charAt(0).toUpperCase() + opt.slice(1)
+                            label: t[`os_${opt}`] || (opt.charAt(0).toUpperCase() + opt.slice(1))
                         }))}
                         placeholder={t.os}
                         lang={lang}
@@ -101,12 +106,49 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang }) => {
                             <CustomSelect label={t.cli} value={cli} onChange={setCli} options={osDetails[os]?.clis || []} placeholder={t.selectCli} lang={lang} error={formErrors.cli} />
                         </>
                     ) : (
-                       <>
+                        <>
                             <CustomInput label={t.customOsLabel} value={customOsName} onChange={setCustomOsName} placeholder={t.customOsPlaceholder} error={formErrors.customOsName} />
                             <CustomInput label={t.customOsVersionLabel} value={customOsVersion} onChange={setCustomOsVersion} placeholder={t.customOsVersionPlaceholder} error={formErrors.customOsVersion} />
-                       </>
+                        </>
                     )}
                 </div>
+
+                {os === 'cisco' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <CustomSelect
+                            label={t.deviceType}
+                            value={deviceType}
+                            onChange={setDeviceType}
+                            options={deviceOptions.map(opt => ({ value: opt, label: t[`device_${opt}`] }))}
+                            placeholder={t.selectDevice}
+                            lang={lang}
+                            isObjectOptions={true}
+                        />
+                        <CustomSelect
+                            label={t.knowledgeLevel}
+                            value={knowledgeLevel}
+                            onChange={setKnowledgeLevel}
+                            options={knowledgeLevelOptions.map(opt => ({ value: opt, label: t[`level_${opt}`] }))}
+                            placeholder={t.selectLevel}
+                            lang={lang}
+                            isObjectOptions={true}
+                        />
+                    </div>
+                )}
+
+                {os !== 'cisco' && os !== 'other' && (
+                    <div className="mb-4">
+                        <CustomSelect
+                            label={t.knowledgeLevel}
+                            value={knowledgeLevel}
+                            onChange={setKnowledgeLevel}
+                            options={knowledgeLevelOptions.map(opt => ({ value: opt, label: t[`level_${opt}`] }))}
+                            placeholder={t.selectLevel}
+                            lang={lang}
+                            isObjectOptions={true}
+                        />
+                    </div>
+                )}
 
                 {os === 'other' && (
                     <div className="mb-4">
@@ -120,12 +162,15 @@ const Form = ({ onSubmit, onExplain, isLoading, loadingMessage, lang }) => {
                     {formErrors.userInput && <p className="text-red-500 text-xs mt-1">{formErrors.userInput}</p>}
                 </div>
 
-                <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
                     <button onClick={() => validateAndSubmit(onSubmit)} disabled={isLoading} className="w-full bg-cyan-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-cyan-700 disabled:bg-gray-400 flex items-center justify-center min-h-[48px] transition-colors">
-                        {isLoading ? <LoadingSpinner/> : <><Wand2 size={18} /><span className="ml-2">{t.generate}</span></>}
+                        {isLoading ? <LoadingSpinner /> : <><Wand2 size={18} /><span className="ml-2">{t.generate}</span></>}
+                    </button>
+                    <button onClick={() => validateAndSubmit(onScript)} disabled={isLoading} className="w-full bg-purple-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400 flex items-center justify-center min-h-[48px] transition-colors">
+                        {isLoading ? <LoadingSpinner /> : <><FileCode2 size={18} /><span className="ml-2">{t.generateScript}</span></>}
                     </button>
                     <button onClick={() => validateAndSubmit(onExplain)} disabled={isLoading} className="w-full bg-sky-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-sky-700 disabled:bg-gray-400 flex items-center justify-center min-h-[48px] transition-colors">
-                        {isLoading ? <LoadingSpinner/> : <><Search size={18} /><span className="ml-2">{t.explain}</span></>}
+                        {isLoading ? <LoadingSpinner /> : <><Search size={18} /><span className="ml-2">{t.explain}</span></>}
                     </button>
                 </div>
                 {isLoading && <p className="text-center text-sm text-gray-500 mt-2">{loadingMessage}</p>}
