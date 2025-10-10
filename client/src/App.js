@@ -11,7 +11,6 @@ import { PlusCircle, Github } from 'lucide-react';
 import LoadingSpinner from './components/common/LoadingSpinner';
 
 // Lazy load components that are not needed on initial render
-const AboutModal = lazy(() => import('./components/AboutModal'));
 const ErrorAnalysis = lazy(() => import('./components/ErrorAnalysis'));
 const MobileDrawer = lazy(() => import('./components/MobileDrawer'));
 const FeedbackCard = lazy(() => import('./components/FeedbackCard'));
@@ -29,7 +28,6 @@ function AppContent() {
   const [loadingMessage, setLoadingMessage] = useState('');
   const [moreCommandsCount, setMoreCommandsCount] = useState(0);
   
-  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   
   const [formState, setFormState] = useState({}); 
@@ -41,6 +39,7 @@ function AppContent() {
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'dark';
     setTheme(savedTheme);
+    document.documentElement.className = savedTheme;
     
     const savedLang = localStorage.getItem('lang') || 'en';
     setLang(savedLang);
@@ -57,7 +56,6 @@ function AppContent() {
     setLang(newLang);
     localStorage.setItem('lang', newLang);
     document.body.dir = newLang === 'fa' ? 'rtl' : 'ltr';
-    setIsAboutModalOpen(false);
     setIsDrawerOpen(false);
   };
 
@@ -166,16 +164,11 @@ function AppContent() {
        />
        
        <Suspense fallback={<div />}>
-          {isAboutModalOpen && <AboutModal lang={lang} onClose={() => setIsAboutModalOpen(false)} onLangChange={handleLangChange} />}
           <MobileDrawer 
             isOpen={isDrawerOpen} 
             lang={lang}
             onClose={() => setIsDrawerOpen(false)} 
             onLangChange={handleLangChange}
-            onAboutClick={() => {
-              setIsAboutModalOpen(true);
-              setIsDrawerOpen(false);
-            }}
           />
        </Suspense>
        
@@ -183,7 +176,6 @@ function AppContent() {
          lang={lang} 
          theme={theme} 
          onThemeChange={toggleTheme}
-         onAboutClick={() => setIsAboutModalOpen(true)}
          onMenuClick={() => setIsDrawerOpen(true)}
          onLangChange={handleLangChange}
        />
@@ -232,12 +224,14 @@ function AppContent() {
 
         <footer className="bg-white dark:bg-gray-900 py-4 text-center text-gray-500 dark:text-gray-400 text-xs border-t border-gray-200 dark:border-gray-800">
              <div className="flex justify-center items-center gap-4 mb-2">
-                <a href="https://github.com/amirhosseinyavari021/AY-CMDGEN/" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                <a href="https://github.com/amirhosseinyavari021/ay-cmdgen" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
                     <Github size={20} />
                 </a>
              </div>
-             <p>{t.footerLine1}</p>
-             <p className="mt-1">{t.footerLine2}</p>
+             <p>This service belongs to Cando Academy.</p>
+             <p className="mt-1">
+                Created and executed by <a href="mailto:amirhosseinyavari61@gmail.com" className="font-semibold text-amber-600 hover:underline">Amirhossein Yavari</a>.
+             </p>
         </footer>
     </div>
   );
