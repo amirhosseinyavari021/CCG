@@ -1,8 +1,8 @@
 import React from 'react';
-import { X, Info } from 'lucide-react';
+import { X } from 'lucide-react';
 import { translations } from '../constants/translations';
 
-const MobileDrawer = ({ isOpen, onClose, lang, onLangChange, onAboutClick }) => {
+const MobileDrawer = ({ isOpen, onClose, lang, onLangChange }) => {
     const t = translations[lang];
 
     const handleContentClick = (e) => e.stopPropagation();
@@ -20,22 +20,17 @@ const MobileDrawer = ({ isOpen, onClose, lang, onLangChange, onAboutClick }) => 
                 onClick={handleContentClick}
             >
                 <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
-                    <h2 className="text-lg font-bold text-cyan-600 dark:text-cyan-400">Menu</h2>
+                    <h2 className="text-lg font-bold text-amber-600 dark:text-amber-400">Menu</h2>
                     <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
                         <X size={20} />
                     </button>
                 </div>
                 <div className="p-4 space-y-4">
-                    <button onClick={onAboutClick} className="w-full flex items-center gap-3 text-left p-2 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-                        <Info size={18} />
-                        <span>{t.about}</span>
-                    </button>
-                    
                     <div className="pt-2">
                         <p className="text-xs text-gray-500 dark:text-gray-400 px-2 mb-2">Language</p>
                          <div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5">
-                            <button onClick={() => onLangChange('en')} className={`flex-1 text-center px-3 py-1 rounded-full text-xs ${lang === 'en' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>EN</button>
-                            <button onClick={() => onLangChange('fa')} className={`flex-1 text-center px-3 py-1 rounded-full text-xs ${lang === 'fa' ? 'bg-cyan-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>FA</button>
+                            <button onClick={() => onLangChange('en')} className={`flex-1 text-center px-3 py-1 rounded-full text-xs ${lang === 'en' ? 'bg-amber-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>EN</button>
+                            <button onClick={() => onLangChange('fa')} className={`flex-1 text-center px-3 py-1 rounded-full text-xs ${lang === 'fa' ? 'bg-amber-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>FA</button>
                         </div>
                     </div>
                 </div>
