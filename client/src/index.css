@@ -36,7 +36,7 @@ html {
 /* Custom styles for better UI */
 @layer components {
     .btn-primary {
-        @apply w-full bg-cyan-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-cyan-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200;
+        @apply w-full bg-amber-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-amber-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200;
     }
 }
 
