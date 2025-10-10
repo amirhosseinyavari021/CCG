@@ -74,15 +74,23 @@ async function handleFeedback() {
 
 const showHelp = (config = {}) => {
     const { os: osDefault, shell: shellDefault, lang: langDefault, knowledgeLevel: levelDefault, deviceType: deviceDefault } = config;
-    console.log(chalk.cyan(`
-  ██████╗███╗   ███╗██████╗   ██████╗ ███████╗███╗   ██╗
- ██╔════╝████╗ ████║██╔══██╗ ██╔════╝ ██╔════╝████╗  ██║
- ██║     ██╔████╔██║██║  ██║ ██║  ███╗█████╗  ██╔██╗ ██║
- ██║     ██║╚██╔╝██║██║  ██║ ██║   ██║██╔══╝  ██║╚██╗██║
- ╚██████╗██║ ╚═╝ ██║██████╔╝ ╚██████╔╝███████╗██║ ╚████║
-  ╚═════╝╚═╝     ╚═╝╚═════╝  ╚═════╝ ╚══════╝╚═╝  ╚═══╝
+    // Corrected ASCII Art and slogan alignment
+    console.log(chalk.gray(String.raw`
+________/\\\\\\\\\__________________/\\\\\\\\\_______________/\\\\\\\\\\\\_        
+ _____/\\\////////________________/\\\////////______________/\\\//////////__       
+  ___/\\\/_______________________/\\\/______________________/\\\_____________       
+   __/\\\________________________/\\\_______________________\/\\\____/\\\\\\\_      
+    _\/\\\_______________________\/\\\_______________________\/\\\___\/////\\\_     
+     _\//\\\______________________\//\\\______________________\/\\\_______\/\\\_    
+      __\///\\\_____________________\///\\\____________________\/\\\_______\/\\\_   
+       ____\////\\\\\\\\\______________\////\\\\\\\\\___________\//\\\\\\\\\\\\/__  
+        _______\/////////__________________\/////////_____________\////////////____ 
 `));
-    console.log(chalk.bold('cmdgen - Your AI-powered command assistant\n'));
+    console.log(chalk.bold('\n                   (Cando Command Generator)\n'));
+    console.log(`                This service belongs to ${chalk.yellow.bold('Cando')} (cando.ac)`);
+    console.log(`                Created and Run by ${chalk.white.bold('Amirhossein Yavari')}\n`);
+
+    console.log(chalk.bold('CCG - Your AI-powered command assistant\n'));
     console.log(chalk.bold('Usage:'));
     console.log('  cmdgen <command> [options]\n');
     console.log(chalk.bold('Commands:'));
@@ -107,19 +115,19 @@ const showHelp = (config = {}) => {
 const showWelcomeBanner = async () => {
     const config = await getConfig();
     if (config.isFirstRun === false) return;
-    console.log(chalk.bold('\nWelcome to AY-CMDGEN!'));
+    console.log(chalk.bold('\nWelcome to CCG (Cando Command Generator)!'));
     console.log('To get started, please run the setup wizard:');
     console.log(chalk.yellow('  cmdgen config wizard'));
     await setConfig({ isFirstRun: false });
 };
 
 const gracefulExit = () => {
-    console.log(chalk.green(`\n🙏 Thank you for using cmdgen!`));
+    console.log(chalk.green(`\n🙏 Thank you for using CCG!`));
     process.exit(0);
 };
 
 const runSetupWizard = async () => {
-    console.log(chalk.cyan('\n--- CMDGEN Setup Wizard ---'));
+    console.log(chalk.cyan('\n--- CCG Setup Wizard ---'));
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     const question = (query) => new Promise(resolve => rl.question(query, resolve));
 
@@ -174,7 +182,7 @@ const runSetupWizard = async () => {
 const handleConfigCommand = async (action, key, value) => {
     const config = await getConfig();
     if (action === 'show') {
-        console.log(chalk.bold('\nCurrent CMDGEN Configuration:'));
+        console.log(chalk.bold('\nCurrent CCG Configuration:'));
         Object.entries(config).forEach(([k, v]) => {
             if (!['history', 'last_update_check', 'isFirstRun', 'skillLevel'].includes(k) && v) {
                 console.log(`  ${chalk.cyan(k)}: ${chalk.yellow(String(v))}`);
