@@ -20,7 +20,7 @@ const ErrorAnalysisCard = ({ analysis, lang }) => {
     return (
         <div className="mt-6 max-w-2xl mx-auto">
             <Card lang={lang}>
-                <h3 className="text-lg font-bold text-cyan-600 dark:text-cyan-400 flex items-center gap-2 mb-4">
+                <h3 className="text-lg font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2 mb-4">
                     <ShieldAlert size={18} /> {t.errorAnalysis}
                 </h3>
                 <div className="space-y-5">
@@ -76,11 +76,11 @@ const ErrorAnalysis = ({ lang, os, osVersion, cli }) => {
                 <div className="mt-4 flex flex-col gap-4">
                     <div>
                         <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.errorLabel} <span className="text-red-500">*</span></label>
-                        <textarea value={errorInput} onChange={(e) => setErrorInput(e.target.value)} placeholder={t.errorPlaceholder} className="mt-1 w-full h-24 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-cyan-500 resize-none" />
+                        <textarea value={errorInput} onChange={(e) => setErrorInput(e.target.value)} placeholder={t.errorPlaceholder} className="mt-1 w-full h-24 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-amber-500 resize-none" />
                     </div>
                      <div>
                         <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.errorContextLabel}</label>
-                        <textarea value={errorContext} onChange={(e) => setErrorContext(e.target.value)} placeholder={t.errorContextPlaceholder} className="mt-1 w-full h-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-cyan-500 resize-none" />
+                        <textarea value={errorContext} onChange={(e) => setErrorContext(e.target.value)} placeholder={t.errorContextPlaceholder} className="mt-1 w-full h-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-amber-500 resize-none" />
                     </div>
                 </div>
                 <button onClick={handleAnalyze} disabled={isLoading} className="mt-4 w-full bg-amber-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-amber-700 disabled:bg-gray-400 flex items-center justify-center min-h-[44px]">
