@@ -166,10 +166,10 @@ const Form = ({ onSubmit, onExplain, onScript, isLoading, loadingMessage, lang }
                     <button onClick={() => validateAndSubmit(onSubmit)} disabled={isLoading} className="w-full bg-amber-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-amber-700 disabled:bg-gray-400 flex items-center justify-center min-h-[48px] transition-colors">
                         {isLoading ? <LoadingSpinner /> : <><Wand2 size={18} /><span className="ml-2">{t.generate}</span></>}
                     </button>
-                    <button onClick={() => validateAndSubmit(onScript)} disabled={isLoading} className="w-full bg-gray-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-gray-700 disabled:bg-gray-400 flex items-center justify-center min-h-[48px] transition-colors">
+                    <button onClick={() => validateAndSubmit(onScript)} disabled={isLoading} className="w-full bg-teal-700 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-teal-800 disabled:bg-gray-400 flex items-center justify-center min-h-[48px] transition-colors">
                         {isLoading ? <LoadingSpinner /> : <><FileCode2 size={18} /><span className="ml-2">{t.generateScript}</span></>}
                     </button>
-                    <button onClick={() => validateAndSubmit(onExplain)} disabled={isLoading} className="w-full bg-gray-700 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-gray-800 disabled:bg-gray-400 flex items-center justify-center min-h-[48px] transition-colors">
+                    <button onClick={() => validateAndSubmit(onExplain)} disabled={isLoading} className="w-full bg-slate-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-slate-700 disabled:bg-gray-400 flex items-center justify-center min-h-[48px] transition-colors">
                         {isLoading ? <LoadingSpinner /> : <><Search size={18} /><span className="ml-2">{t.explain}</span></>}
                     </button>
                 </div>
