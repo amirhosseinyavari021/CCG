@@ -10,7 +10,7 @@ const CustomSelect = ({ label, value, onChange, options, placeholder, lang, erro
             <select
                 value={value}
                 onChange={e => onChange(e.target.value)}
-                className="w-full appearance-none bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500"
+                className="w-full appearance-none bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-amber-500"
             >
                 <option value="" disabled>{placeholder}</option>
                 {isObjectOptions
