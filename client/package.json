@@ -3,6 +3,7 @@
   "version": "2.7.1",
   "private": true,
   "homepage": "https://cmdgen.onrender.com",
+  "description": "The web interface for CCG (Cando Command Generator)",
   "dependencies": {
     "@tailwindcss/typography": "^0.5.13",
     "firebase": "^9.23.0",
