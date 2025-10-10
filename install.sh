@@ -4,7 +4,7 @@
 set -e
 
 # --- Configuration ---
-GITHUB_REPO="amirhosseinyavari021/ay-cmdgen"
+GITHUB_REPO="amirhosseinyavari021/CCG"
 INSTALL_DIR="/usr/local/bin"
 CMD_NAME="cmdgen"
 
@@ -14,7 +14,7 @@ echo_color() {
 }
 
 # --- Main Logic ---
-echo_color "36" "Installing/Updating AY-CMDGEN..."
+echo_color "36" "Installing/Updating CCG (Cando Command Generator)..."
 
 # --- Stop running instances if any ---
 echo_color "33" "Checking for running instances of cmdgen..."
@@ -101,9 +101,9 @@ fi
 
 # 5. Success message
 if [ -n "$LATEST_TAG" ]; then
-  echo_color "32" "✅ AY-CMDGEN $LATEST_TAG was installed successfully!"
+  echo_color "32" "✅ CCG $LATEST_TAG was installed successfully!"
 else
-  echo_color "32" "✅ AY-CMDGEN was installed successfully!"
+  echo_color "32" "✅ CCG was installed successfully!"
 fi
 
 echo "You can now use the 'cmdgen' command in a new terminal window."

@@ -86,9 +86,9 @@ ________/\\\\\\\\\__________________/\\\\\\\\\_______________/\\\\\\\\\\\\_
        ____\////\\\\\\\\\______________\////\\\\\\\\\___________\//\\\\\\\\\\\\/__  
         _______\/////////__________________\/////////_____________\////////////____ 
 `));
-    console.log(chalk.bold('\n                   (Cando Command Generator)\n'));
-    console.log(`                This service belongs to ${chalk.yellow.bold('Cando')} (cando.ac)`);
-    console.log(`                Created and Run by ${chalk.white.bold('Amirhossein Yavari')}\n`);
+    console.log(chalk.bold('\n                    (Cando Command Generator)\n'));
+    console.log(`               This service belongs to ${chalk.yellow.bold('Cando')} (cando.ac)`);
+    console.log(`               Created and Run by ${chalk.white.bold('Amirhossein Yavari')}\n`);
 
     console.log(chalk.bold('CCG - Your AI-powered command assistant\n'));
     console.log(chalk.bold('Usage:'));
@@ -227,7 +227,7 @@ async function checkForUpdates() {
     const now = Date.now();
     if (now - (config.last_update_check || 0) < 24 * 60 * 60 * 1000) return;
     try {
-        const response = await axios.get('https://api.github.com/repos/amirhosseinyavari021/ay-cmdgen/releases/latest', { timeout: 2000 });
+        const response = await axios.get('https://api.github.com/repos/amirhosseinyavari021/CCG/releases/latest', { timeout: 2000 });
         const latestVersion = response.data.tag_name.replace('v', '');
         if (semver.gt(latestVersion, currentVersion)) {
             console.log(chalk.green(`\n💡 New version available! (${currentVersion} -> ${latestVersion})`));
@@ -454,8 +454,8 @@ const run = async () => {
         })
         .command('update', 'Update cmdgen', {}, () => {
             const command = process.platform === 'win32'
-                ? 'Invoke-WebRequest -Uri https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.ps1 -UseBasicParsing | Invoke-Expression'
-                : 'curl -fsSL https://raw.githubusercontent.com/amirhosseinyavari021/ay-cmdgen/main/install.sh | bash';
+                ? 'Invoke-WebRequest -Uri https://raw.githubusercontent.com/amirhosseinyavari021/CCG/main/install.ps1 -UseBasicParsing | Invoke-Expression'
+                : 'curl -fsSL https://raw.githubusercontent.com/amirhosseinyavari021/CCG/main/install.sh | bash';
             const shell = process.platform === 'win32' ? 'powershell.exe' : 'bash';
             const args = process.platform === 'win32' ? ['-Command', command] : ['-c', command];
             spawn(shell, args, { stdio: 'inherit' }).on('close', code => process.exit(code));
