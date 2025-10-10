@@ -9,7 +9,7 @@ export const GeneratedCommandCard = ({ command, explanation, warning, lang }) =>
     return (
         <Card lang={lang}>
             <div className="flex justify-between items-center mb-3">
-                <h4 className="flex items-center gap-2 text-lg font-semibold text-cyan-600 dark:text-cyan-400">
+                <h4 className="flex items-center gap-2 text-lg font-semibold text-amber-600 dark:text-amber-400">
                     <Terminal size={18} /> Command
                 </h4>
             </div>
@@ -26,7 +26,7 @@ export const ExplanationCard = ({ explanation, lang }) => {
     return (
         <div className="mt-6 max-w-2xl mx-auto">
             <Card lang={lang}>
-                <h3 className="text-lg font-bold text-cyan-600 dark:text-cyan-400 flex items-center gap-2 mb-4">
+                <h3 className="text-lg font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2 mb-4">
                     <Bot size={18} /> {t.detailedExplanation}
                 </h3>
                 <div 
@@ -59,11 +59,11 @@ export const ScriptCard = ({ filename, script_lines = [], lang }) => {
         <div className="mt-6 max-w-2xl mx-auto">
             <Card lang={lang}>
                 <div className="flex justify-between items-center mb-3">
-                    <h4 className="flex items-center gap-2 text-lg font-semibold text-cyan-600 dark:text-cyan-400">
+                    <h4 className="flex items-center gap-2 text-lg font-semibold text-amber-600 dark:text-amber-400">
                         <FileCode2 size={18} /> {filename}
                     </h4>
-                    <button onClick={downloadScript} className="flex items-center gap-1 text-sm text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 transition-colors">
-                        {t.downloadScript}
+                    <button onClick={downloadScript} className="flex items-center gap-1 text-sm text-amber-600 dark:text-amber-400 hover:text-amber-700 transition-colors">
+                        {t.downloadScript || 'Download Script'}
                     </button>
                 </div>
                 <CommandDisplay command={fullScript} lang={lang} />
