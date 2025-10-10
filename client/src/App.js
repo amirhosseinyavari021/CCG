@@ -228,7 +228,9 @@ function AppContent() {
                     <Github size={20} />
                 </a>
              </div>
-             <p>This service belongs to Cando Academy.</p>
+             <p>
+                This service belongs to <a href="https://cando.ac" target="_blank" rel="noopener noreferrer" className="font-bold text-amber-600 hover:underline">Cando Academy</a>.
+             </p>
              <p className="mt-1">
                 Created and executed by <a href="mailto:amirhosseinyavari61@gmail.com" className="font-semibold text-amber-600 hover:underline">Amirhossein Yavari</a>.
              </p>
