@@ -1,13 +1,13 @@
 # --- Configuration ---
-$GithubRepo = "amirhosseinyavari021/ay-cmdgen"
-$InstallDir = "$env:ProgramFiles\AY-CMDGEN"
+$GithubRepo = "amirhosseinyavari021/CCG"
+$InstallDir = "$env:ProgramFiles\CCG"
 $ExeName = "cmdgen.exe"
 $ReleaseAsset = "cmdgen-win.exe"
 
 # --- Resolve Latest Release via GitHub API ---
 try {
     Write-Host "Fetching latest release info from GitHub API..." -ForegroundColor Cyan
-    $LatestRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/$GithubRepo/releases/latest" -Headers @{ "User-Agent" = "AY-CMDGEN-Installer" }
+    $LatestRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/$GithubRepo/releases/latest" -Headers @{ "User-Agent" = "CCG-Installer" }
     $TagName = $LatestRelease.tag_name
     $PrimaryReleaseUrl = "https://github.com/$GithubRepo/releases/download/$TagName/$ReleaseAsset"
     $FallbackReleaseUrl = $PrimaryReleaseUrl
@@ -20,7 +20,7 @@ try {
 $DownloadPath = "$env:TEMP\$ReleaseAsset"
 
 # --- Main Logic ---
-Write-Host "Installing/Updating AY-CMDGEN for Windows..." -ForegroundColor Cyan
+Write-Host "Installing/Updating CCG for Windows..." -ForegroundColor Cyan
 
 # --- Stop running instances if any ---
 Write-Host "Checking for running instances of cmdgen..."
@@ -69,5 +69,5 @@ try {
     exit 1
 }
 
-Write-Host "✅ AY-CMDGEN v$TagName was installed successfully!" -ForegroundColor Green
+Write-Host "✅ CCG v$TagName was installed successfully!" -ForegroundColor Green
 Write-Host "Open a new terminal and try running: cmdgen --help"
