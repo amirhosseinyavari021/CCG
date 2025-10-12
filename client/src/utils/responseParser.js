@@ -1,5 +1,5 @@
 /**
- * Parses the raw text response from the AI.
+ * Parses the raw text response from the AI for the web client.
  * This version is more robust and correctly handles different modes.
  */
 export const parseAndConstructData = (textResponse, mode) => {
@@ -8,45 +8,42 @@ export const parseAndConstructData = (textResponse, mode) => {
         if (!trimmedResponse) return null;
 
         if (mode === 'generate') {
-            const lines = trimmedResponse.split('\n').filter(line => line.trim());
+            const lines = trimmedResponse.split('\n').filter(line => line.trim() && line.includes('|||'));
             const commands = lines.map(line => {
                 const parts = line.split('|||');
-                if (parts.length < 2) return null; // A valid line needs a command and explanation
+                if (parts.length < 2) return null;
 
-                // Clean the command: remove backticks and any leading numbers/periods.
                 const rawCommand = parts[0]?.trim().replace(/^`|`$/g, '').trim() || '';
                 const cleanedCommand = rawCommand.replace(/^\s*\d+[\.\s]*\s*/, '');
 
-                if (!cleanedCommand) return null; // Ignore if the command is empty after cleaning
+                if (!cleanedCommand) return null;
 
                 return {
                     command: cleanedCommand,
-                    explanation: parts[1]?.trim() || '',
+                    explanation: parts[1]?.trim() || 'No explanation provided.',
                     warning: parts[2]?.trim() || ''
                 };
-            }).filter(Boolean); // Clean up any malformed lines
+            }).filter(Boolean);
 
-            // If parsing fails, return at least something to avoid crashing
             if (commands.length === 0) {
-                return { commands: [{ command: trimmedResponse, explanation: "Could not parse the response.", warning: "" }] };
+                // Graceful fallback if parsing fails completely
+                return { commands: [{ command: trimmedResponse, explanation: "Could not parse the AI's response format.", warning: "" }] };
             }
 
             return { commands };
         }
 
         if (mode === 'explain' || mode === 'script') {
-            // For both explain and script, the entire response is the content
             return { explanation: trimmedResponse };
         }
 
         if (mode === 'error') {
             const parts = trimmedResponse.split('|||');
-            if (parts.length < 3) {
-                // Fallback for non-compliant error responses
+            if (parts.length < 2) {
                 return {
                     cause: 'Analysis Result',
                     explanation: trimmedResponse,
-                    solution: ['No specific command steps could be parsed, please review the explanation above.']
+                    solution: []
                 };
             }
             return {
@@ -60,6 +57,7 @@ export const parseAndConstructData = (textResponse, mode) => {
 
     } catch (error) {
         console.error("Critical error in responseParser:", error);
-        return null;
+        // Return a user-friendly error structure
+        return { error: "Failed to parse the response from the server." };
     }
 };
