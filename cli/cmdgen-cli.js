@@ -17,11 +17,12 @@ const { parseAndConstructData } = require('./responseParser-cli.js');
 
 const packageJson = require('./package.json');
 const currentVersion = packageJson.version;
+const packageName = packageJson.name;
 
 const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfkigw8FoqPI2KpIg7Xhy_3CqXAovCVwuPXQGCeKnVaV1PLAg/viewform?usp=header';
 const USAGE_THRESHOLD_FOR_FEEDBACK = 20;
 
-const configDir = path.join(os.homedir(), '.cmdgen');
+const configDir = path.join(os.homedir(), '.config', 'ccg');
 const configFile = path.join(configDir, 'config.json');
 const MAX_HISTORY = 20;
 
@@ -61,7 +62,7 @@ async function handleFeedback() {
     const config = await getConfig();
     if ((config.usageCount || 0) >= USAGE_THRESHOLD_FOR_FEEDBACK && !config.feedbackRequested) {
         console.log(chalk.cyan.bold('\n--- We Value Your Feedback! ---'));
-        console.log("You've used CMDGEN many times. Would you mind sharing your thoughts to help us improve?");
+        console.log("You've used CCG many times. Would you mind sharing your thoughts to help us improve?");
         const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
         const answer = await new Promise(resolve => rl.question(chalk.yellow('Open feedback form in browser? (y/N) '), resolve));
         rl.close();
@@ -74,7 +75,6 @@ async function handleFeedback() {
 
 const showHelp = (config = {}) => {
     const { os: osDefault, shell: shellDefault, lang: langDefault, knowledgeLevel: levelDefault, deviceType: deviceDefault } = config;
-    // Corrected ASCII Art and slogan alignment
     console.log(chalk.gray(String.raw`
 ________/\\\\\\\\\__________________/\\\\\\\\\_______________/\\\\\\\\\\\\_        
  _____/\\\////////________________/\\\////////______________/\\\//////////__       
@@ -87,12 +87,12 @@ ________/\\\\\\\\\__________________/\\\\\\\\\_______________/\\\\\\\\\\\\_
         _______\/////////__________________\/////////_____________\////////////____ 
 `));
     console.log(chalk.bold('\n                    (Cando Command Generator)\n'));
-    console.log(`               This service belongs to ${chalk.yellow.bold('Cando')} (cando.ac)`);
+    console.log(`               This service belongs to ${chalk.yellow.bold('Cando Academy')} (cando.ac)`);
     console.log(`               Created and Run by ${chalk.white.bold('Amirhossein Yavari')}\n`);
 
     console.log(chalk.bold('CCG - Your AI-powered command assistant\n'));
     console.log(chalk.bold('Usage:'));
-    console.log('  cmdgen <command> [options]\n');
+    console.log('  ccg <command> [options]\n');
     console.log(chalk.bold('Commands:'));
     console.log(`  ${chalk.green('generate <request>')}    Generate command suggestions        [alias: g]`);
     console.log(`  ${chalk.green('script <request>')}      Generate a full script              [alias: s]`);
@@ -101,13 +101,13 @@ ________/\\\\\\\\\__________________/\\\\\\\\\_______________/\\\\\\\\\\\\_
     console.log(`  ${chalk.green('history')}               Show recently generated items       [alias: h]`);
     console.log(`  ${chalk.green('feedback')}               Provide feedback on the tool        [alias: f]`);
     console.log(`  ${chalk.green('config <action>')}       Manage settings (show, set, wizard)`);
-    console.log(`  ${chalk.green('update')}                Update cmdgen to the latest version\n`);
+    console.log(`  ${chalk.green('update')}                Update CCG to the latest version\n`);
     console.log(chalk.bold('Options:'));
     console.log(`  --os <os>             Target OS (windows, linux, cisco)     [default: ${chalk.yellow(osDefault || 'not set')}]`);
     console.log(`  --shell <shell>         Target shell (PowerShell, bash, CLI)    [default: ${chalk.yellow(shellDefault || 'not set')}]`);
     console.log(`  --lang <lang>           Response language (en, fa)              [default: ${chalk.yellow(langDefault || 'en')}]`);
-    console.log(`  --level <level>         Knowledge level (beginner, intermediate, expert) [default: ${chalk.yellow(levelDefault || 'intermediate')}]`);
-    console.log(`  --device <device>       Device type for Cisco (router, switch, firewall) [default: ${chalk.yellow(deviceDefault || 'n/a')}]`);
+    console.log(`  --level <level>         Knowledge level (beginner, expert)      [default: ${chalk.yellow(levelDefault || 'intermediate')}]`);
+    console.log(`  --device <device>       Device type for Cisco (router, switch)  [default: ${chalk.yellow(deviceDefault || 'n/a')}]`);
     console.log(`  -h, --help            Show this help menu`);
     console.log(`  -v, --version         Show version number`);
 };
@@ -117,7 +117,7 @@ const showWelcomeBanner = async () => {
     if (config.isFirstRun === false) return;
     console.log(chalk.bold('\nWelcome to CCG (Cando Command Generator)!'));
     console.log('To get started, please run the setup wizard:');
-    console.log(chalk.yellow('  cmdgen config wizard'));
+    console.log(chalk.yellow('  ccg config wizard'));
     await setConfig({ isFirstRun: false });
 };
 
@@ -137,10 +137,11 @@ const runSetupWizard = async () => {
     const osChoice = await question('> ');
     const selectedOsKey = osOptions[parseInt(osChoice) - 1]?.toLowerCase() || 'other';
 
-    let os, shell, deviceType = null;
+    let os, shell, deviceType = null, osVersion;
 
     if (selectedOsKey === 'other') {
         os = await question('Enter your OS name: ');
+        osVersion = await question('Enter your OS version: ');
         shell = await question('Enter your Shell name: ');
     } else {
         os = selectedOsKey;
@@ -173,7 +174,7 @@ const runSetupWizard = async () => {
     const selectedLang = ['en', 'fa'][parseInt(langChoice) - 1] || 'en';
 
     rl.close();
-    const newConfig = { os, shell, lang: selectedLang, knowledgeLevel, deviceType };
+    const newConfig = { os, shell, osVersion, lang: selectedLang, knowledgeLevel, deviceType };
     await setConfig(newConfig);
     console.log(chalk.green(`\n✅ Configuration saved successfully!`));
     return newConfig;
@@ -184,7 +185,7 @@ const handleConfigCommand = async (action, key, value) => {
     if (action === 'show') {
         console.log(chalk.bold('\nCurrent CCG Configuration:'));
         Object.entries(config).forEach(([k, v]) => {
-            if (!['history', 'last_update_check', 'isFirstRun', 'skillLevel'].includes(k) && v) {
+            if (!['history', 'last_update_check', 'isFirstRun'].includes(k) && v) {
                 console.log(`  ${chalk.cyan(k)}: ${chalk.yellow(String(v))}`);
             }
         });
@@ -223,18 +224,14 @@ const stopSpinner = () => {
 };
 
 async function checkForUpdates() {
-    const config = await getConfig();
-    const now = Date.now();
-    if (now - (config.last_update_check || 0) < 24 * 60 * 60 * 1000) return;
     try {
-        const response = await axios.get('https://api.github.com/repos/amirhosseinyavari021/CCG/releases/latest', { timeout: 2000 });
-        const latestVersion = response.data.tag_name.replace('v', '');
+        const response = await axios.get(`https://registry.npmjs.org/${packageName}/latest`, { timeout: 2000 });
+        const latestVersion = response.data.version;
         if (semver.gt(latestVersion, currentVersion)) {
             console.log(chalk.green(`\n💡 New version available! (${currentVersion} -> ${latestVersion})`));
-            console.log(`   Run ${chalk.cyan('cmdgen update')} to get the latest version.\n`);
+            console.log(`   Run ${chalk.cyan('ccg update')} to get the latest version.\n`);
         }
     } catch (error) { /* Silently fail */ }
-    await setConfig({ last_update_check: now });
 }
 
 const primaryServerUrl = 'https://ay-cmdgen-cli.onrender.com';
@@ -328,12 +325,16 @@ const run = async () => {
     }
 
     const parser = yargs(args)
-        .scriptName("cmdgen")
+        .scriptName("ccg")
         .help(false).version(false)
         .option('os', { type: 'string' }).option('shell', { type: 'string' }).option('lang', { type: 'string' })
         .option('level', { type: 'string' }).option('device', { type: 'string' }).option('debug', { type: 'boolean' })
         .command(['generate <request>', 'g'], 'Generate command suggestions', {}, async (argv) => {
             const context = { ...config, ...argv };
+            if (context.os === 'cisco' && !context.device) {
+                console.error(chalk.red('Error: --device is required for Cisco OS (e.g., --device router).'));
+                process.exit(1);
+            }
             const initialResult = await callApi({ userInput: argv.request, mode: 'generate', os: context.os, cli: context.shell, lang: context.lang, options: { knowledgeLevel: context.level, deviceType: context.device } });
 
             if (!initialResult?.finalData?.commands?.length) {
@@ -395,7 +396,7 @@ const run = async () => {
                         const confirmRl = readline.createInterface({ input: process.stdin, output: process.stdout });
                         confirmRl.question(chalk.yellow(`\nExecute: "${chalk.cyan(commands[index].command)}"? [y/N] `), answer => {
                             confirmRl.close();
-                            resolve(answer.toLowerCase() === 'y' ? { type: 'execute', index } : { type: 'quit' });
+                            resolve(answer.toLowerCase() === 'y' ? { type: 'execute', index } : { type: 'reprompt' });
                         });
                     } else {
                         console.log(chalk.red('\nInvalid choice.'));
@@ -441,7 +442,7 @@ const run = async () => {
             gracefulExit();
         })
         .command('config [action] [key] [value]', 'Manage settings', {}, (argv) => handleConfigCommand(argv.action, argv.key, argv.value))
-        .command('history', 'Show command history', {}, async () => {
+        .command(['history', 'h'], 'Show command history', {}, async () => {
             const config = await getConfig();
             const history = config.history || [];
             if (history.length === 0) return console.log(chalk.yellow('No history found.'));
@@ -452,15 +453,27 @@ const run = async () => {
                 console.log(item.command.includes('\n') ? chalk.gray(item.command) : `  ${chalk.green(item.command)}`);
             });
         })
-        .command('update', 'Update cmdgen', {}, () => {
-            const command = process.platform === 'win32'
-                ? 'Invoke-WebRequest -Uri https://raw.githubusercontent.com/amirhosseinyavari021/CCG/main/install.ps1 -UseBasicParsing | Invoke-Expression'
-                : 'curl -fsSL https://raw.githubusercontent.com/amirhosseinyavari021/CCG/main/install.sh | bash';
-            const shell = process.platform === 'win32' ? 'powershell.exe' : 'bash';
-            const args = process.platform === 'win32' ? ['-Command', command] : ['-c', command];
-            spawn(shell, args, { stdio: 'inherit' }).on('close', code => process.exit(code));
+        .command('update', 'Update CCG to the latest version', {}, () => {
+            console.log(chalk.cyan('Attempting to update CCG via npm...'));
+            const command = `npm install -g ${packageName}`;
+            const fullCommand = process.platform !== 'win32' && process.getuid() !== 0 ? `sudo ${command}` : command;
+
+            console.log(chalk.yellow(`Executing: ${fullCommand}`));
+            if (fullCommand.startsWith('sudo')) {
+                console.log(chalk.yellow('You may be prompted for your password.'));
+            }
+
+            const child = spawn(fullCommand, [], { stdio: 'inherit', shell: true });
+            child.on('close', code => {
+                if (code === 0) {
+                    console.log(chalk.green('\n✅ CCG updated successfully!'));
+                } else {
+                    console.error(chalk.red(`\n❌ Update failed with code ${code}. Please try running the command manually.`));
+                }
+                process.exit(code);
+            });
         })
-        .command('feedback', 'Provide feedback', {}, async () => {
+        .command(['feedback', 'f'], 'Provide feedback on the tool', {}, async () => {
             await open(FEEDBACK_URL).catch(() => console.log(chalk.yellow('Please visit: ' + FEEDBACK_URL)));
             gracefulExit();
         });

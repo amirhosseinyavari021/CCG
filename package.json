@@ -1,18 +1,18 @@
 {
   "name": "CCG-server",
-  "version": "2.7.4",
+  "version": "2.7.5",
   "private": true,
-  "description": "The server and web component for AY-CMDGEN",
+  "description": "The server and web component for CCG",
   "main": "server.js",
   "bin": {
-    "cmdgen": "./cli/cmdgen-cli.js"
+    "ccg": "./cli/cmdgen-cli.js"
   },
   "scripts": {
     "start": "node server.js",
     "build": "cd client && npm install && cross-env REACT_APP_VERSION=$npm_package_version npm run build",
-    "pkg:linux": "cd cli && npm install && pkg . --targets latest-linux-x64 --output ../dist/cmdgen-linux",
-    "pkg:win": "cd cli && npm install && pkg . --targets latest-win-x64 --output ../dist/cmdgen-win.exe",
-    "pkg:macos": "cd cli && npm install && pkg . --targets latest-macos-x64 --output ../dist/cmdgen-macos",
+    "pkg:linux": "cd cli && npm install && pkg . --targets latest-linux-x64 --output ../dist/ccg-linux",
+    "pkg:win": "cd cli && npm install && pkg . --targets latest-win-x64 --output ../dist/ccg-win.exe",
+    "pkg:macos": "cd cli && npm install && pkg . --targets latest-macos-x64 --output ../dist/ccg-macos",
     "release": "npm run build && npm run pkg:linux && npm run pkg:win && npm run pkg:macos"
   },
   "engines": {

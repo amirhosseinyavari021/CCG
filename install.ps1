@@ -1,8 +1,8 @@
 # --- Configuration ---
 $GithubRepo = "amirhosseinyavari021/CCG"
 $InstallDir = "$env:ProgramFiles\CCG"
-$ExeName = "cmdgen.exe"
-$ReleaseAsset = "cmdgen-win.exe"
+$ExeName = "ccg.exe" # <--- Changed
+$ReleaseAsset = "ccg-win.exe" # <--- Changed
 
 # --- Resolve Latest Release via GitHub API ---
 try {
@@ -23,11 +23,11 @@ $DownloadPath = "$env:TEMP\$ReleaseAsset"
 Write-Host "Installing/Updating CCG for Windows..." -ForegroundColor Cyan
 
 # --- Stop running instances if any ---
-Write-Host "Checking for running instances of cmdgen..."
-$RunningProcesses = Get-Process -Name "cmdgen" -ErrorAction SilentlyContinue
+Write-Host "Checking for running instances of ccg..."
+$RunningProcesses = Get-Process -Name "ccg" -ErrorAction SilentlyContinue
 if ($RunningProcesses) {
-    Write-Host "Stopping running cmdgen process to allow update..." -ForegroundColor Yellow
-    Stop-Process -Name "cmdgen" -Force
+    Write-Host "Stopping running ccg process to allow update..." -ForegroundColor Yellow
+    Stop-Process -Name "ccg" -Force
     Start-Sleep -Seconds 2
 }
 
@@ -70,4 +70,4 @@ try {
 }
 
 Write-Host "✅ CCG v$TagName was installed successfully!" -ForegroundColor Green
-Write-Host "Open a new terminal and try running: cmdgen --help"
+Write-Host "Open a new terminal and try running: ccg --help"
