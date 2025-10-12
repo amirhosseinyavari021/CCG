@@ -6,7 +6,7 @@ set -e
 # --- Configuration ---
 GITHUB_REPO="amirhosseinyavari021/CCG"
 INSTALL_DIR="/usr/local/bin"
-CMD_NAME="cmdgen"
+CMD_NAME="ccg" # <--- Changed
 
 # --- Helper Functions ---
 echo_color() {
@@ -17,13 +17,13 @@ echo_color() {
 echo_color "36" "Installing/Updating CCG (Cando Command Generator)..."
 
 # --- Stop running instances if any ---
-echo_color "33" "Checking for running instances of cmdgen..."
-if pgrep -x "cmdgen" > /dev/null; then
-    echo_color "33" "Stopping running cmdgen process to allow update..."
+echo_color "33" "Checking for running instances of ccg..."
+if pgrep -x "ccg" > /dev/null; then
+    echo_color "33" "Stopping running ccg process to allow update..."
     if command -v killall >/dev/null 2>&1; then
-        killall cmdgen || true
+        killall ccg || true
     else
-        pkill -f cmdgen || true
+        pkill -f ccg || true
     fi
     sleep 1
 fi
@@ -36,13 +36,13 @@ TARGET=""
 case "$OS" in
   Linux)
     case "$ARCH" in
-      x86_64) TARGET="cmdgen-linux" ;;
+      x86_64) TARGET="ccg-linux" ;; # <--- Changed
       *) echo_color "31" "Error: Architecture $ARCH for Linux is not supported."; exit 1 ;;
     esac
     ;;
   Darwin)
     case "$ARCH" in
-      x86_64 | arm64) TARGET="cmdgen-macos" ;;
+      x86_64 | arm64) TARGET="ccg-macos" ;; # <--- Changed
       *) echo_color "31" "Error: Architecture $ARCH for macOS is not supported."; exit 1 ;;
     esac
     ;;
@@ -106,5 +106,5 @@ else
   echo_color "32" "✅ CCG was installed successfully!"
 fi
 
-echo "You can now use the 'cmdgen' command in a new terminal window."
-echo "To get started, try running: cmdgen --help"
+echo "You can now use the 'ccg' command in a new terminal window."
+echo "To get started, try running: ccg --help"

@@ -1,11 +1,9 @@
 /**
- * Enhanced AY-CMDGEN response parser.
- * Handles both legacy (|||) format and gracefully degrades for malformed responses.
+ * Enhanced CCG response parser.
+ * Handles the '|||' format robustly and gracefully degrades for malformed responses.
  */
-
-const parseAndConstructData = (textResponse, mode, cli) => {
+const parseAndConstructData = (textResponse, mode) => {
     try {
-        // Universal cleaning for script mode
         const trimmedResponse = textResponse.trim().replace(/^```(?:\w+)?\n|```$/g, '');
         if (!trimmedResponse) return null;
 
@@ -17,16 +15,16 @@ const parseAndConstructData = (textResponse, mode, cli) => {
                 const parts = line.split('|||');
                 if (parts.length < 2) return null;
 
-                // Clean command: remove markdown and leading list markers
+                // Clean command: remove markdown, leading list markers, and ensure it's a single line.
                 const cleanedCommand = (parts[0]?.trim() || '').replace(/[*`]/g, '').replace(/^\s*[\d\-\*]+[\.\:\)]\s*/, '').trim();
                 if (!cleanedCommand) return null;
 
                 return {
                     command: cleanedCommand,
-                    explanation: parts[1]?.trim() || '',
+                    explanation: parts[1]?.trim() || 'No explanation provided.',
                     warning: parts[2]?.trim() || ''
                 };
-            }).filter(Boolean);
+            }).filter(Boolean); // Filter out any null entries
 
             return commands.length > 0 ? { commands } : null;
         }
@@ -38,22 +36,24 @@ const parseAndConstructData = (textResponse, mode, cli) => {
         if (mode === 'error') {
             const parts = trimmedResponse.split('|||');
             if (parts.length < 2) {
+                // Fallback for malformed error responses
                 return { cause: 'Analysis Result', explanation: trimmedResponse, solution: [] };
             }
             return {
                 cause: parts[0]?.trim() || 'Analysis',
                 explanation: parts[1]?.trim() || 'No detailed explanation.',
-                solution: parts.slice(2).map(s => s.trim()).filter(s => s)
+                solution: parts.slice(2).map(s => s.trim()).filter(s => s) // Handles multiple solution steps
             };
         }
 
         return null;
 
     } catch (error) {
+        // Optional: Add more verbose logging if a debug flag is present
         if (process.argv.includes('--debug')) {
             console.error("Critical error in responseParser:", error);
         }
-        return null;
+        return null; // Ensure function returns null on error
     }
 };
 
