@@ -29,8 +29,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            dist/cmdgen-linux
-            dist/cmdgen-macos
-            dist/cmdgen-win.exe
+            dist/ccg-linux
+            dist/ccg-macos
+            dist/ccg-win.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
