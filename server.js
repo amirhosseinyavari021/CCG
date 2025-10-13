@@ -193,6 +193,7 @@ app.listen(PORT, () => {
     event: 'server_start',
     port: PORT,
     timestamp: new Date().toISOString(),
-    version: '2.6.0'
+    version: '2.7.6
+      '
   }));
 });
