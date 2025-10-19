@@ -186,13 +186,13 @@ app.get('*', (req, res) => {
   });
 });
 
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 50000;
 app.listen(PORT, () => {
   console.log(`Server is running and listening on port ${PORT}`);
   console.log(JSON.stringify({
     event: 'server_start',
     port: PORT,
     timestamp: new Date().toISOString(),
-    version: '2.7.6'
+    version: '2.8.1'
   }));
 });
