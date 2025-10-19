@@ -103,11 +103,11 @@ ________/\\\\\\\\\__________________/\\\\\\\\\_______________/\\\\\\\\\\\\_
     console.log(`  ${chalk.green('config <action>')}       Manage settings (show, set, wizard)`);
     console.log(`  ${chalk.green('update')}                Update CCG to the latest version\n`);
     console.log(chalk.bold('Options:'));
-    console.log(`  --os <os>             Target OS (windows, linux, cisco)     [default: ${chalk.yellow(osDefault || 'not set')}]`);
-    console.log(`  --shell <shell>         Target shell (PowerShell, bash, CLI)    [default: ${chalk.yellow(shellDefault || 'not set')}]`);
-    console.log(`  --lang <lang>           Response language (en, fa)              [default: ${chalk.yellow(langDefault || 'en')}]`);
-    console.log(`  --level <level>         Knowledge level (beginner, expert)      [default: ${chalk.yellow(levelDefault || 'intermediate')}]`);
-    console.log(`  --device <device>       Device type for Cisco (router, switch)  [default: ${chalk.yellow(deviceDefault || 'n/a')}]`);
+    console.log(`  --os <os>             Platform (linux, windows, cisco, mikrotik, python) [default: ${chalk.yellow(osDefault || 'not set')}]`);
+    console.log(`  --shell <shell>         Target shell (PowerShell, bash, CLI)               [default: ${chalk.yellow(shellDefault || 'not set')}]`);
+    console.log(`  --lang <lang>           Response language (en, fa)                         [default: ${chalk.yellow(langDefault || 'en')}]`);
+    console.log(`  --level <level>         Knowledge level (beginner, intermediate, expert)   [default: ${chalk.yellow(levelDefault || 'intermediate')}]`);
+    console.log(`  --device <device>       Device type for Cisco (router, switch, firewall)   [default: ${chalk.yellow(deviceDefault || 'n/a')}]`);
     console.log(`  -h, --help            Show this help menu`);
     console.log(`  -v, --version         Show version number`);
 };
@@ -131,7 +131,7 @@ const runSetupWizard = async () => {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     const question = (query) => new Promise(resolve => rl.question(query, resolve));
 
-    const osOptions = ['Windows', 'macOS', 'Linux', 'Cisco', 'Other'];
+    const osOptions = ['Linux', 'Windows', 'macOS', 'Cisco', 'MikroTik', 'Python', 'Other'];
     console.log('\nSelect your primary platform/OS:');
     osOptions.forEach((opt, i) => console.log(chalk.gray(`  ${i + 1}. ${opt}`)));
     const osChoice = await question('> ');
@@ -145,9 +145,16 @@ const runSetupWizard = async () => {
         shell = await question('Enter your Shell name: ');
     } else {
         os = selectedOsKey;
-        const shellMap = { windows: ['PowerShell', 'CMD'], macos: ['zsh', 'bash'], linux: ['bash', 'zsh', 'fish'], cisco: ['CLI'] };
+        const shellMap = {
+            windows: ['PowerShell', 'CMD'],
+            macos: ['zsh', 'bash'],
+            linux: ['bash', 'zsh', 'fish'],
+            cisco: ['CLI'],
+            mikrotik: ['MikroTik CLI'],
+            python: ['Python 3']
+        };
         const shellOptions = shellMap[os];
-        console.log(`\nSelect a Shell for ${os}:`);
+        console.log(`\nSelect a Shell/Environment for ${os}:`);
         shellOptions.forEach((opt, i) => console.log(chalk.gray(`  ${i + 1}. ${opt}`)));
         const shellChoice = await question('> ');
         shell = shellOptions[parseInt(shellChoice) - 1];

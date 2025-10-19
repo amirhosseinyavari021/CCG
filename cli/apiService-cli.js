@@ -46,12 +46,25 @@ const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
 - Target Device: **${deviceType || 'generic'}**. Tailor commands (e.g., VLANs for switches, routing for routers).
 - Configuration Context: Show necessary mode changes (e.g., \`configure terminal\`, \`interface ...\`).
 `;
+    } else if (lowerOs.includes('mikrotik')) {
+        platformInstructions = `
+**PLATFORM NUANCE: MIKROTIK (RouterOS)**
+- Commands MUST start with \`/\` (e.g., \`/ip address add\`).
+- Provide full, unambiguous commands.
+- Differentiate between \`add\`, \`set\`, and \`print\` commands.
+`;
+    } else if (lowerOs.includes('python')) {
+        platformInstructions = `
+**PLATFORM NUANCE: PYTHON**
+- Provide clean, modern, idiomatic Python 3 code.
+- Import necessary libraries (e.g., \`os\`, \`subprocess\`, \`paramiko\` for automation).
+- Focus on automation tasks, especially for network and system administration.
+`;
     } else if (lowerCli.includes('powershell')) {
         platformInstructions = `
 **SHELL NUANCE: POWERSHELL**
 - Use correct operators (\`-eq\`, \`-gt\`).
 - Prefer modern cmdlets (\`Get-CimInstance\`).
-- Leverage the pipeline.
 `;
     } else if (['bash', 'zsh', 'sh'].includes(lowerCli)) {
         platformInstructions = `

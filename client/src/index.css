@@ -35,9 +35,9 @@ html {
 
 /* Custom styles for better UI */
 @layer components {
-    .btn-primary {
-        @apply w-full bg-amber-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-amber-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200;
-    }
+  .btn-primary {
+    @apply w-full bg-amber-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-amber-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200;
+  }
 }
 
 /* Persian Font */
@@ -50,15 +50,19 @@ html {
   body {
     font-size: 14px;
   }
+
   .container {
     padding-left: 1rem;
     padding-right: 1rem;
   }
+
   .card {
     padding: 1rem;
   }
+
   h2 {
-    font-size: 1.75rem; /* Larger title on mobile */
+    font-size: 1.75rem;
+    /* Larger title on mobile */
   }
 }
 

@@ -34,13 +34,13 @@ export const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) =>
 1.  **SYNTAX IS SACRED:** The command/configuration MUST be syntactically perfect and runnable without modification.
 2.  **PRACTICAL & EDUCATIONAL:** Provide commands that are not just functional but also teach best practices, tailored to the user's expertise level.
 3.  **EFFICIENCY & MODERNITY:** Always prefer the most direct, modern, and efficient solution.
-4.  **NO BACKTICKS FOR COMMANDS:** Do NOT wrap final commands in markdown backticks (\`\`\` \`\`\`). The raw command should be directly usable.
+4.  **NO BACKTICKS FOR COMMANDS:** The raw command must be directly usable.
 5.  **SECURITY FIRST:** If a command is destructive (e.g., \`rm\`, \`no interface\`), you MUST include a clear, strong warning.
 `;
 
     let platformInstructions = "";
-    const lowerOs = os.toLowerCase();
-    const lowerCli = cli.toLowerCase();
+    const lowerOs = (os || '').toLowerCase();
+    const lowerCli = (cli || '').toLowerCase();
 
     if (lowerOs.includes('cisco')) {
         platformInstructions = `
@@ -48,20 +48,31 @@ export const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) =>
 - Target Device: **${deviceType || 'generic'}**. Tailor commands accordingly.
 - Configuration Context: Commands must reflect the correct mode (e.g., \`configure terminal\`, \`interface ...\`).
 - Privilege Levels: Differentiate between User EXEC, Privileged EXEC, and Global Config modes.
-- Best Practices: For scripts, include necessary preliminaries and save commands (\`end\`, \`wr mem\`).
+`;
+    } else if (lowerOs.includes('mikrotik')) {
+        platformInstructions = `
+**PLATFORM NUANCE: MIKROTIK (RouterOS)**
+- Commands MUST start with \`/\` (e.g., \`/ip address add\`).
+- Provide full, unambiguous commands.
+- Differentiate between \`add\`, \`set\`, and \`print\` commands.
+`;
+    } else if (lowerOs.includes('python')) {
+        platformInstructions = `
+**PLATFORM NUANCE: PYTHON**
+- Provide clean, modern, idiomatic Python 3 code.
+- Import necessary libraries (e.g., \`os\`, \`subprocess\`, \`paramiko\` for automation).
+- Focus on automation tasks, especially for network and system administration.
 `;
     } else if (lowerCli.includes('powershell')) {
         platformInstructions = `
 **SHELL NUANCE: POWERSHELL**
 - Use correct operators (\`-eq\`, \`-gt\`).
 - Prefer modern cmdlets (\`Get-CimInstance\`).
-- Leverage the pipeline for efficiency.
 `;
     } else if (['bash', 'zsh', 'sh'].includes(lowerCli)) {
         platformInstructions = `
 **SHELL NUANCE: BASH/ZSH/SH**
 - **Always quote variables** ("$variable").
-- Prefer modern tools like \`find\` and \`xargs\`.
 - Use correct test operators (\`[[ -f "$file" ]]\`).
 `;
     }
