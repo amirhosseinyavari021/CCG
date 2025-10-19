@@ -3,7 +3,7 @@
 [![Hosted by Cando Academy](https://img.shields.io/badge/Hosted%20by-Cando%20Academy-yellow)](https://cando.ac)
 [![License: MIT](https://img.shields.io/badge/License-MIT-00d4aa)](https://opensource.org/licenses/MIT)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-3498db)](https://www.apache.org/licenses/LICENSE-2.0)
-[![Version](https://img.shields.io/badge/Release-v2.7.6-8a2be2)](https://github.com/amirhosseinyavari021/CCG/releases)
+[![Version](https://img.shields.io/badge/Release-v2.8.1-8a2be2)](https://github.com/amirhosseinyavari021/CCG/releases)
 [![Website](https://img.shields.io/badge/Live_Demo-HERE-FFD700)](https://cmdgen.onrender.com)
 [![npm](https://img.shields.io/badge/Published_on-npm-dd1100)](https://www.npmjs.com/package/@amirhosseinyavari/ay-cmdgen)
 
