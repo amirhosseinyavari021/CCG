@@ -9,7 +9,29 @@ const parseAndConstructData = (textResponse, mode) => {
 
         if (mode === 'generate') {
             const lines = trimmedResponse.split('\n').filter(line => line.trim() && line.includes('|||'));
-            if (lines.length === 0) return null; // No valid lines found
+            if (lines.length === 0) {
+                // Fallback: If no '|||' is found, try to find a command.
+                const codeBlockMatch = trimmedResponse.match(/```(?:\w+)?\n([\s\S]*?)\n```/);
+                let command = '';
+                let explanation = trimmedResponse;
+
+                if (codeBlockMatch && codeBlockMatch[1]) {
+                    command = codeBlockMatch[1].trim();
+                    explanation = trimmedResponse.replace(codeBlockMatch[0], '').trim();
+                } else {
+                    const firstLine = trimmedResponse.split('\n')[0];
+                    if (firstLine.length < 150 && !firstLine.includes(' ')) { // Simple command check
+                        command = firstLine;
+                        explanation = trimmedResponse.substring(firstLine.length).trim();
+                    }
+                }
+
+                if (command) {
+                    return { commands: [{ command, explanation, warning: "" }] };
+                }
+
+                return null;
+            }
 
             const commands = lines.map(line => {
                 const parts = line.split('|||');

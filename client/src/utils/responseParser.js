@@ -1,14 +1,38 @@
 /**
  * Parses the raw text response from the AI for the web client.
- * This version is more robust and correctly handles different modes.
+ * This version is robust and handles multi-line '|||' formats and fallbacks.
  */
 export const parseAndConstructData = (textResponse, mode) => {
     try {
-        const trimmedResponse = textResponse.trim();
+        const trimmedResponse = textResponse.trim().replace(/^```(?:\w+)?\n|```$/g, '');
         if (!trimmedResponse) return null;
 
         if (mode === 'generate') {
             const lines = trimmedResponse.split('\n').filter(line => line.trim() && line.includes('|||'));
+            if (lines.length === 0) {
+                // Fallback: If no '|||' is found, try to find a command.
+                const codeBlockMatch = trimmedResponse.match(/```(?:\w+)?\n([\s\S]*?)\n```/);
+                let command = '';
+                let explanation = trimmedResponse;
+
+                if (codeBlockMatch && codeBlockMatch[1]) {
+                    command = codeBlockMatch[1].trim();
+                    explanation = trimmedResponse.replace(codeBlockMatch[0], '').trim();
+                } else {
+                    const firstLine = trimmedResponse.split('\n')[0];
+                    if (firstLine.length < 150 && !firstLine.includes(' ')) { // Simple command check
+                        command = firstLine;
+                        explanation = trimmedResponse.substring(firstLine.length).trim();
+                    }
+                }
+
+                if (command) {
+                    return { commands: [{ command, explanation, warning: "" }] };
+                }
+
+                return null;
+            }
+
             const commands = lines.map(line => {
                 const parts = line.split('|||');
                 if (parts.length < 2) return null;
@@ -24,11 +48,6 @@ export const parseAndConstructData = (textResponse, mode) => {
                     warning: parts[2]?.trim() || ''
                 };
             }).filter(Boolean);
-
-            if (commands.length === 0) {
-                // Graceful fallback if parsing fails completely
-                return { commands: [{ command: trimmedResponse, explanation: "Could not parse the AI's response format.", warning: "" }] };
-            }
 
             return { commands };
         }
@@ -57,7 +76,6 @@ export const parseAndConstructData = (textResponse, mode) => {
 
     } catch (error) {
         console.error("Critical error in responseParser:", error);
-        // Return a user-friendly error structure
         return { error: "Failed to parse the response from the server." };
     }
 };

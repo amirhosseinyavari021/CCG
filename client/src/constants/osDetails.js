@@ -15,6 +15,14 @@ export const osDetails = {
     versions: ['IOS', 'IOS-XE', 'NX-OS', 'ASA'],
     clis: ['CLI']
   },
+  mikrotik: {
+    versions: ['RouterOS v7', 'RouterOS v6'],
+    clis: ['MikroTik CLI']
+  },
+  python: {
+    versions: ['Python 3.11', 'Python 3.10', 'Python 3.9'],
+    clis: ['Python 3']
+  },
   other: {
     versions: [], // No predefined versions
     clis: ['Bash', 'Zsh', 'PowerShell', 'CMD', 'Sh'] // Common shells
