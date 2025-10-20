@@ -15,6 +15,25 @@ const ErrorAnalysis = lazy(() => import('./components/ErrorAnalysis'));
 const MobileDrawer = lazy(() => import('./components/MobileDrawer'));
 const FeedbackCard = lazy(() => import('./components/FeedbackCard'));
 
+/**
+ * Helper function to determine the correct script file extension based on OS and CLI.
+ * @param {string} os - The selected operating system (e.g., 'python', 'windows', 'linux').
+ * @param {string} cli - The selected command-line interface (e.g., 'PowerShell 7', 'CMD').
+ * @returns {string} The file extension (e.g., '.py', '.ps1', '.sh').
+ */
+const getScriptExtension = (os, cli) => {
+  const lowerOs = (os || '').toLowerCase();
+  const lowerCli = (cli || '').toLowerCase();
+
+  if (lowerOs === 'python') return '.py';
+  if (lowerOs === 'windows') {
+    if (lowerCli.includes('powershell')) return '.ps1';
+    if (lowerCli.includes('cmd')) return '.bat';
+  }
+  // Default for linux, macos, cisco, mikrotik, bash, zsh, sh, etc.
+  return '.sh';
+};
+
 function AppContent() {
   const [lang, setLang] = useState('en');
   const [theme, setTheme] = useState('dark');
@@ -125,8 +144,13 @@ function AppContent() {
     );
 
     if (apiResult?.data?.explanation) {
+      // --- FIX: Determine filename dynamically based on OS/CLI ---
+      const extension = getScriptExtension(formData.os, formData.cli);
+      const filename = `generated_script${extension}`;
+      // --------------------------------------------------------
+
       setScript({
-        filename: 'generated_script.sh', // Default filename
+        filename: filename, // Use the dynamic filename
         script_lines: apiResult.data.explanation.split('\n')
       });
       incrementUsageCount();
