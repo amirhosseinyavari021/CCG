@@ -3,7 +3,7 @@ import { Sun, Moon, Menu } from 'lucide-react';
 
 const Header = ({ lang, theme, onThemeChange, onMenuClick, onLangChange }) => {
 
-    const appVersion = process.env.REACT_APP_VERSION || '2.8.1';
+    const appVersion = process.env.REACT_APP_VERSION || '2.8.2';
 
     return (
         <header className="bg-white dark:bg-gray-900 shadow-sm sticky top-0 z-40">
