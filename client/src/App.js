@@ -194,7 +194,7 @@ function AppContent() {
           onClose={() => setIsDrawerOpen(false)}
           onLangChange={handleLangChange}
         />
-      </Suspense>
+      </Guspense>
 
       <Header
         lang={lang}
@@ -229,14 +229,14 @@ function AppContent() {
 
           {commandList.length > 0 && !isLoading && (
             <div className="mt-6 text-center">
-              <button onClick={handleMoreCommands} disabled={isLoadingMore} className="w-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 px-4 py-2.5 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 flex items-center justify-center gap-2 min-h-[48px] transition-colors">
+              <button onClick={handleMoreCommands} disabled={isLoadingMore} className="w-full bg-gray-200/70 dark:bg-gray-700/70 backdrop-blur-lg text-gray-800 dark:text-gray-200 px-4 py-2.5 rounded-lg font-semibold hover:bg-gray-300/80 dark:hover:bg-gray-600/80 disabled:opacity-50 flex items-center justify-center gap-2 min-h-[48px] transition-colors">
                 {isLoadingMore ? <><LoadingSpinner /> {t.loadingMore}</> : <><PlusCircle size={18} /> {t.moreCommands}</>}
               </button>
             </div>
           )}
 
           {explanation && <ExplanationCard explanation={explanation} lang={lang} />}
-          {script && <ScriptCard filename={script.filename} script_lines={script.script_lines} lang={lang} />}
+          {script && <ScriptCard filename={script.filename} script_lines={script_lines} lang={lang} />}
 
           {(commandList.length > 0 || explanation || script) && !isLoading && (
             <Suspense fallback={<div className="text-center mt-10"><LoadingSpinner /></div>}>
@@ -246,7 +246,7 @@ function AppContent() {
         </div>
       </main>
 
-      <footer className="bg-transparent py-4 text-center text-gray-900 dark:text-gray-400 text-xs border-t border-gray-200 dark:border-gray-800">
+      <footer className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-lg py-3 text-center text-gray-900 dark:text-gray-400 text-xs border-t border-gray-200/50 dark:border-gray-800/50">
         <div className="flex justify-center items-center gap-4 mb-2">
           <a href="https://github.com/amirhosseinyavari021/CCG" target="_blank" rel="noopener noreferrer" className="text-gray-700 hover:text-black dark:text-gray-400 dark:hover:text-gray-300">
             <Github size={20} />
