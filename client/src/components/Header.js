@@ -14,7 +14,7 @@ const Header = ({ lang, onMenuClick, onLangChange }) => {
                         <Menu size={20} />
                     </button>
                     <div className="flex items-center gap-3">
-                        <img src="/logo.png" alt="Cando Logo" className="h-8 w-auto" />
+                        <img src="/logo (2).png" alt="Cando Logo" className="h-8 w-auto" />
                         <div className="flex items-baseline gap-2">
                             <h1 className="text-xl font-bold text-amber-500 dark:text-amber-400">CCG</h1>
                             <span className="text-xs font-mono text-gray-500 dark:text-gray-500">v{appVersion}</span>
