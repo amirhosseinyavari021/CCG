@@ -25,8 +25,7 @@ const buildBasePrompt = (os, osVersion, cli, lang, knowledgeLevel, deviceType) =
 };
 
 export const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
-    const { existingCommands = [], command = '', knowledgeLevel, deviceType, code = '', error = '' } = options;
-    // Note: os, osVersion, cli are less relevant for compiler modes, but passed for context
+    const { existingCommands = [], command = '', knowledgeLevel, deviceType, codeA = '', codeB = '', langA = '', langB = '', analysis = '' } = options;
     const finalBasePrompt = buildBasePrompt(os, osVersion, cli, lang, knowledgeLevel, deviceType);
     const language = lang === 'fa' ? 'Persian' : 'English';
 
@@ -43,7 +42,7 @@ export const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) =>
     const lowerOs = (os || '').toLowerCase();
     const lowerCli = (cli || '').toLowerCase();
 
-    // These instructions are for the 'generate' mode, not compiler modes
+    // These instructions are for the 'generate' mode, not compare modes
     if (lowerOs.includes('cisco')) {
         platformInstructions = `
 **PLATFORM NUANCE: CISCO**
@@ -113,57 +112,43 @@ ${goldenRules}
 **OUTPUT FORMAT:** Use the format: probable_cause|||explanation|||CMD: solution_command_1|||CMD: solution_command_2
 `;
 
-        // --- New Smart Compiler Modes ---
+        // --- New Smart Code Compare Modes ---
         case 'detect-lang':
             return `You are a language detection expert. Analyze the code snippet and respond with ONLY the common name of the programming language (e.g., Python, JavaScript, Bash, PowerShell, C++, Java).
 **MISSION:** Detect the language from the following code:
-${code}`;
+${codeA}`; // Use codeA as the generic code parameter
 
-        case 'explain-code':
-            return `You are an expert developer. **Briefly** explain what the user's code is expected to do in a friendly tone. Respond in **${language}**.
-**MISSION:** Explain this code:
-${code}`;
+        case 'compare-diff':
+            return `You are an expert code analyst. Compare Code A and Code B. Explain the **logical differences** in behavior, not just the syntax changes. Respond in **${language}**.
+**LANGUAGE A:** ${langA}
+**LANGUAGE B:** ${langB}
+**CODE A (Original):**
+${codeA}
+**CODE B (Modified):**
+${codeB}
+**MISSION:** Provide a bulleted list of the logical changes, new features, or bug fixes.`;
 
-        case 'analyze-error':
-            return `You are a friendly and empathetic debugging assistant. The user's code failed. Explain the problem in a human-like, encouraging tone. Respond in **${language}**.
-**MISSION:** Analyze this error.
-**CODE:**
-${code}
-**ERROR:**
-${error}`;
+        case 'compare-quality':
+            return `You are a senior code reviewer. Compare Code A and Code B for quality, efficiency, readability, and security. State which version is better and why. Respond in **${language}**.
+**LANGUAGE A:** ${langA}
+**LANGUAGE B:** ${langB}
+**CODE A (Original):**
+${codeA}
+**CODE B (Modified):**
+${codeB}
+**MISSION:** Provide a concise review and a final recommendation.`;
 
-        case 'auto-fix':
-            return `You are an expert code fixer. The user's code produced an error. Provide a fixed version. Respond with **ONLY** the raw, fixed code block. Do not add any explanation or markdown.
-**MISSION:** Fix this code.
-**CODE:**
-${code}
-**ERROR:**
-${error}`;
-
-        case 'learning-mode':
-            return `You are an educator. Explain the provided code with a step-by-step execution trace or a detailed line-by-line breakdown for a beginner. Respond in **${language}**.
-**MISSION:** Provide a learning-mode trace for this code:
-${code}`;
-
-        case 'review-code':
-            return `You are a senior code reviewer. Analyze the code for potential optimizations, bugs, or security improvements. Provide your suggestions as a bulleted list. If there are no issues, say so. Respond in **${language}**.
-**MISSION:** Review this code:
-${code}`;
-
-        case 'visualize-flow':
-            return `You are a CLI artist. Create a simple, text-based (ASCII/Unicode) visual representation of the provided code's execution flow (e.g., using arrows, indentation).
-**MISSION:** Visualize this code's flow:
-${code}`;
-
-        case 'safety-check':
-            return `You are a security bot. Does this code perform any potentially unsafe operations (e.g., file deletion, network access, sudo/admin commands, 'rm -rf', 'format', 'Invoke-Expression')? Respond with 'SAFE' if no issues are found. If unsafe, respond with 'UNSAFE: [brief reason]'.
-**MISSION:** Analyze this code for safety:
-${code}`;
-
-        case 'suggestions':
-            return `You are an expert developer. The user's code ran successfully. Provide brief suggestions for improvement, next steps, or alternative approaches. Respond in **${language}**.
-**MISSION:** Provide suggestions for this code:
-${code}`;
+        case 'compare-merge':
+            return `You are an expert developer. You are given two code versions and an analysis of their differences. Generate an optimized merged version that combines the best features of both.
+**LANGUAGE A:** ${langA}
+**LANGUAGE B:** ${langB}
+**CODE A (Original):**
+${codeA}
+**CODE B (Modified):**
+${codeB}
+**ANALYSIS OF DIFFERENCES:**
+${analysis}
+**MISSION:** Respond with **ONLY** the raw, merged, and optimized code block. Do not add any explanation or markdown.`;
 
         default:
             return finalBasePrompt;

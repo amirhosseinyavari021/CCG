@@ -7,7 +7,7 @@ import { callApi } from './api/promptService';
 import Header from './components/Header';
 import Form from './components/Form';
 import { GeneratedCommandCard, ExplanationCard, ScriptCard } from './components/CommandCard';
-import { PlusCircle, Github, Wand2, Code2 } from 'lucide-react';
+import { PlusCircle, Github, Wand2, GitCompare } from 'lucide-react';
 import LoadingSpinner from './components/common/LoadingSpinner';
 import Card from './components/common/Card';
 
@@ -15,7 +15,7 @@ import Card from './components/common/Card';
 const ErrorAnalysis = lazy(() => import('./components/ErrorAnalysis'));
 const MobileDrawer = lazy(() => import('./components/MobileDrawer'));
 const FeedbackCard = lazy(() => import('./components/FeedbackCard'));
-const SmartCompilerPanel = lazy(() => import('./components/SmartCompilerPanel')); // New Compiler Panel
+const CodeComparePanel = lazy(() => import('./components/CodeComparePanel')); // New Compare Panel
 
 /**
  * Helper function to determine the correct script file extension based on OS and CLI.
@@ -38,7 +38,7 @@ const getScriptExtension = (os, cli) => {
 
 function AppContent() {
   const [lang, setLang] = useState('en');
-  const [appMode, setAppMode] = useState('generate'); // 'generate' or 'compile'
+  const [appMode, setAppMode] = useState('generate'); // 'generate' or 'compare'
 
   const [commandList, setCommandList] = useState([]);
   const [explanation, setExplanation] = useState(null);
@@ -184,14 +184,14 @@ function AppContent() {
             {t.appModeGenerator}
           </button>
           <button
-            onClick={() => setAppMode('compile')}
-            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-semibold transition-colors ${appMode === 'compile'
+            onClick={() => setAppMode('compare')}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-semibold transition-colors ${appMode === 'compare'
                 ? 'bg-white dark:bg-gray-800 text-amber-600 dark:text-amber-400 shadow'
                 : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100/50 dark:hover:bg-gray-600/50'
               }`}
           >
-            <Code2 size={16} />
-            {t.appModeCompiler}
+            <GitCompare size={16} />
+            {t.appModeCompare}
           </button>
         </div>
       </Card>
@@ -267,9 +267,9 @@ function AppContent() {
             )}
           </div>
         ) : (
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-5xl mx-auto">
             <Suspense fallback={<div className="text-center mt-10"><LoadingSpinner /></div>}>
-              <SmartCompilerPanel lang={lang} t={t} />
+              <CodeComparePanel lang={lang} t={t} />
             </Suspense>
           </div>
         )}

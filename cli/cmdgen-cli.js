@@ -2,6 +2,7 @@
 
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
+const axios = require('axios/dist/node/axios.cjs');
 const { spawn } = require('child_process');
 const os = require('os');
 const path = require('path');
@@ -10,12 +11,10 @@ const semver = require('semver');
 const readline = require('readline');
 const chalk = require('chalk');
 const open = require('open');
-const axios = require('axios/dist/node/axios.cjs'); // Still needed for update check
 
-// Refactored imports
-const { getSystemPrompt, callApi, startSpinner, stopSpinner } = require('./apiService-cli.js');
+const { getSystemPrompt } = require('./apiService-cli.js');
 const { parseAndConstructData } = require('./responseParser-cli.js');
-const { runCompiler } = require('./compiler-cli.js'); // New compiler logic
+const { runComparer } = require('./modules/codeCompare.js'); // New Compare Logic
 
 const packageJson = require('./package.json');
 const currentVersion = packageJson.version;
@@ -100,7 +99,7 @@ ________/\\\\\\\\\__________________/\\\\\\\\\_______________/\\\\\\\\\\\\_
     console.log(`  ${chalk.green('script <request>')}      Generate a full script              [alias: s]`);
     console.log(`  ${chalk.green('analyze <command>')}     Explain a command or script         [alias: a]`);
     console.log(`  ${chalk.green('error <message>')}       Get solutions for an error          [alias: e]`);
-    console.log(`  ${chalk.green('run <file>')}            Run & debug code w/ Smart Compiler  [alias: r]`); // New
+    console.log(`  ${chalk.green('compare <fileA> <fileB>')} Smart AI code compare             [alias: c]`); // New
     console.log(`  ${chalk.green('history')}               Show recently generated items       [alias: h]`);
     console.log(`  ${chalk.green('feedback')}               Provide feedback on the tool        [alias: f]`);
     console.log(`  ${chalk.green('config <action>')}       Manage settings (show, set, wizard)`);
@@ -111,8 +110,6 @@ ________/\\\\\\\\\__________________/\\\\\\\\\_______________/\\\\\\\\\\\\_
     console.log(`  --lang <lang>           Response language (en, fa)                   [default: ${chalk.yellow(langDefault || 'en')}]`);
     console.log(`  --level <level>         Knowledge level (beginner, intermediate, expert) [default: ${chalk.yellow(levelDefault || 'intermediate')}]`);
     console.log(`  --device <device>       Device type for Cisco (router, switch, firewall) [default: ${chalk.yellow(deviceDefault || 'n/a')}]`);
-    console.log(chalk.bold('Options (for run):'));
-    console.log(`  --learn               Enable Learning Mode for step-by-step trace`);
     console.log(chalk.bold('Global Options:'));
     console.log(`  -h, --help            Show this help menu`);
     console.log(`  -v, --version         Show version number`);
@@ -229,6 +226,26 @@ const handleConfigCommand = async (action, key, value) => {
     }
 };
 
+let spinnerInterval;
+const startSpinner = (message) => {
+    if (spinnerInterval) return;
+    const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+    let i = 0;
+    process.stdout.write('\x1B[?25l');
+    spinnerInterval = setInterval(() => {
+        process.stdout.write(chalk.blue(`\r${frames[i++ % frames.length]} ${message}`));
+    }, 80);
+};
+
+const stopSpinner = () => {
+    if (spinnerInterval) {
+        clearInterval(spinnerInterval);
+        spinnerInterval = null;
+    }
+    process.stdout.write('\r' + ' '.repeat(50) + '\r');
+    process.stdout.write('\x1B[?25h');
+};
+
 async function checkForUpdates() {
     try {
         const response = await axios.get(`https://registry.npmjs.org/${packageName}/latest`, { timeout: 2000 });
@@ -240,7 +257,75 @@ async function checkForUpdates() {
     } catch (error) { /* Silently fail */ }
 }
 
-// callApi, startSpinner, stopSpinner, and server URLs were moved to apiService-cli.js
+const primaryServerUrl = 'https://ay-cmdgen-cli.onrender.com';
+const fallbackServerUrl = 'https://cmdgen.onrender.com';
+
+const callApi = async (params) => {
+    const { mode, userInput, os, osVersion, cli, lang, options = {} } = params;
+
+    // Pass codeA/codeB for compare modes
+    const promptOptions = { ...options };
+    if (mode === 'detect-lang') {
+        promptOptions.codeA = userInput;
+    } else if (['compare-diff', 'compare-quality', 'compare-merge'].includes(mode)) {
+        const [codeA, codeB, langA, langB, analysis] = userInput.split('|||');
+        promptOptions.codeA = codeA;
+        promptOptions.codeB = codeB;
+        promptOptions.langA = langA;
+        promptOptions.langB = langB;
+        promptOptions.analysis = analysis;
+    }
+
+    const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, promptOptions);
+
+    // For compare modes, user input is just a trigger
+    const userContent = ['detect-lang', 'compare-diff', 'compare-quality', 'compare-merge'].includes(mode)
+        ? "Analyze the code provided in the system prompt."
+        : userInput;
+
+    const payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userContent }] };
+
+    const attemptRequest = (url) => new Promise(async (resolve, reject) => {
+        try {
+            const response = await axios.post(`${url}/api/proxy`, payload, { responseType: 'stream', timeout: 60000 });
+            stopSpinner();
+            startSpinner('Generating response...');
+            let fullContent = '';
+            response.data.on('data', chunk => {
+                const textChunk = new TextDecoder().decode(chunk);
+                textChunk.split('\n').filter(line => line.startsWith('data: ')).forEach(line => {
+                    const jsonPart = line.substring(5).trim();
+                    if (jsonPart && jsonPart !== "[DONE]") {
+                        try { fullContent += JSON.parse(jsonPart).choices[0].delta.content || ''; } catch (e) { }
+                    }
+                });
+            });
+            response.data.on('end', () => {
+                stopSpinner();
+                const finalData = parseAndConstructData(fullContent, mode, cli);
+                if (!finalData) reject(new Error("Parsing failed"));
+                else resolve({ type: mode, finalData });
+            });
+            response.data.on('error', reject);
+        } catch (err) { reject(err); }
+    });
+
+    try {
+        startSpinner('Connecting to primary server...');
+        return await attemptRequest(primaryServerUrl);
+    } catch (primaryError) {
+        stopSpinner();
+        console.warn(chalk.yellow(`\n⚠️  Primary server failed. Trying fallback...`));
+        startSpinner('Connecting to fallback server...');
+        try {
+            return await attemptRequest(fallbackServerUrl);
+        } catch (fallbackError) {
+            stopSpinner();
+            console.error(chalk.red(`\n❌ Error: Could not connect to any server.`));
+            return null;
+        }
+    }
+};
 
 const executeCommand = (command, shell) => {
     return new Promise((resolve) => {
@@ -276,7 +361,7 @@ const run = async () => {
     }
 
     const command = args[0]?.toLowerCase();
-    const needsConfig = !['config', 'update', 'feedback', 'f', 'run', 'r', undefined, '--help', '-h', '--version', '-v'].includes(command);
+    const needsConfig = !['config', 'update', 'feedback', 'f', 'compare', 'c', undefined, '--help', '-h', '--version', '-v'].includes(command);
 
     if (needsConfig && (!config.os || !config.shell)) {
         config = await runSetupWizard();
@@ -287,7 +372,6 @@ const run = async () => {
         .help(false).version(false)
         .option('os', { type: 'string' }).option('shell', { type: 'string' }).option('lang', { type: 'string' })
         .option('level', { type: 'string' }).option('device', { type: 'string' }).option('debug', { type: 'boolean' })
-        .option('learn', { type: 'boolean', desc: 'Enable Learning Mode for Smart Compiler' }) // New
         .command(['generate <request>', 'g'], 'Generate command suggestions', {}, async (argv) => {
             const context = { ...config, ...argv };
             if (context.os === 'cisco' && !context.device) {
@@ -400,37 +484,34 @@ const run = async () => {
             } else { console.log(chalk.red("\n❌ Failed to analyze the error.")); }
             gracefulExit();
         })
-        // --- NEW 'run' COMMAND ---
-        .command(['run <file>', 'r'], 'Run & debug code w/ Smart Compiler', {}, async (argv) => {
-            const { file, learn, lang } = { ...config, ...argv };
-            const compilerOptions = {
-                learningMode: learn || false,
-                lang: lang || 'en'
-            };
+        // --- NEW 'compare' COMMAND ---
+        .command(['compare <fileA> <fileB>', 'c'], 'Compare two code files with AI', {}, async (argv) => {
+            const { fileA, fileB, lang } = { ...config, ...argv };
 
-            let fileContent;
+            let contentA, contentB;
             try {
-                const filePath = path.resolve(file);
-                if (!await fs.pathExists(filePath)) {
-                    console.error(chalk.red(`\n❌ Error: File not found at ${filePath}`));
-                    process.exit(1);
-                }
-                fileContent = await fs.readFile(filePath, 'utf-8');
+                const pathA = path.resolve(fileA);
+                const pathB = path.resolve(fileB);
+                if (!await fs.pathExists(pathA)) throw new Error(`File not found: ${fileA}`);
+                if (!await fs.pathExists(pathB)) throw new Error(`File not found: ${fileB}`);
+
+                contentA = await fs.readFile(pathA, 'utf-8');
+                contentB = await fs.readFile(pathB, 'utf-8');
             } catch (err) {
-                console.error(chalk.red(`\n❌ Error reading file: ${err.message}`));
+                console.error(chalk.red(`\n❌ Error reading files: ${err.message}`));
                 process.exit(1);
             }
 
-            if (!fileContent.trim()) {
-                console.error(chalk.red(`\n❌ Error: File is empty.`));
+            if (!contentA.trim() || !contentB.trim()) {
+                console.error(chalk.red(`\n❌ Error: One or both files are empty.`));
                 process.exit(1);
             }
 
             await setConfig({ usageCount: (config.usageCount || 0) + 1 });
-            await runCompiler(fileContent, compilerOptions, config);
+            await runComparer(contentA, contentB, { lang: lang || 'en' }, config, callApi);
             gracefulExit();
         })
-        // --- End of 'run' command ---
+        // --- End of 'compare' command ---
         .command('config [action] [key] [value]', 'Manage settings', {}, (argv) => handleConfigCommand(argv.action, argv.key, argv.value))
         .command(['history', 'h'], 'Show command history', {}, async () => {
             const config = await getConfig();
