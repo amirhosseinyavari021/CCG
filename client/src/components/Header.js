@@ -6,7 +6,7 @@ const Header = ({ lang, theme, onThemeChange, onMenuClick, onLangChange }) => {
     const appVersion = process.env.REACT_APP_VERSION || '2.8.2';
 
     return (
-        <header className="bg-white dark:bg-gray-900 shadow-sm sticky top-0 z-40">
+        <header className="bg-transparent shadow-sm sticky top-0 z-40">
             <div className="container mx-auto px-4 py-3 flex justify-between items-center">
                 <div className="flex items-center gap-3">
                     {/* Menu button for mobile */}
