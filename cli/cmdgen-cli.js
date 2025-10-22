@@ -2,7 +2,6 @@
 
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
-const axios = require('axios/dist/node/axios.cjs');
 const { spawn } = require('child_process');
 const os = require('os');
 const path = require('path');
@@ -11,9 +10,12 @@ const semver = require('semver');
 const readline = require('readline');
 const chalk = require('chalk');
 const open = require('open');
+const axios = require('axios/dist/node/axios.cjs'); // Still needed for update check
 
-const { getSystemPrompt } = require('./apiService-cli.js');
+// Refactored imports
+const { getSystemPrompt, callApi, startSpinner, stopSpinner } = require('./apiService-cli.js');
 const { parseAndConstructData } = require('./responseParser-cli.js');
+const { runCompiler } = require('./compiler-cli.js'); // New compiler logic
 
 const packageJson = require('./package.json');
 const currentVersion = packageJson.version;
@@ -98,16 +100,20 @@ ________/\\\\\\\\\__________________/\\\\\\\\\_______________/\\\\\\\\\\\\_
     console.log(`  ${chalk.green('script <request>')}      Generate a full script              [alias: s]`);
     console.log(`  ${chalk.green('analyze <command>')}     Explain a command or script         [alias: a]`);
     console.log(`  ${chalk.green('error <message>')}       Get solutions for an error          [alias: e]`);
+    console.log(`  ${chalk.green('run <file>')}            Run & debug code w/ Smart Compiler  [alias: r]`); // New
     console.log(`  ${chalk.green('history')}               Show recently generated items       [alias: h]`);
     console.log(`  ${chalk.green('feedback')}               Provide feedback on the tool        [alias: f]`);
     console.log(`  ${chalk.green('config <action>')}       Manage settings (show, set, wizard)`);
     console.log(`  ${chalk.green('update')}                Update CCG to the latest version\n`);
-    console.log(chalk.bold('Options:'));
-    console.log(`  --os <os>             Platform (linux, windows, cisco, mikrotik, python) [default: ${chalk.yellow(osDefault || 'not set')}]`);
-    console.log(`  --shell <shell>         Target shell (PowerShell, bash, CLI)               [default: ${chalk.yellow(shellDefault || 'not set')}]`);
-    console.log(`  --lang <lang>           Response language (en, fa)                         [default: ${chalk.yellow(langDefault || 'en')}]`);
-    console.log(`  --level <level>         Knowledge level (beginner, intermediate, expert)   [default: ${chalk.yellow(levelDefault || 'intermediate')}]`);
-    console.log(`  --device <device>       Device type for Cisco (router, switch, firewall)   [default: ${chalk.yellow(deviceDefault || 'n/a')}]`);
+    console.log(chalk.bold('Options (for generate, script, analyze, error):'));
+    console.log(`  --os <os>             Platform (ubuntu, windows, cisco, etc.)      [default: ${chalk.yellow(osDefault || 'not set')}]`);
+    console.log(`  --shell <shell>         Target shell (PowerShell, bash, CLI)         [default: ${chalk.yellow(shellDefault || 'not set')}]`);
+    console.log(`  --lang <lang>           Response language (en, fa)                   [default: ${chalk.yellow(langDefault || 'en')}]`);
+    console.log(`  --level <level>         Knowledge level (beginner, intermediate, expert) [default: ${chalk.yellow(levelDefault || 'intermediate')}]`);
+    console.log(`  --device <device>       Device type for Cisco (router, switch, firewall) [default: ${chalk.yellow(deviceDefault || 'n/a')}]`);
+    console.log(chalk.bold('Options (for run):'));
+    console.log(`  --learn               Enable Learning Mode for step-by-step trace`);
+    console.log(chalk.bold('Global Options:'));
     console.log(`  -h, --help            Show this help menu`);
     console.log(`  -v, --version         Show version number`);
 };
@@ -126,38 +132,50 @@ const gracefulExit = () => {
     process.exit(0);
 };
 
+// --- Updated OS Wizard ---
 const runSetupWizard = async () => {
     console.log(chalk.cyan('\n--- CCG Setup Wizard ---'));
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
     const question = (query) => new Promise(resolve => rl.question(query, resolve));
 
-    const osOptions = ['Linux', 'Windows', 'macOS', 'Cisco', 'MikroTik', 'Python', 'Other'];
+    // New OS list
+    const osOptions = [
+        'Ubuntu', 'Debian', 'Fedora', 'CentOS Stream', 'CentOS', 'Arch Linux',
+        'Windows', 'macOS', 'Cisco', 'MikroTik', 'Python', 'Other'
+    ];
     console.log('\nSelect your primary platform/OS:');
     osOptions.forEach((opt, i) => console.log(chalk.gray(`  ${i + 1}. ${opt}`)));
     const osChoice = await question('> ');
-    const selectedOsKey = osOptions[parseInt(osChoice) - 1]?.toLowerCase() || 'other';
+    const selectedOsKey = osOptions[parseInt(osChoice) - 1]?.toLowerCase().replace(' ', '-') || 'other';
 
-    let os, shell, deviceType = null, osVersion;
+    let os, shell, deviceType = null, osVersion = ''; // osVersion is now optional
 
     if (selectedOsKey === 'other') {
         os = await question('Enter your OS name: ');
-        osVersion = await question('Enter your OS version: ');
+        osVersion = await question('Enter your OS version (optional): '); // Made optional
         shell = await question('Enter your Shell name: ');
     } else {
         os = selectedOsKey;
         const shellMap = {
-            windows: ['PowerShell', 'CMD'],
-            macos: ['zsh', 'bash'],
-            linux: ['bash', 'zsh', 'fish'],
-            cisco: ['CLI'],
-            mikrotik: ['MikroTik CLI'],
-            python: ['Python 3']
+            'ubuntu': ['bash', 'zsh'],
+            'debian': ['bash', 'zsh'],
+            'fedora': ['bash', 'zsh'],
+            'centos-stream': ['bash', 'zsh'],
+            'centos': ['bash', 'zsh'],
+            'arch': ['bash', 'zsh'],
+            'windows': ['PowerShell', 'CMD'],
+            'macos': ['zsh', 'bash'],
+            'cisco': ['CLI'],
+            'mikrotik': ['MikroTik CLI'],
+            'python': ['Python 3']
         };
         const shellOptions = shellMap[os];
         console.log(`\nSelect a Shell/Environment for ${os}:`);
         shellOptions.forEach((opt, i) => console.log(chalk.gray(`  ${i + 1}. ${opt}`)));
         const shellChoice = await question('> ');
         shell = shellOptions[parseInt(shellChoice) - 1];
+
+        // OS Version question is REMOVED for standard OSs
 
         if (os === 'cisco') {
             const deviceOptions = ['router', 'switch', 'firewall'];
@@ -186,6 +204,7 @@ const runSetupWizard = async () => {
     console.log(chalk.green(`\n✅ Configuration saved successfully!`));
     return newConfig;
 };
+// --- End of OS Wizard Update ---
 
 const handleConfigCommand = async (action, key, value) => {
     const config = await getConfig();
@@ -198,7 +217,7 @@ const handleConfigCommand = async (action, key, value) => {
         });
     } else if (action === 'set') {
         if (!key || !value) return console.error(chalk.red('Error: "set" action requires a key and value.'));
-        const validKeys = ['os', 'osVersion', 'shell', 'lang', 'knowledgeLevel', 'deviceType'];
+        const validKeys = ['os', 'osVersion', 'shell', 'lang', 'knowledgeLevel', 'deviceType']; // osVersion is still valid
         if (validKeys.includes(key)) {
             await setConfig({ [key]: value });
             console.log(chalk.green(`✅ Success! Set "${key}" to "${value}".`));
@@ -208,26 +227,6 @@ const handleConfigCommand = async (action, key, value) => {
     } else {
         await runSetupWizard();
     }
-};
-
-let spinnerInterval;
-const startSpinner = (message) => {
-    if (spinnerInterval) return;
-    const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-    let i = 0;
-    process.stdout.write('\x1B[?25l');
-    spinnerInterval = setInterval(() => {
-        process.stdout.write(chalk.blue(`\r${frames[i++ % frames.length]} ${message}`));
-    }, 80);
-};
-
-const stopSpinner = () => {
-    if (spinnerInterval) {
-        clearInterval(spinnerInterval);
-        spinnerInterval = null;
-    }
-    process.stdout.write('\r' + ' '.repeat(50) + '\r');
-    process.stdout.write('\x1B[?25h');
 };
 
 async function checkForUpdates() {
@@ -241,55 +240,7 @@ async function checkForUpdates() {
     } catch (error) { /* Silently fail */ }
 }
 
-const primaryServerUrl = 'https://ay-cmdgen-cli.onrender.com';
-const fallbackServerUrl = 'https://cmdgen.onrender.com';
-
-const callApi = async (params) => {
-    const { mode, userInput, os, osVersion, cli, lang, options = {} } = params;
-    const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, options);
-    const payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userInput }] };
-
-    const attemptRequest = (url) => new Promise(async (resolve, reject) => {
-        try {
-            const response = await axios.post(`${url}/api/proxy`, payload, { responseType: 'stream', timeout: 60000 });
-            stopSpinner();
-            startSpinner('Generating response...');
-            let fullContent = '';
-            response.data.on('data', chunk => {
-                const textChunk = new TextDecoder().decode(chunk);
-                textChunk.split('\n').filter(line => line.startsWith('data: ')).forEach(line => {
-                    const jsonPart = line.substring(5).trim();
-                    if (jsonPart && jsonPart !== "[DONE]") {
-                        try { fullContent += JSON.parse(jsonPart).choices[0].delta.content || ''; } catch (e) { }
-                    }
-                });
-            });
-            response.data.on('end', () => {
-                stopSpinner();
-                const finalData = parseAndConstructData(fullContent, mode, cli);
-                if (!finalData) reject(new Error("Parsing failed"));
-                else resolve({ type: mode, finalData });
-            });
-            response.data.on('error', reject);
-        } catch (err) { reject(err); }
-    });
-
-    try {
-        startSpinner('Connecting to primary server...');
-        return await attemptRequest(primaryServerUrl);
-    } catch (primaryError) {
-        stopSpinner();
-        console.warn(chalk.yellow(`\n⚠️  Primary server failed. Trying fallback...`));
-        startSpinner('Connecting to fallback server...');
-        try {
-            return await attemptRequest(fallbackServerUrl);
-        } catch (fallbackError) {
-            stopSpinner();
-            console.error(chalk.red(`\n❌ Error: Could not connect to any server.`));
-            return null;
-        }
-    }
-};
+// callApi, startSpinner, stopSpinner, and server URLs were moved to apiService-cli.js
 
 const executeCommand = (command, shell) => {
     return new Promise((resolve) => {
@@ -325,7 +276,7 @@ const run = async () => {
     }
 
     const command = args[0]?.toLowerCase();
-    const needsConfig = !['config', 'update', 'feedback', 'f', undefined, '--help', '-h', '--version', '-v'].includes(command);
+    const needsConfig = !['config', 'update', 'feedback', 'f', 'run', 'r', undefined, '--help', '-h', '--version', '-v'].includes(command);
 
     if (needsConfig && (!config.os || !config.shell)) {
         config = await runSetupWizard();
@@ -336,13 +287,14 @@ const run = async () => {
         .help(false).version(false)
         .option('os', { type: 'string' }).option('shell', { type: 'string' }).option('lang', { type: 'string' })
         .option('level', { type: 'string' }).option('device', { type: 'string' }).option('debug', { type: 'boolean' })
+        .option('learn', { type: 'boolean', desc: 'Enable Learning Mode for Smart Compiler' }) // New
         .command(['generate <request>', 'g'], 'Generate command suggestions', {}, async (argv) => {
             const context = { ...config, ...argv };
             if (context.os === 'cisco' && !context.device) {
                 console.error(chalk.red('Error: --device is required for Cisco OS (e.g., --device router).'));
                 process.exit(1);
             }
-            const initialResult = await callApi({ userInput: argv.request, mode: 'generate', os: context.os, cli: context.shell, lang: context.lang, options: { knowledgeLevel: context.level, deviceType: context.device } });
+            const initialResult = await callApi({ userInput: argv.request, mode: 'generate', os: context.os, osVersion: context.osVersion, cli: context.shell, lang: context.lang, options: { knowledgeLevel: context.level, deviceType: context.device } });
 
             if (!initialResult?.finalData?.commands?.length) {
                 console.log(chalk.red("\n❌ Failed to generate valid commands."));
@@ -388,7 +340,7 @@ const run = async () => {
             const getMoreSuggestions = async (request, allCommands, context) => {
                 console.log(chalk.blue("\n🔄 Getting more suggestions..."));
                 const existing = allCommands.map(c => c.command);
-                const result = await callApi({ userInput: request, mode: 'generate', os: context.os, cli: context.shell, lang: context.lang, options: { existingCommands: existing, knowledgeLevel: context.level, deviceType: context.device } });
+                const result = await callApi({ userInput: request, mode: 'generate', os: context.os, osVersion: context.osVersion, cli: context.shell, lang: context.lang, options: { existingCommands: existing, knowledgeLevel: context.level, deviceType: context.device } });
                 return result?.finalData?.commands || [];
             };
             const promptUser = (commands) => new Promise(resolve => {
@@ -414,8 +366,8 @@ const run = async () => {
             await startInteractiveSession();
         })
         .command(['script <request>', 's'], 'Generate a full script', {}, async (argv) => {
-            const { os, shell, lang, level, device, request } = { ...config, ...argv };
-            const result = await callApi({ userInput: request, mode: 'script', os, cli: shell, lang, options: { knowledgeLevel: level, deviceType: device } });
+            const { os, osVersion, shell, lang, level, device, request } = { ...config, ...argv };
+            const result = await callApi({ userInput: request, mode: 'script', os, osVersion, cli: shell, lang, options: { knowledgeLevel: level, deviceType: device } });
             if (result?.finalData?.explanation) {
                 await setConfig({ usageCount: (config.usageCount || 0) + 1 });
                 console.log(chalk.cyan.bold('\n--- Generated Script ---'));
@@ -425,8 +377,8 @@ const run = async () => {
             gracefulExit();
         })
         .command(['analyze <command>', 'a'], 'Explain a command', {}, async (argv) => {
-            const { os, shell, lang, level, device, command } = { ...config, ...argv };
-            const result = await callApi({ userInput: command, mode: 'explain', os, cli: shell, lang, options: { knowledgeLevel: level, deviceType: device } });
+            const { os, osVersion, shell, lang, level, device, command } = { ...config, ...argv };
+            const result = await callApi({ userInput: command, mode: 'explain', os, osVersion, cli: shell, lang, options: { knowledgeLevel: level, deviceType: device } });
             if (result?.finalData?.explanation) {
                 await setConfig({ usageCount: (config.usageCount || 0) + 1 });
                 console.log(chalk.cyan.bold('\n--- Analysis ---'));
@@ -435,8 +387,8 @@ const run = async () => {
             gracefulExit();
         })
         .command(['error <message>', 'e'], 'Get help for an error', {}, async (argv) => {
-            const { os, shell, lang, level, device, message } = { ...config, ...argv };
-            const result = await callApi({ userInput: message, mode: 'error', os, cli: shell, lang, options: { knowledgeLevel: level, deviceType: device } });
+            const { os, osVersion, shell, lang, level, device, message } = { ...config, ...argv };
+            const result = await callApi({ userInput: message, mode: 'error', os, osVersion, cli: shell, lang, options: { knowledgeLevel: level, deviceType: device } });
             if (result?.finalData?.cause) {
                 await setConfig({ usageCount: (config.usageCount || 0) + 1 });
                 console.log(chalk.red.bold('\nProbable Cause:'), result.finalData.cause);
@@ -448,6 +400,37 @@ const run = async () => {
             } else { console.log(chalk.red("\n❌ Failed to analyze the error.")); }
             gracefulExit();
         })
+        // --- NEW 'run' COMMAND ---
+        .command(['run <file>', 'r'], 'Run & debug code w/ Smart Compiler', {}, async (argv) => {
+            const { file, learn, lang } = { ...config, ...argv };
+            const compilerOptions = {
+                learningMode: learn || false,
+                lang: lang || 'en'
+            };
+
+            let fileContent;
+            try {
+                const filePath = path.resolve(file);
+                if (!await fs.pathExists(filePath)) {
+                    console.error(chalk.red(`\n❌ Error: File not found at ${filePath}`));
+                    process.exit(1);
+                }
+                fileContent = await fs.readFile(filePath, 'utf-8');
+            } catch (err) {
+                console.error(chalk.red(`\n❌ Error reading file: ${err.message}`));
+                process.exit(1);
+            }
+
+            if (!fileContent.trim()) {
+                console.error(chalk.red(`\n❌ Error: File is empty.`));
+                process.exit(1);
+            }
+
+            await setConfig({ usageCount: (config.usageCount || 0) + 1 });
+            await runCompiler(fileContent, compilerOptions, config);
+            gracefulExit();
+        })
+        // --- End of 'run' command ---
         .command('config [action] [key] [value]', 'Manage settings', {}, (argv) => handleConfigCommand(argv.action, argv.key, argv.value))
         .command(['history', 'h'], 'Show command history', {}, async () => {
             const config = await getConfig();
