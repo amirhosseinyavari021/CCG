@@ -238,7 +238,7 @@ function AppContent() {
         </div>
       </main>
 
-      <footer className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-lg py-3 text-center text-gray-900 dark:text-gray-400 text-xs border-t border-gray-200/50 dark:border-gray-800/50">
+      <footer className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-lg py-3 text-center font-semibold text-gray-900 dark:text-gray-300 text-xs border-t border-gray-200/50 dark:border-gray-800/50">
         <div className="flex justify-center items-center gap-4 mb-2">
           <a href="https://github.com/amirhosseinyavari021/CCG" target="_blank" rel="noopener noreferrer" className="text-gray-700 hover:text-black dark:text-gray-400 dark:hover:text-gray-300">
             <Github size={20} />
