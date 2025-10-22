@@ -228,7 +228,7 @@ function AppContent() {
           )}
 
           {explanation && <ExplanationCard explanation={explanation} lang={lang} />}
-          {script && <ScriptCard filename={script.filename} script_lines={script_lines} lang={lang} />}
+          {script && <ScriptCard filename={script.filename} script_lines={script.script_lines} lang={lang} />}
 
           {(commandList.length > 0 || explanation || script) && !isLoading && (
             <Suspense fallback={<div className="text-center mt-10"><LoadingSpinner /></div>}>
