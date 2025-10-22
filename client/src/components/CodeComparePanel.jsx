@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Card from './common/Card';
 import LoadingSpinner from './common/LoadingSpinner';
 import CommandDisplay from './common/CommandDisplay';
-import { useCodeCompare } from 'hooks/useCodeCompare'; // <-- FIXED: Changed path from ../hooks/ to hooks/
+import { useCodeCompare } from '../hooks/useCodeCompare'; // <-- FIXED: Corrected relative path
 import { GitCompare, Terminal, AlertTriangle, CheckCircle, Wand2, Star } from 'lucide-react';
 
 // A reusable component for displaying AI analysis sections
