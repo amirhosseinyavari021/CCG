@@ -178,7 +178,7 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100/95 dark:bg-gray-900/95 text-gray-900 dark:text-gray-200" style={{ fontFamily: lang === 'fa' ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }}>
+    <div className="min-h-screen bg-transparent text-gray-900 dark:text-gray-200" style={{ fontFamily: lang === 'fa' ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }}>
       <Toaster
         position="top-center"
         reverseOrder={false}
@@ -246,7 +246,7 @@ function AppContent() {
         </div>
       </main>
 
-      <footer className="bg-gray-100/95 dark:bg-gray-900/95 py-4 text-center text-black dark:text-gray-400 text-xs border-t border-gray-200 dark:border-gray-800">
+      <footer className="bg-transparent py-4 text-center text-gray-900 dark:text-gray-400 text-xs border-t border-gray-200 dark:border-gray-800">
         <div className="flex justify-center items-center gap-4 mb-2">
           <a href="https://github.com/amirhosseinyavari021/CCG" target="_blank" rel="noopener noreferrer" className="text-gray-700 hover:text-black dark:text-gray-400 dark:hover:text-gray-300">
             <Github size={20} />
