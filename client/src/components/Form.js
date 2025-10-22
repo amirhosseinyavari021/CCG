@@ -6,10 +6,10 @@ import Card from './common/Card';
 import CustomSelect from './common/CustomSelect';
 import LoadingSpinner from './common/LoadingSpinner';
 
-const CustomInput = ({ label, value, onChange, placeholder, error }) => (
+const CustomInput = ({ label, value, onChange, placeholder, error, isRequired = true }) => (
     <div className="flex flex-col gap-2">
         <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
-            {label}&nbsp;<span className="text-red-500">*</span>
+            {label}&nbsp;{isRequired && <span className="text-red-500">*</span>}
         </label>
         <input
             type="text"
@@ -25,14 +25,14 @@ const CustomInput = ({ label, value, onChange, placeholder, error }) => (
 const Form = ({ onSubmit, onExplain, onScript, isLoading, loadingMessage, lang }) => {
     const t = translations[lang];
 
-    const [os, setOs] = useState('linux');
-    const [osVersion, setOsVersion] = useState('');
+    const [os, setOs] = useState('ubuntu'); // Default to new OS list
+    const [osVersion, setOsVersion] = useState(''); // This will only be used for 'other'
     const [cli, setCli] = useState('');
     const [userInput, setUserInput] = useState('');
     const [formErrors, setFormErrors] = useState({});
 
     const [customOsName, setCustomOsName] = useState('');
-    const [customOsVersion, setCustomOsVersion] = useState('');
+    const [customOsVersion, setCustomOsVersion] = useState(''); // Renamed for clarity
     const [customCli, setCustomCli] = useState('');
 
     const [deviceType, setDeviceType] = useState('router');
@@ -40,11 +40,11 @@ const Form = ({ onSubmit, onExplain, onScript, isLoading, loadingMessage, lang }
 
     useEffect(() => {
         if (os in osDetails && os !== 'other') {
-            setOsVersion(osDetails[os].versions[0] || '');
             setCli(osDetails[os].clis[0] || '');
+            setOsVersion(''); // Clear osVersion for standard OSs
         } else {
-            setOsVersion('');
             setCli('');
+            setOsVersion(''); // Clear for 'other' initially
         }
     }, [os]);
 
@@ -53,19 +53,19 @@ const Form = ({ onSubmit, onExplain, onScript, isLoading, loadingMessage, lang }
         if (!userInput.trim()) newErrors.userInput = t.fieldRequired;
 
         let finalOs = os;
-        let finalOsVersion = osVersion;
+        let finalOsVersion = ''; // Changed: OS version is now optional
         let finalCli = cli;
 
         if (os === 'other') {
             if (!customOsName.trim()) newErrors.customOsName = t.fieldRequired;
-            if (!customOsVersion.trim()) newErrors.customOsVersion = t.fieldRequired;
+            // osVersion (customOsVersion) is now optional, no validation needed
             if (!customCli.trim()) newErrors.customCli = t.fieldRequired;
             finalOs = customOsName.trim();
-            finalOsVersion = customOsVersion.trim();
+            finalOsVersion = customOsVersion.trim(); // Pass it if user provided it
             finalCli = customCli.trim();
         } else {
             if (!os) newErrors.os = t.fieldRequired;
-            if (!osVersion && osDetails[os]?.versions.length > 0) newErrors.osVersion = t.fieldRequired;
+            // osVersion field is removed, so no validation
             if (!cli) newErrors.cli = t.fieldRequired;
         }
 
@@ -78,7 +78,7 @@ const Form = ({ onSubmit, onExplain, onScript, isLoading, loadingMessage, lang }
         if (Object.keys(newErrors).length === 0) {
             const formData = {
                 os: finalOs,
-                osVersion: finalOsVersion,
+                osVersion: finalOsVersion, // Pass the optional version
                 cli: finalCli,
                 userInput,
                 knowledgeLevel,
@@ -88,6 +88,7 @@ const Form = ({ onSubmit, onExplain, onScript, isLoading, loadingMessage, lang }
         }
     };
 
+    // Updated OS options from osDetails keys
     const osOptions = [...Object.keys(osDetails).filter(k => k !== 'other'), 'other'];
     const deviceOptions = ['router', 'switch', 'firewall'];
     const knowledgeLevelOptions = ['beginner', 'intermediate', 'expert'];
@@ -115,13 +116,24 @@ const Form = ({ onSubmit, onExplain, onScript, isLoading, loadingMessage, lang }
 
                     {os !== 'other' ? (
                         <>
-                            <CustomSelect label={t.osVersion} value={osVersion} onChange={setOsVersion} options={osDetails[os]?.versions || []} placeholder={t.selectVersion} lang={lang} error={formErrors.osVersion} />
-                            <CustomSelect label={t.cli} value={cli} onChange={setCli} options={osDetails[os]?.clis || []} placeholder={t.selectCli} lang={lang} error={formErrors.cli} />
+                            {/* OS Version Select is REMOVED for standard OSs */}
+                            <div className="lg:col-span-1">
+                                <CustomSelect label={t.cli} value={cli} onChange={setCli} options={osDetails[os]?.clis || []} placeholder={t.selectCli} lang={lang} error={formErrors.cli} />
+                            </div>
+                            {/* This div is to fill the grid cell */}
+                            <div className="hidden lg:block lg:col-span-1"></div>
                         </>
                     ) : (
                         <>
                             <CustomInput label={t.customOsLabel} value={customOsName} onChange={setCustomOsName} placeholder={t.customOsPlaceholder} error={formErrors.customOsName} />
-                            <CustomInput label={t.customOsVersionLabel} value={customOsVersion} onChange={setCustomOsVersion} placeholder={t.customOsVersionPlaceholder} error={formErrors.customOsVersion} />
+                            <CustomInput
+                                label={t.customOsVersionLabel}
+                                value={customOsVersion}
+                                onChange={setCustomOsVersion}
+                                placeholder={t.customOsVersionPlaceholder}
+                                error={formErrors.customOsVersion}
+                                isRequired={false} // Field is now optional
+                            />
                             <CustomInput label={t.cli} value={customCli} onChange={setCustomCli} placeholder={t.customCliPlaceholder || 'e.g., sh'} error={formErrors.customCli} />
                         </>
                     )}
@@ -153,7 +165,7 @@ const Form = ({ onSubmit, onExplain, onScript, isLoading, loadingMessage, lang }
 
                 <div className="flex flex-col gap-2">
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.questionLabel}</label>
-                    <textarea value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder={t.questionPlaceholder} className="w-full h-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-amber-500 resize-none" />
+                    <textarea value={userInput} onChange={(e) => setUserInput(e.g.target.value)} placeholder={t.questionPlaceholder} className="w-full h-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-amber-500 resize-none" />
                     {formErrors.userInput && <p className="text-red-500 text-xs mt-1">{formErrors.userInput}</p>}
                 </div>
 

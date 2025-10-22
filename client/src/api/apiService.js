@@ -17,7 +17,7 @@ const buildBasePrompt = (os, osVersion, cli, lang, knowledgeLevel, deviceType) =
     const language = lang === 'fa' ? 'Persian (Farsi)' : 'English';
     return baseSystemPrompt
         .replace('{{os}}', os || 'Not Specified')
-        .replace('{{osVersion}}', osVersion || 'N/A')
+        .replace('{{osVersion}}', osVersion || 'N/A') // This logic correctly handles the new optional version
         .replace('{{cli}}', cli || 'Not Specified')
         .replace('{{language}}', language)
         .replace('{{expertise}}', knowledgeLevel || 'intermediate')
@@ -25,7 +25,8 @@ const buildBasePrompt = (os, osVersion, cli, lang, knowledgeLevel, deviceType) =
 };
 
 export const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) => {
-    const { existingCommands = [], command = '', knowledgeLevel, deviceType } = options;
+    const { existingCommands = [], command = '', knowledgeLevel, deviceType, code = '', error = '' } = options;
+    // Note: os, osVersion, cli are less relevant for compiler modes, but passed for context
     const finalBasePrompt = buildBasePrompt(os, osVersion, cli, lang, knowledgeLevel, deviceType);
     const language = lang === 'fa' ? 'Persian' : 'English';
 
@@ -42,6 +43,7 @@ export const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) =>
     const lowerOs = (os || '').toLowerCase();
     const lowerCli = (cli || '').toLowerCase();
 
+    // These instructions are for the 'generate' mode, not compiler modes
     if (lowerOs.includes('cisco')) {
         platformInstructions = `
 **PLATFORM NUANCE: CISCO**
@@ -78,6 +80,7 @@ export const getSystemPrompt = (mode, os, osVersion, cli, lang, options = {}) =>
     }
 
     switch (mode) {
+        // --- Existing Modes ---
         case 'generate':
             return `${finalBasePrompt}
 ${goldenRules}
@@ -109,6 +112,58 @@ ${goldenRules}
 **MISSION:** Analyze the user's error message. Provide a cause, a simple explanation, and concrete solution steps.
 **OUTPUT FORMAT:** Use the format: probable_cause|||explanation|||CMD: solution_command_1|||CMD: solution_command_2
 `;
+
+        // --- New Smart Compiler Modes ---
+        case 'detect-lang':
+            return `You are a language detection expert. Analyze the code snippet and respond with ONLY the common name of the programming language (e.g., Python, JavaScript, Bash, PowerShell, C++, Java).
+**MISSION:** Detect the language from the following code:
+${code}`;
+
+        case 'explain-code':
+            return `You are an expert developer. **Briefly** explain what the user's code is expected to do in a friendly tone. Respond in **${language}**.
+**MISSION:** Explain this code:
+${code}`;
+
+        case 'analyze-error':
+            return `You are a friendly and empathetic debugging assistant. The user's code failed. Explain the problem in a human-like, encouraging tone. Respond in **${language}**.
+**MISSION:** Analyze this error.
+**CODE:**
+${code}
+**ERROR:**
+${error}`;
+
+        case 'auto-fix':
+            return `You are an expert code fixer. The user's code produced an error. Provide a fixed version. Respond with **ONLY** the raw, fixed code block. Do not add any explanation or markdown.
+**MISSION:** Fix this code.
+**CODE:**
+${code}
+**ERROR:**
+${error}`;
+
+        case 'learning-mode':
+            return `You are an educator. Explain the provided code with a step-by-step execution trace or a detailed line-by-line breakdown for a beginner. Respond in **${language}**.
+**MISSION:** Provide a learning-mode trace for this code:
+${code}`;
+
+        case 'review-code':
+            return `You are a senior code reviewer. Analyze the code for potential optimizations, bugs, or security improvements. Provide your suggestions as a bulleted list. If there are no issues, say so. Respond in **${language}**.
+**MISSION:** Review this code:
+${code}`;
+
+        case 'visualize-flow':
+            return `You are a CLI artist. Create a simple, text-based (ASCII/Unicode) visual representation of the provided code's execution flow (e.g., using arrows, indentation).
+**MISSION:** Visualize this code's flow:
+${code}`;
+
+        case 'safety-check':
+            return `You are a security bot. Does this code perform any potentially unsafe operations (e.g., file deletion, network access, sudo/admin commands, 'rm -rf', 'format', 'Invoke-Expression')? Respond with 'SAFE' if no issues are found. If unsafe, respond with 'UNSAFE: [brief reason]'.
+**MISSION:** Analyze this code for safety:
+${code}`;
+
+        case 'suggestions':
+            return `You are an expert developer. The user's code ran successfully. Provide brief suggestions for improvement, next steps, or alternative approaches. Respond in **${language}**.
+**MISSION:** Provide suggestions for this code:
+${code}`;
 
         default:
             return finalBasePrompt;

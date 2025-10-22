@@ -7,13 +7,15 @@ import { callApi } from './api/promptService';
 import Header from './components/Header';
 import Form from './components/Form';
 import { GeneratedCommandCard, ExplanationCard, ScriptCard } from './components/CommandCard';
-import { PlusCircle, Github } from 'lucide-react';
+import { PlusCircle, Github, Wand2, Code2 } from 'lucide-react';
 import LoadingSpinner from './components/common/LoadingSpinner';
+import Card from './components/common/Card';
 
 // Lazy load components that are not needed on initial render
 const ErrorAnalysis = lazy(() => import('./components/ErrorAnalysis'));
 const MobileDrawer = lazy(() => import('./components/MobileDrawer'));
 const FeedbackCard = lazy(() => import('./components/FeedbackCard'));
+const SmartCompilerPanel = lazy(() => import('./components/SmartCompilerPanel')); // New Compiler Panel
 
 /**
  * Helper function to determine the correct script file extension based on OS and CLI.
@@ -36,7 +38,7 @@ const getScriptExtension = (os, cli) => {
 
 function AppContent() {
   const [lang, setLang] = useState('en');
-  // const [theme, setTheme] = useState('dark'); // Theme is now locked to dark
+  const [appMode, setAppMode] = useState('generate'); // 'generate' or 'compile'
 
   const [commandList, setCommandList] = useState([]);
   const [explanation, setExplanation] = useState(null);
@@ -76,8 +78,6 @@ function AppContent() {
     document.body.dir = newLang === 'fa' ? 'rtl' : 'ltr';
     setIsDrawerOpen(false);
   };
-
-  // toggleTheme function removed
 
   const resetStateForNewRequest = () => {
     setCommandList([]);
@@ -138,13 +138,11 @@ function AppContent() {
     );
 
     if (apiResult?.data?.explanation) {
-      // --- FIX: Determine filename dynamically based on OS/CLI ---
       const extension = getScriptExtension(formData.os, formData.cli);
       const filename = `generated_script${extension}`;
-      // --------------------------------------------------------
 
       setScript({
-        filename: filename, // Use the dynamic filename
+        filename: filename,
         script_lines: apiResult.data.explanation.split('\n')
       });
       incrementUsageCount();
@@ -170,6 +168,35 @@ function AppContent() {
     setShowFeedback(false);
     localStorage.setItem('feedbackRequested', 'true');
   };
+
+  const AppModeToggle = () => (
+    <div className="max-w-2xl mx-auto mb-6">
+      <Card lang={lang} className="p-2">
+        <div className="flex bg-gray-200/70 dark:bg-gray-700/70 rounded-lg p-1 space-x-1">
+          <button
+            onClick={() => setAppMode('generate')}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-semibold transition-colors ${appMode === 'generate'
+                ? 'bg-white dark:bg-gray-800 text-amber-600 dark:text-amber-400 shadow'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100/50 dark:hover:bg-gray-600/50'
+              }`}
+          >
+            <Wand2 size={16} />
+            {t.appModeGenerator}
+          </button>
+          <button
+            onClick={() => setAppMode('compile')}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-semibold transition-colors ${appMode === 'compile'
+                ? 'bg-white dark:bg-gray-800 text-amber-600 dark:text-amber-400 shadow'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100/50 dark:hover:bg-gray-600/50'
+              }`}
+          >
+            <Code2 size={16} />
+            {t.appModeCompiler}
+          </button>
+        </div>
+      </Card>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-transparent text-gray-900 dark:text-gray-200" style={{ fontFamily: lang === 'fa' ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }}>
@@ -197,45 +224,55 @@ function AppContent() {
       />
 
       <main className="container mx-auto px-4 py-8 md:py-12 flex-grow">
-        <div className="max-w-2xl mx-auto">
-          <Form
-            onSubmit={handleGenerate}
-            onExplain={handleExplain}
-            onScript={handleScript}
-            isLoading={isLoading}
-            loadingMessage={loadingMessage}
-            lang={lang}
-          />
+        <AppModeToggle />
 
-          {showFeedback && (
-            <Suspense fallback={<div />}>
-              <FeedbackCard lang={lang} onDismiss={dismissFeedback} />
-            </Suspense>
-          )}
+        {appMode === 'generate' ? (
+          <div className="max-w-2xl mx-auto">
+            <Form
+              onSubmit={handleGenerate}
+              onExplain={handleExplain}
+              onScript={handleScript}
+              isLoading={isLoading}
+              loadingMessage={loadingMessage}
+              lang={lang}
+            />
 
-          <div className="mt-8 space-y-4">
-            {commandList.map((cmd, index) => (
-              <GeneratedCommandCard key={index} {...cmd} lang={lang} />
-            ))}
-          </div>
+            {showFeedback && (
+              <Suspense fallback={<div />}>
+                <FeedbackCard lang={lang} onDismiss={dismissFeedback} />
+              </Suspense>
+            )}
 
-          {commandList.length > 0 && !isLoading && (
-            <div className="mt-6 text-center">
-              <button onClick={handleMoreCommands} disabled={isLoadingMore} className="w-full bg-gray-200/70 dark:bg-gray-700/70 backdrop-blur-lg text-gray-800 dark:text-gray-200 px-4 py-2.5 rounded-lg font-semibold hover:bg-gray-300/80 dark:hover:bg-gray-600/80 disabled:opacity-50 flex items-center justify-center gap-2 min-h-[48px] transition-colors">
-                {isLoadingMore ? <><LoadingSpinner /> {t.loadingMore}</> : <><PlusCircle size={18} /> {t.moreCommands}</>}
-              </button>
+            <div className="mt-8 space-y-4">
+              {commandList.map((cmd, index) => (
+                <GeneratedCommandCard key={index} {...cmd} lang={lang} />
+              ))}
             </div>
-          )}
 
-          {explanation && <ExplanationCard explanation={explanation} lang={lang} />}
-          {script && <ScriptCard filename={script.filename} script_lines={script.script_lines} lang={lang} />}
+            {commandList.length > 0 && !isLoading && (
+              <div className="mt-6 text-center">
+                <button onClick={handleMoreCommands} disabled={isLoadingMore} className="w-full bg-gray-200/70 dark:bg-gray-700/70 backdrop-blur-lg text-gray-800 dark:text-gray-200 px-4 py-2.5 rounded-lg font-semibold hover:bg-gray-300/80 dark:hover:bg-gray-600/80 disabled:opacity-50 flex items-center justify-center gap-2 min-h-[48px] transition-colors">
+                  {isLoadingMore ? <><LoadingSpinner /> {t.loadingMore}</> : <><PlusCircle size={18} /> {t.moreCommands}</>}
+                </button>
+              </div>
+            )}
 
-          {(commandList.length > 0 || explanation || script) && !isLoading && (
+            {explanation && <ExplanationCard explanation={explanation} lang={lang} />}
+            {script && <ScriptCard filename={script.filename} script_lines={script.script_lines} lang={lang} />}
+
+            {(commandList.length > 0 || explanation || script) && !isLoading && (
+              <Suspense fallback={<div className="text-center mt-10"><LoadingSpinner /></div>}>
+                <ErrorAnalysis {...formState} lang={lang} />
+              </Suspense>
+            )}
+          </div>
+        ) : (
+          <div className="max-w-4xl mx-auto">
             <Suspense fallback={<div className="text-center mt-10"><LoadingSpinner /></div>}>
-              <ErrorAnalysis {...formState} lang={lang} />
+              <SmartCompilerPanel lang={lang} t={t} />
             </Suspense>
-          )}
-        </div>
+          </div>
+        )}
       </main>
 
       <footer className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-lg py-3 text-center font-semibold text-gray-900 dark:text-gray-300 text-xs border-t border-gray-200/50 dark:border-gray-800/50">

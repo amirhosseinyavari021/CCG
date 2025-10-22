@@ -1,30 +1,50 @@
 export const osDetails = {
-  linux: {
-    versions: ['Ubuntu 24.04 LTS', 'Debian 12', 'Fedora 40', 'Arch Linux (Latest)'],
-    clis: ['Bash', 'Zsh', 'Fish']
+  ubuntu: {
+    versions: [], // Versions removed as per new logic
+    clis: ['Bash', 'Zsh']
+  },
+  debian: {
+    versions: [],
+    clis: ['Bash', 'Zsh']
+  },
+  fedora: {
+    versions: [],
+    clis: ['Bash', 'Zsh']
+  },
+  'centos-stream': {
+    versions: [],
+    clis: ['Bash', 'Zsh']
+  },
+  centos: {
+    versions: [],
+    clis: ['Bash', 'Zsh']
+  },
+  arch: {
+    versions: [],
+    clis: ['Bash', 'Zsh']
   },
   windows: {
-    versions: ['Windows 11', 'Windows 10', 'Windows Server 2025'],
+    versions: [],
     clis: ['PowerShell 7', 'CMD']
   },
   macos: {
-    versions: ['Sequoia (15)', 'Sonoma (14)'],
+    versions: [],
     clis: ['Zsh', 'Bash']
   },
   cisco: {
-    versions: ['IOS', 'IOS-XE', 'NX-OS', 'ASA'],
+    versions: [],
     clis: ['CLI']
   },
   mikrotik: {
-    versions: ['RouterOS v7', 'RouterOS v6'],
+    versions: [],
     clis: ['MikroTik CLI']
   },
   python: {
-    versions: ['Python 3.11', 'Python 3.10', 'Python 3.9'],
+    versions: [],
     clis: ['Python 3']
   },
   other: {
-    versions: [], // No predefined versions
+    versions: ['N/A'], // This field will be treated as optional text input
     clis: ['Bash', 'Zsh', 'PowerShell', 'CMD', 'Sh'] // Common shells
   }
 };
