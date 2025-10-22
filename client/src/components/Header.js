@@ -1,7 +1,7 @@
 import React from 'react';
-import { Sun, Moon, Menu } from 'lucide-react';
+import { Menu } from 'lucide-react';
 
-const Header = ({ lang, theme, onThemeChange, onMenuClick, onLangChange }) => {
+const Header = ({ lang, onMenuClick, onLangChange }) => {
 
     const appVersion = process.env.REACT_APP_VERSION || '2.8.2';
 
@@ -29,10 +29,6 @@ const Header = ({ lang, theme, onThemeChange, onMenuClick, onLangChange }) => {
                             <button onClick={() => onLangChange('fa')} className={`px-2.5 py-1 rounded-full text-xs ${lang === 'fa' ? 'bg-amber-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>FA</button>
                         </div>
                     </div>
-                    {/* Theme toggle */}
-                    <button onClick={onThemeChange} className="p-1.5 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-200/70 dark:hover:bg-gray-700/70">
-                        {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-                    </button>
                 </div>
             </div>
         </header>
