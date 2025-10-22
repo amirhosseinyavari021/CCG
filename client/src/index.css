@@ -13,6 +13,13 @@ body {
   box-sizing: border-box;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* --- MODIFIED FOR SVG BACKGROUND IMAGE --- */
+  background-image: url('/background.svg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  /* ------------------------------------- */
 }
 
 html {
