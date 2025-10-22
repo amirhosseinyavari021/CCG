@@ -36,7 +36,7 @@ const getScriptExtension = (os, cli) => {
 
 function AppContent() {
   const [lang, setLang] = useState('en');
-  const [theme, setTheme] = useState('dark');
+  // const [theme, setTheme] = useState('dark'); // Theme is now locked to dark
 
   const [commandList, setCommandList] = useState([]);
   const [explanation, setExplanation] = useState(null);
@@ -56,9 +56,8 @@ function AppContent() {
   const t = translations[lang];
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') || 'dark';
-    setTheme(savedTheme);
-    document.documentElement.className = savedTheme;
+    // Permanently set theme to dark
+    document.documentElement.className = 'dark';
 
     const savedLang = localStorage.getItem('lang') || 'en';
     setLang(savedLang);
@@ -69,7 +68,7 @@ function AppContent() {
     if (usageCount >= 15 && !feedbackRequested) {
       setShowFeedback(true);
     }
-  }, []);
+  }, []); // Empty dependency array ensures this runs only once on mount
 
   const handleLangChange = (newLang) => {
     setLang(newLang);
@@ -78,12 +77,7 @@ function AppContent() {
     setIsDrawerOpen(false);
   };
 
-  const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
-    document.documentElement.className = newTheme;
-  };
+  // toggleTheme function removed
 
   const resetStateForNewRequest = () => {
     setCommandList([]);
@@ -194,12 +188,10 @@ function AppContent() {
           onClose={() => setIsDrawerOpen(false)}
           onLangChange={handleLangChange}
         />
-      </Guspense>
+      </Suspense>
 
       <Header
         lang={lang}
-        theme={theme}
-        onThemeChange={toggleTheme}
         onMenuClick={() => setIsDrawerOpen(true)}
         onLangChange={handleLangChange}
       />
