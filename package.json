@@ -1,33 +1,33 @@
 {
-  "name": "CCG-server",
-  "version": "2.9.2",
-  "private": true,
-  "description": "The server and web component for CCG",
-  "main": "server.js",
-  "bin": {
-    "ccg": "./cli/cmdgen-cli.js"
-  },
-  "scripts": {
-    "start": "node server.js",
-    "build": "cd client && npm install && cross-env REACT_APP_VERSION=$npm_package_version npm run build",
-    "pkg:linux": "cd cli && npm install && pkg . --targets latest-linux-x64 --output ../dist/ccg-linux",
-    "pkg:win": "cd cli && npm install && pkg . --targets latest-win-x64 --output ../dist/ccg-win.exe",
-    "pkg:macos": "cd cli && npm install && pkg . --targets latest-macos-x64 --output ../dist/ccg-macos",
-    "release": "npm run build && npm run pkg:linux && npm run pkg:win && npm run pkg:macos"
-  },
-  "engines": {
-    "node": ">=20.x"
-  },
-  "dependencies": {
-    "axios": "^1.7.2",
-    "express": "^4.18.2",
-    "express-rate-limit": "^6.7.0",
-    "express-validator": "^7.0.1",
-    "node-fetch": "^2.6.7",
-    "open": "^10.2.0"
-  },
-  "devDependencies": {
-    "cross-env": "^7.0.3",
-    "pkg": "^5.8.1"
-  }
+    "name": "CCG-server",
+    "version": "2.9.3",
+    "private": true,
+    "description": "The server and web component for CCG",
+    "main": "server.js",
+    "bin": {
+        "ccg": "./cli/cmdgen-cli.js"
+    },
+    "scripts": {
+        "start": "node server.js",
+        "build": "cd client && npm install && cross-env REACT_APP_VERSION=$npm_package_version npm run build",
+        "pkg:linux": "cd cli && npm install && pkg . --targets latest-linux-x64 --output ../dist/ccg-linux",
+        "pkg:win": "cd cli && npm install && pkg . --targets latest-win-x64 --output ../dist/ccg-win.exe",
+        "pkg:macos": "cd cli && npm install && pkg . --targets latest-macos-x64 --output ../dist/ccg-macos",
+        "release": "npm run build && npm run pkg:linux && npm run pkg:win && npm run pkg:macos"
+    },
+    "engines": {
+        "node": ">=20.x"
+    },
+    "dependencies": {
+        "axios": "^1.7.2",
+        "express": "^4.18.2",
+        "express-rate-limit": "^6.7.0",
+        "express-validator": "^7.0.1",
+        "node-fetch": "^2.6.7",
+        "open": "^10.2.0"
+    },
+    "devDependencies": {
+        "cross-env": "^7.0.3",
+        "pkg": "^5.8.1"
+    }
 }
