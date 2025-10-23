@@ -191,9 +191,9 @@ const CodeComparePanel = ({ lang, t }) => {
                                         )}
                                     </div>
                                     
-                                    {/* --- FIXED: Use 'hidden' class for tab content --- */}
+                                    {/* --- FIXED: Use 'hidden' class AND add dir="ltr" wrapper --- */}
                                     <div className={activeTab === 'visual' ? '' : 'hidden'}>
-                                        <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden" style={{ height: '500px' }}>
+                                        <div dir="ltr" className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden" style={{ height: '500px' }}>
                                             <DiffEditor
                                                 height="500px"
                                                 language={getMonacoLanguage(result.langA)}
@@ -208,7 +208,7 @@ const CodeComparePanel = ({ lang, t }) => {
                                                     minimap: { enabled: false }
                                                 }}
                                                 loading={<LoadingSpinner />}
-                                                onMount={handleEditorDidMount} // <-- Keep layout handler
+                                                onMount={handleEditorDidMount} // Keep layout handler
                                             />
                                         </div>
                                     </div>
