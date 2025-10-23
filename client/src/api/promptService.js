@@ -28,15 +28,43 @@ const handleError = (error, lang) => {
     toast.error(message, { duration: 5000 });
 };
 
-export const callApi = async ({ mode, userInput, os, osVersion, cli, lang, iteration = 0, existingCommands = [], command = '' }, onUpdate) => {
+// --- UPDATED FUNCTION SIGNATURE ---
+export const callApi = async ({ 
+    mode, 
+    userInput, 
+    os, 
+    osVersion, 
+    cli, 
+    lang, 
+    iteration = 0, 
+    existingCommands = [], 
+    command = '',
+    // New parameters for Code Compare
+    codeA = '',
+    codeB = '',
+    langA = '',
+    langB = '',
+    analysis = ''
+}, onUpdate) => {
     const t = translations[lang];
-    const cacheKey = `${lang}-${mode}-${os}-${osVersion}-${cli}-${userInput}-${command}-${iteration}`;
+    const cacheKey = `${lang}-${mode}-${os}-${osVersion}-${cli}-${userInput}-${command}-${iteration}-${codeA.length}-${codeB.length}`;
 
     if (sessionCache.has(cacheKey)) {
         return sessionCache.get(cacheKey);
     }
 
-    const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, { existingCommands, command });
+    // --- UPDATED SYSTEM PROMPT OPTIONS ---
+    // Now passes all compare-related options to getSystemPrompt
+    const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, { 
+        existingCommands, 
+        command,
+        codeA,
+        codeB,
+        langA,
+        langB,
+        analysis
+    });
+
     const payload = {
         messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userInput }],
         stream: true
