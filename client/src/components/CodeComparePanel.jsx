@@ -85,6 +85,19 @@ const CodeComparePanel = ({ lang, t }) => {
         setActiveTab('visual'); 
     };
 
+    /**
+     * --- NEW FIX ---
+     * This handler is called when the Monaco DiffEditor mounts.
+     * It uses a short delay to ensure the tab animation is complete,
+     * then manually forces the editor to recalculate its layout.
+     * This fixes the "blank editor" bug.
+     */
+    const handleEditorDidMount = (editor) => {
+        setTimeout(() => {
+            editor.layout();
+        }, 100); // 100ms delay to ensure tab transition is complete
+    };
+
     const TabButton = ({ tabId, title, icon }) => (
         <button
             onClick={() => setActiveTab(tabId)}
@@ -180,7 +193,7 @@ const CodeComparePanel = ({ lang, t }) => {
                                         )}
                                     </div>
                                     
-                                    {/* --- FIXED: Use conditional rendering instead of 'hidden' class --- */}
+                                    {/* --- FIXED: Use conditional rendering AND onMount trigger --- */}
                                     {activeTab === 'visual' && (
                                         <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden" style={{ height: '500px' }}>
                                             <DiffEditor
@@ -193,10 +206,11 @@ const CodeComparePanel = ({ lang, t }) => {
                                                     readOnly: true,
                                                     enableSplitViewResizing: false,
                                                     renderSideBySide: true,
-                                                    automaticLayout: true, // Keep this, it helps on window resize
+                                                    automaticLayout: false, // Turn off automatic, we'll do it manually
                                                     minimap: { enabled: false }
                                                 }}
                                                 loading={<LoadingSpinner />}
+                                                onMount={handleEditorDidMount} // <-- ADDED HANDLER
                                             />
                                         </div>
                                     )}
