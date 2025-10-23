@@ -86,16 +86,14 @@ const CodeComparePanel = ({ lang, t }) => {
     };
 
     /**
-     * --- NEW FIX ---
      * This handler is called when the Monaco DiffEditor mounts.
-     * It uses a short delay to ensure the tab animation is complete,
-     * then manually forces the editor to recalculate its layout.
-     * This fixes the "blank editor" bug.
+     * It manually forces the editor to recalculate its layout.
+     * This fixes the "blank editor" bug that happens when it loads in a hidden tab.
      */
     const handleEditorDidMount = (editor) => {
         setTimeout(() => {
             editor.layout();
-        }, 100); // 100ms delay to ensure tab transition is complete
+        }, 100); 
     };
 
     const TabButton = ({ tabId, title, icon }) => (
@@ -193,8 +191,8 @@ const CodeComparePanel = ({ lang, t }) => {
                                         )}
                                     </div>
                                     
-                                    {/* --- FIXED: Use conditional rendering AND onMount trigger --- */}
-                                    {activeTab === 'visual' && (
+                                    {/* --- FIXED: Use 'hidden' class for tab content --- */}
+                                    <div className={activeTab === 'visual' ? '' : 'hidden'}>
                                         <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden" style={{ height: '500px' }}>
                                             <DiffEditor
                                                 height="500px"
@@ -206,16 +204,15 @@ const CodeComparePanel = ({ lang, t }) => {
                                                     readOnly: true,
                                                     enableSplitViewResizing: false,
                                                     renderSideBySide: true,
-                                                    automaticLayout: false, // Turn off automatic, we'll do it manually
+                                                    automaticLayout: false, // Turn off automatic
                                                     minimap: { enabled: false }
                                                 }}
                                                 loading={<LoadingSpinner />}
-                                                onMount={handleEditorDidMount} // <-- ADDED HANDLER
+                                                onMount={handleEditorDidMount} // <-- Keep layout handler
                                             />
                                         </div>
-                                    )}
+                                    </div>
                                     
-                                    {/* --- EXISTING: Tab Content (remains hidden when not active) --- */}
                                     <div className={activeTab === 'diff' ? '' : 'hidden'}>
                                         <AnalysisSection title={t.logicalDifferences} icon={<GitCompare size={18} />} content={result.diffAnalysis} />
                                     </div>
