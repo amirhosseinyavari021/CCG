@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import Card from './common/Card';
 import LoadingSpinner from './common/LoadingSpinner';
 import CommandDisplay from './common/CommandDisplay';
-import { useCodeCompare } from '../hooks/useCodeCompare'; // <-- FIXED: Corrected relative path
-import { GitCompare, Terminal, AlertTriangle, CheckCircle, Wand2, Star } from 'lucide-react';
+import { useCodeCompare } from '../hooks/useCodeCompare';
+import { GitCompare, Terminal, AlertTriangle, CheckCircle, Wand2, Star, Eye } from 'lucide-react';
+import { DiffEditor } from '@monaco-editor/react'; // <-- NEW: Import DiffEditor
 
 // A reusable component for displaying AI analysis sections
 const AnalysisSection = ({ title, icon, content }) => {
@@ -13,7 +14,7 @@ const AnalysisSection = ({ title, icon, content }) => {
             <h4 className="flex items-center gap-2 text-md font-semibold text-amber-600 dark:text-amber-400 mb-2">
                 {icon} {title}
             </h4>
-            {/* Use pre-wrap to respect newlines and formatting from AI */ }
+            {/* Use pre-wrap to respect newlines and formatting from AI */}
             <pre className="font-sans text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{content}</pre>
         </div>
     );
@@ -22,24 +23,24 @@ const AnalysisSection = ({ title, icon, content }) => {
 const CodeComparePanel = ({ lang, t }) => {
     const [codeA, setCodeA] = useState('');
     const [codeB, setCodeB] = useState('');
-    const [activeTab, setActiveTab] = useState('diff'); // 'diff', 'analysis', 'merge'
+    const [activeTab, setActiveTab] = useState('visual'); // <-- NEW: Default to visual diff
     const { state, runCompare } = useCodeCompare(lang, t);
     const { isLoading, error, result } = state;
 
     const handleCompare = () => {
         runCompare(codeA, codeB);
+        setActiveTab('visual'); // Ensure visual tab is shown on new compare
     };
 
-    const TabButton = ({ tabId, title }) => (
+    const TabButton = ({ tabId, title, icon }) => ( // <-- NEW: Added icon
         <button
             onClick={() => setActiveTab(tabId)}
-            className={`px-4 py-2 font-medium text-sm rounded-t-lg ${
-                activeTab === tabId
+            className={`flex items-center gap-2 px-4 py-2 font-medium text-sm rounded-t-lg ${activeTab === tabId
                     ? 'bg-white/70 dark:bg-gray-800/70 border-b-2 border-amber-500 text-amber-600 dark:text-amber-400'
                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-200/50 dark:hover:bg-gray-700/50'
-            }`}
+                }`}
         >
-            {title}
+            {icon} {title}
         </button>
     );
 
@@ -83,7 +84,7 @@ const CodeComparePanel = ({ lang, t }) => {
 
             {/* Error Display */}
             {error && (
-                 <Card lang={lang} className="mt-6">
+                <Card lang={lang} className="mt-6">
                     <div className="p-4 bg-red-100 dark:bg-red-900/30 border border-red-400/50 rounded-lg">
                         <h4 className="flex items-center gap-2 text-lg font-semibold text-red-600 dark:text-red-400">
                             <AlertTriangle size={20} />
@@ -91,25 +92,28 @@ const CodeComparePanel = ({ lang, t }) => {
                         </h4>
                         <p className="mt-2 text-sm text-red-700 dark:text-red-300">{error}</p>
                     </div>
-                 </Card>
+                </Card>
             )}
 
             {/* Results Card */}
             {(isLoading || result) && !error && (
                 <div className="mt-6">
-                    <div className="border-b border-gray-200/50 dark:border-gray-700/50 flex">
-                        <TabButton tabId="diff" title={t.tabDifferences} />
-                        <TabButton tabId="analysis" title={t.tabAIAnalysis} />
-                        <TabButton tabId="merge" title={t.tabSuggestedMerge} />
+                    <div className="border-b border-gray-200/50 dark:border-gray-700/50 flex flex-wrap">
+                        {/* --- NEW VISUAL TAB --- */}
+                        <TabButton tabId="visual" title={t.tabSideBySide} icon={<Eye size={16} />} />
+                        {/* --- EXISTING TABS --- */}
+                        <TabButton tabId="diff" title={t.tabDifferences} icon={<GitCompare size={16} />} />
+                        <TabButton tabId="analysis" title={t.tabAIAnalysis} icon={<Star size={16} />} />
+                        <TabButton tabId="merge" title={t.tabSuggestedMerge} icon={<Wand2 size={16} />} />
                     </div>
-                    
+
                     <Card lang={lang} className="rounded-t-none">
                         {isLoading ? (
                             <div className="flex justify-center p-10"><LoadingSpinner /></div>
                         ) : (
                             result && (
                                 <div>
-                                    {/* Language Detection Info */}
+                                    {/* Language Detection Info (shown on all tabs) */}
                                     <div className="pb-2 mb-4 border-b border-gray-200/50 dark:border-gray-700/50">
                                         <h4 className="flex items-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-200">
                                             <Terminal size={16} /> {t.langDetected}:
@@ -123,8 +127,29 @@ const CodeComparePanel = ({ lang, t }) => {
                                             </p>
                                         )}
                                     </div>
-                                    
-                                    {/* Tab Content */}
+
+                                    {/* --- NEW: Tab Content for Visual Diff --- */}
+                                    <div className={activeTab === 'visual' ? '' : 'hidden'}>
+                                        <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden" style={{ height: '500px' }}>
+                                            <DiffEditor
+                                                height="500px"
+                                                language={(result.langA || 'plaintext').toLowerCase().split(' ')[0]} // Get base lang e.g. 'python'
+                                                original={codeA}
+                                                modified={codeB}
+                                                theme="vs-dark" // Match app's dark theme
+                                                options={{
+                                                    readOnly: true,
+                                                    enableSplitViewResizing: false,
+                                                    renderSideBySide: true,
+                                                    automaticLayout: true,
+                                                    minimap: { enabled: false }
+                                                }}
+                                                loading={<LoadingSpinner />}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* --- EXISTING: Tab Content --- */}
                                     <div className={activeTab === 'diff' ? '' : 'hidden'}>
                                         <AnalysisSection title={t.logicalDifferences} icon={<GitCompare size={18} />} content={result.diffAnalysis} />
                                     </div>
