@@ -116,7 +116,8 @@ const handleApiRequest = async (req, res) => {
 
 // --- API Routes (Point to the same handler) ---
 app.post('/api/ccg', handleApiRequest);
-app.post('/api/ccg-backup', handleApiRequest);
+// --- REMOVED /api/ccg-backup route ---
+
 
 // --- Static File Serving (Unchanged) ---
 const staticPath = path.join(__dirname, 'client/build');

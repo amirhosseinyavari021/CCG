@@ -26,14 +26,13 @@ export async function fetchCCGResponse(params) {
     };
 
     /**
-     * --- NEW: Enhanced error handling function ---
+     * --- Enhanced error handling function ---
      * Provides specific user-facing messages based on the error type.
      * @param {Error} error - The error object from axios.
-     * @param {boolean} isRetry - Whether this is the retry attempt.
      * @returns {string} A user-friendly error message.
      */
-    const handleApiError = (error, isRetry = false) => {
-        console.error(`CCG Web API error${isRetry ? ' (retry)' : ''}:`, error.message);
+    const handleApiError = (error) => {
+        console.error(`CCG Web API error:`, error.message);
 
         if (error.response) {
             // The request was made and the server responded with a status code
@@ -61,25 +60,13 @@ export async function fetchCCGResponse(params) {
     try {
         // Primary attempt to the relative backend proxy
         const response = await axios.post("/api/ccg", payload, {
-            timeout: 30000 // Increased timeout to 30s
+            timeout: 30000 // 30s timeout
         });
         // Return the direct output string for the UI
         return response.data.output;
     } catch (error) {
-        // --- FIXED: Use enhanced error handler ---
-        const primaryErrorMessage = handleApiError(error, false);
-        console.warn("Primary API failed. Trying backup...");
-
-        // Retry once with the backup relative proxy
-        try {
-            const retry = await axios.post("/api/ccg-backup", payload, {
-                timeout: 30000 // Increased timeout to 30s
-            });
-            return retry.data.output;
-        } catch (retryErr) {
-            // --- FIXED: Use enhanced error handler ---
-            // Return the error from the *retry* attempt
-            return handleApiError(retryErr, true);
-        }
+        // --- REMOVED Retry Logic ---
+        // If the primary call fails, report the error directly.
+        return handleApiError(error);
     }
 }
