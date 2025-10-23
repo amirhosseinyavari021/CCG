@@ -63,7 +63,8 @@ function AppContent() {
 
     const savedLang = localStorage.getItem('lang') || 'en';
     setLang(savedLang);
-    document.body.dir = savedLang === 'fa' ? 'rtl' : 'ltr';
+    // --- FIXED: Set direction on <html> (documentElement) not <body> ---
+    document.documentElement.dir = savedLang === 'fa' ? 'rtl' : 'ltr';
 
     const usageCount = parseInt(localStorage.getItem('usageCount') || '0', 10);
     const feedbackRequested = localStorage.getItem('feedbackRequested') === 'true';
@@ -75,7 +76,8 @@ function AppContent() {
   const handleLangChange = (newLang) => {
     setLang(newLang);
     localStorage.setItem('lang', newLang);
-    document.body.dir = newLang === 'fa' ? 'rtl' : 'ltr';
+    // --- FIXED: Set direction on <html> (documentElement) not <body> ---
+    document.documentElement.dir = newLang === 'fa' ? 'rtl' : 'ltr';
     setIsDrawerOpen(false);
   };
 
@@ -176,8 +178,8 @@ function AppContent() {
           <button
             onClick={() => setAppMode('generate')}
             className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-semibold transition-colors ${appMode === 'generate'
-                ? 'bg-white dark:bg-gray-800 text-amber-600 dark:text-amber-400 shadow'
-                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100/50 dark:hover:bg-gray-600/50'
+              ? 'bg-white dark:bg-gray-800 text-amber-600 dark:text-amber-400 shadow'
+              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100/50 dark:hover:bg-gray-600/50'
               }`}
           >
             <Wand2 size={16} />
@@ -186,8 +188,8 @@ function AppContent() {
           <button
             onClick={() => setAppMode('compare')}
             className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-semibold transition-colors ${appMode === 'compare'
-                ? 'bg-white dark:bg-gray-800 text-amber-600 dark:text-amber-400 shadow'
-                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100/50 dark:hover:bg-gray-600/50'
+              ? 'bg-white dark:bg-gray-800 text-amber-600 dark:text-amber-400 shadow'
+              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100/50 dark:hover:bg-gray-600/50'
               }`}
           >
             <GitCompare size={16} />
@@ -286,7 +288,7 @@ function AppContent() {
         </p>
         <p className="mt-1">
           Created and designed by <a href="mailto:amirhosseinyavari61@gmail.com" className="font-semibold text-amber-600 hover:underline">Amirhossein Yavari</a>.
-        </p>
+        </warning>
       </footer>
     </div>
   );
