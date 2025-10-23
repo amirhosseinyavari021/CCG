@@ -118,7 +118,11 @@ app.post('/api/proxy', async (req, res) => {
     console.log(JSON.stringify(requestLog));
 
     const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
-    const payload = { model: 'openai/gpt-3.5-turbo', messages, stream: true };
+    
+    // --- MODIFIED LINE ---
+    // Changed model to the free testing model as requested
+    const payload = { model: 'openai/gpt-oss-20b:free', messages, stream: true };
+    // --- END MODIFICATION ---
 
     const apiResponse = await axios.post(openRouterUrl, payload, {
       headers: {
@@ -201,6 +205,6 @@ app.listen(PORT, () => {
     event: 'server_start',
     port: PORT,
     timestamp: new Date().toISOString(),
-    version: '2.9.2'
+    version: '2.9.1'
   }));
 });
