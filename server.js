@@ -118,7 +118,7 @@ app.post('/api/proxy', async (req, res) => {
     console.log(JSON.stringify(requestLog));
 
     const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
-    
+
     // --- MODIFIED LINE ---
     // Changed model to the free testing model as requested
     const payload = { model: 'openai/gpt-oss-20b:free', messages, stream: true };
@@ -205,6 +205,6 @@ app.listen(PORT, () => {
     event: 'server_start',
     port: PORT,
     timestamp: new Date().toISOString(),
-    version: '2.9.1'
+    version: '2.9.4'
   }));
 });

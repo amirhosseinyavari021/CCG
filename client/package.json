@@ -1,6 +1,6 @@
 {
   "name": "client",
-  "version": "2.9.3",
+  "version": "2.9.4",
   "private": true,
   "homepage": "https://cmdgen.onrender.com",
   "description": "The web interface for CCG (Cando Command Generator)",
