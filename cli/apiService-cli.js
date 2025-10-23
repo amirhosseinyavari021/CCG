@@ -28,22 +28,19 @@ export async function sendToCCGServer(params) {
     try {
         // Primary attempt to the main production endpoint
         const res = await axios.post("https://ccg.cando.ac/api/ccg", payload, {
-            timeout: 15000
+            timeout: 30000 // 30s timeout
         });
         // Return the direct output string as requested
         return res.data.output;
     } catch (err) {
-        console.error("CCG API error:", err.message);
-
-        // Retry once with the backup endpoint if the primary fails
-        try {
-            const retry = await axios.post("https://ccg-backup.cando.ac/api/ccg", payload, {
-                timeout: 15000
-            });
-            return retry.data.output;
-        } catch (retryErr) {
-            // Return a final error string if both fail
-            return "⚠️ AI service unavailable after retry.";
+        console.error("CCG CLI API error:", err.message);
+        // --- REMOVED Retry Logic ---
+        // Return a final error string if the primary fails
+        if (err.response) {
+            return `⚠️ AI service unavailable (Error ${err.response.status}).`;
+        } else if (err.code === 'ECONNABORTED') {
+            return `⚠️ AI service timed out.`;
         }
+        return "⚠️ AI service unavailable. Check your internet connection.";
     }
 }
