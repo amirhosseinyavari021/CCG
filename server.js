@@ -1,30 +1,32 @@
-const express = require('express');
-const path = require('path');
-const axios = require('axios/dist/node/axios.cjs');
-const rateLimit = require('express-rate-limit');
-const crypto = require('crypto');
+import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import rateLimit from 'express-rate-limit';
+import crypto from 'crypto';
+import dotenv from 'dotenv';
+import { routeRequest } from './server/aiRouter.js'; // <-- NEW: Import the AI router
+
+// Load .env variables
+dotenv.config();
+
+// --- ES Module equivalents for __dirname ---
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.set('trust proxy', 1);
 app.use(express.json());
 
-const apiKey = process.env.API_KEY;
-if (apiKey) {
-  console.log("✅ API_KEY loaded successfully from environment variables.");
-} else {
-  console.error("❌ CRITICAL: API_KEY environment variable not found on the server!");
-}
-
+// --- Rate Limiter ---
 const limiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
 });
-
 app.use('/api/', limiter);
 
-// --- ENHANCED LOGGING MIDDLEWARE ---
+// --- Enhanced Logging Middleware ---
 app.use('/api/', (req, res, next) => {
   req.startTime = Date.now();
   req.sessionId = crypto.randomBytes(8).toString('hex');
@@ -57,18 +59,10 @@ app.post('/api/ping', (req, res) => {
   res.status(200).send({ status: 'ok' });
 });
 
-
-// --- NEW UNIFIED API HANDLER ---
-// This function handles all AI requests
+// --- REFACTORED: Unified API Handler ---
 const handleApiRequest = async (req, res) => {
-  if (!apiKey) {
-    const errorLog = { ...req.logContext, event: 'api_error', error: 'SERVER_CONFIG_ERROR', message: 'API key not configured' };
-    console.error(JSON.stringify(errorLog));
-    return res.status(500).json({ error: { code: 'SERVER_CONFIG_ERROR', message: 'API key is not configured on the server.' } });
-  }
-
   try {
-    // 1. Get the new 'prompt' object from the client request
+    // 1. Get the 'prompt' object from the client
     const { prompt } = req.body;
 
     if (!prompt || !prompt.id || !prompt.variables) {
@@ -77,7 +71,7 @@ const handleApiRequest = async (req, res) => {
       return res.status(400).json({ error: { code: 'INVALID_PAYLOAD', message: 'Request payload is missing the "prompt" object.' } });
     }
 
-    // 2. Log the new request structure
+    // 2. Log the request
     const requestLog = {
       ...req.logContext,
       event: 'command_generation_start',
@@ -86,32 +80,12 @@ const handleApiRequest = async (req, res) => {
     };
     console.log(JSON.stringify(requestLog));
 
-    const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
+    // 3. Delegate the entire AI call to the new router
+    // The router handles logic for local vs. OpenAI, transforms the prompt,
+    // and returns the final string.
+    const aiContent = await routeRequest(prompt);
 
-    // 3. Create the payload for OpenRouter
-    // We combine the required model with the new prompt object
-    // We set stream: false, as the new client expects a single response
-    const payload = {
-      model: 'openai/gpt-oss-20b:free',
-      prompt,
-      stream: false // <-- IMPORTANT: Changed to non-streaming
-    };
-
-    // 4. Make the non-streaming call to the AI provider
-    const apiResponse = await axios.post(openRouterUrl, payload, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://ccg.cando.ac/', // <-- MODIFIED
-        'X-Title': 'AY-CMDGEN',
-      },
-      timeout: 15000 // 15 second timeout
-    });
-
-    // 5. Extract the content from the non-streaming response
-    // (Adjust this path if OpenRouter's 'prompt' response is different)
-    const aiContent = apiResponse.data.choices[0].message.content;
-
-    // 6. Log success and send response back in the format apiService.js expects
+    // 4. Log success
     const successLog = {
       ...req.logContext,
       event: 'command_generation_complete',
@@ -121,29 +95,28 @@ const handleApiRequest = async (req, res) => {
     };
     console.log(JSON.stringify(successLog));
 
-    // 7. Send the final string output to the client
+    // 5. Send the final string output to the client
     res.json({ output: aiContent });
 
   } catch (error) {
+    // This catches errors from the aiRouter (e.g., API key issue, network error)
     const errorLog = {
       ...req.logContext,
       event: 'api_proxy_error',
       error: error.message,
-      statusCode: error.response?.status || 500,
+      statusCode: 500, // Generic server error for AI failures
       responseTime: Date.now() - req.startTime,
       success: false
     };
     console.error(JSON.stringify(errorLog));
 
-    const statusCode = error.response?.status || 500;
-    res.status(statusCode).json({ error: { code: `PROXY_ERROR_${statusCode}`, message: error.message } });
+    res.status(500).json({ error: { code: `AI_REQUEST_FAILED`, message: error.message } });
   }
 };
 
-// --- NEW: Define the API routes
+// --- API Routes (Point to the same handler) ---
 app.post('/api/ccg', handleApiRequest);
-app.post('/api/ccg-backup', handleApiRequest); // Alias route points to the same handler
-
+app.post('/api/ccg-backup', handleApiRequest);
 
 // --- Static File Serving (Unchanged) ---
 const staticPath = path.join(__dirname, 'client/build');
@@ -157,6 +130,7 @@ app.get('*', (req, res) => {
   });
 });
 
+// --- Server Start ---
 const PORT = process.env.PORT || 50000;
 app.listen(PORT, () => {
   console.log(`Server is running and listening on port ${PORT}`);
@@ -164,6 +138,6 @@ app.listen(PORT, () => {
     event: 'server_start',
     port: PORT,
     timestamp: new Date().toISOString(),
-    version: '2.9.5'
+    version: process.env.VERSION || '3.0.0'
   }));
 });

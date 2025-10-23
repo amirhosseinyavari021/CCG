@@ -1,6 +1,6 @@
 {
   "name": "client",
-  "version": "2.9.5",
+  "version": "3.0.0",
   "private": true,
   "homepage": "https://ccg.cando.ac/",
   "description": "The web interface for CCG (Cando Command Generator)",
