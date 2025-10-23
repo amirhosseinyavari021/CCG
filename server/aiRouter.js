@@ -23,7 +23,8 @@ const openaiClient = new OpenAI({
 // It uses a dummy API key as local servers often don't require one.
 const localClient = new OpenAI({
     apiKey: 'ollama', // Dummy key, required by the client
-    baseURL: AI_LOCAL_MODEL_URL || 'http://localhost:11434/v1', // OpenAI-compatible endpoint
+    // --- FIXED: Use the .env variable directly as the full base URL ---
+    baseURL: AI_LOCAL_MODEL_URL || 'http://localhost:11434/v1',
 });
 
 /**
@@ -69,7 +70,7 @@ export const routeRequest = async (prompt) => {
         });
 
         const aiContent = response.choices[0].message.content;
-        
+
         if (!aiContent) {
             throw new Error('AI returned an empty response.');
         }
