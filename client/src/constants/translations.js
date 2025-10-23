@@ -93,6 +93,7 @@ export const translations = {
     pasteCodeB: "Paste Code B (Modified)",
     compareWithAI: "Compare with AI",
     comparing: "Analyzing...",
+    tabSideBySide: "Side-by-Side View", // <-- NEW
     tabDifferences: "Differences",
     tabAIAnalysis: "AI Analysis",
     tabSuggestedMerge: "Suggested Merge",
@@ -197,6 +198,7 @@ export const translations = {
     pasteCodeB: "کد B (نسخه تغییریافته)",
     compareWithAI: "مقایسه با AI",
     comparing: "در حال تحلیل...",
+    tabSideBySide: "نمای کنار هم", // <-- NEW
     tabDifferences: "تفاوت‌ها",
     tabAIAnalysis: "تحلیل AI",
     tabSuggestedMerge: "ادغام پیشنهادی",
