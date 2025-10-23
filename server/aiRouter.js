@@ -23,7 +23,7 @@ const openaiClient = new OpenAI({
 // It uses a dummy API key as local servers often don't require one.
 const localClient = new OpenAI({
     apiKey: 'ollama', // Dummy key, required by the client
-    // --- FIXED: Use the .env variable directly as the full base URL ---
+    // --- FIX: This now correctly uses the full base URL from your .env file ---
     baseURL: AI_LOCAL_MODEL_URL || 'http://localhost:11434/v1',
 });
 
