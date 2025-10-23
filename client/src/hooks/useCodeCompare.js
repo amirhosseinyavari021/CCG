@@ -14,7 +14,6 @@ function compareReducer(state, action) {
         case 'START_COMPARE':
             return { ...initialState, isLoading: true };
         case 'SET_RESULTS':
-            // Corrected: ...initialState to ensure old results are cleared
             return { ...initialState, isLoading: false, result: action.payload }; 
         case 'SET_ERROR':
             return { ...initialState, error: action.payload };
@@ -28,8 +27,9 @@ export const useCodeCompare = (lang, t) => {
 
     // Helper for AI calls
     const runAiTask = async (mode, options = {}) => {
-        const result = await callApi({ mode, lang, ...options });
-        // The parser returns 'explanation' for simple text, or 'cause'
+        // --- FIXED: Added userInput: 'analyze' ---
+        // This ensures the payload to /api/proxy is valid, as userInput is required by callApi
+        const result = await callApi({ mode, lang, userInput: 'analyze', ...options });
         return result?.data?.explanation || result?.data?.cause || null;
     };
 
