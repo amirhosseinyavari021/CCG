@@ -52,7 +52,15 @@ export const parseAndConstructData = (textResponse, mode) => {
             return { commands };
         }
 
-        if (mode === 'explain' || mode === 'script') {
+        // --- FIXED: Added all new compare modes to this condition ---
+        if (
+            mode === 'explain' ||
+            mode === 'script' ||
+            mode === 'detect-lang' ||
+            mode === 'compare-diff' ||
+            mode === 'compare-quality' ||
+            mode === 'compare-merge'
+        ) {
             return { explanation: trimmedResponse };
         }
 
@@ -72,6 +80,7 @@ export const parseAndConstructData = (textResponse, mode) => {
             };
         }
 
+        // If mode is unknown (which it was), it will return null
         return null;
 
     } catch (error) {
