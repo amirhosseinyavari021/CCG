@@ -2,7 +2,7 @@ import axios from "axios";
 
 /**
  * Handles communication between the React web client and
- * the backend proxy using the new OpenAI prompt structure.
+ * the backend proxy connected to the CCG AI Assistant.
  *
  * @param {object} params - An object containing all user parameters.
  * @returns {Promise<string>} The AI's direct string output or an error message.

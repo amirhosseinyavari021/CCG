@@ -1,125 +1,91 @@
-import { getSystemPrompt } from './apiService'; // Corrected import path
+import { fetchCCGResponse } from './apiService'; // <-- FIXED: Imports the new function
 import { parseAndConstructData } from '../utils/responseParser';
 import toast from 'react-hot-toast';
 import { translations } from '../constants/translations';
 
 const sessionCache = new Map();
 
-// تابع کمکی برای مدیریت و نمایش خطاها
+// Helper function to show generic errors
 const handleError = (error, lang) => {
     const t = translations[lang];
     let message = t.errorDefault;
 
-    if (error.response) {
-        const status = error.response.status;
-        if (status === 401 || status === 403) {
-            message = t.errorAccessConfig;
-        } else if (status === 429) {
-            message = t.errorTooManyRequests;
-        } else if (status >= 500) {
-            message = t.errorProvider;
-        } else if (status >= 400) {
-            message = t.errorInput;
-        }
-    } else if (error.message.includes('Network')) {
+    if (error.message.includes('Network')) {
         message = t.errorNetwork;
     }
-    
+
     toast.error(message, { duration: 5000 });
 };
 
-// --- UPDATED FUNCTION SIGNATURE ---
-export const callApi = async ({ 
-    mode, 
-    userInput, 
-    os, 
-    osVersion, 
-    cli, 
-    lang, 
-    iteration = 0, 
-    existingCommands = [], 
-    command = '',
-    // New parameters for Code Compare
+/**
+ * Acts as an adapter between the UI components (App.js, useCodeCompare)
+ * and the new `fetchCCGResponse` API service.
+ * It maps UI-layer parameters to the new API structure and parses
+ * the string response back into the data structure the UI expects.
+ */
+export const callApi = async ({
+    mode,
+    userInput,
+    os,
+    osVersion, // No longer sent to API, but kept for cache key
+    cli,        // No longer sent to API, but kept for cache key & parser
+    lang,
+    iteration = 0, // No longer sent to API, but kept for cache key
     codeA = '',
     codeB = '',
-    langA = '',
-    langB = '',
-    analysis = ''
+    // other params ignored by new API (e.g., existingCommands)
+    ...otherProps
 }, onUpdate) => {
+
     const t = translations[lang];
-    const cacheKey = `${lang}-${mode}-${os}-${osVersion}-${cli}-${userInput}-${command}-${iteration}-${codeA.length}-${codeB.length}`;
+    // Create a cache key from all unique request params
+    const cacheKey = `${lang}-${mode}-${os}-${osVersion}-${cli}-${userInput}-${iteration}-${codeA.length}-${codeB.length}`;
 
     if (sessionCache.has(cacheKey)) {
         return sessionCache.get(cacheKey);
     }
 
-    // --- UPDATED SYSTEM PROMPT OPTIONS ---
-    // Now passes all compare-related options to getSystemPrompt
-    const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, { 
-        existingCommands, 
-        command,
-        codeA,
-        codeB,
-        langA,
-        langB,
-        analysis
-    });
+    // This function is no longer streaming, so just signal we are fetching.
+    onUpdate?.('fetching');
 
-    const payload = {
-        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userInput }],
-        stream: true
+    // 1. Map UI-layer state to the new API 'variables'
+    const apiParams = {
+        mode,
+        os, // The new API just takes the OS name
+        lang,
+        // Map userInput to the correct API variable based on mode
+        user_request: (mode !== 'error' && mode !== 'detect-lang') ? userInput : '',
+        input_a: codeA,
+        input_b: codeB,
+        error_message: (mode === 'error') ? userInput : ''
     };
 
     try {
-        const response = await fetch('/api/proxy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        // 2. Call the new API service. It will *always* return a string.
+        const rawOutput = await fetchCCGResponse(apiParams);
 
-        onUpdate?.('fetching');
-
-        if (!response.ok) {
-            const error = new Error("Server responded with an error");
-            error.response = { status: response.status, data: await response.json().catch(() => ({})) };
-            throw error;
+        // 3. Check if the string is an error message from the API service
+        if (rawOutput.startsWith('⚠️')) {
+            toast.error(rawOutput); // Display the specific error
+            return null;
         }
 
-        if (!response.body) {
-            throw new Error("Response body is missing.");
-        }
+        // 4. Parse the successful string output into the data structure the UI expects
+        // The parser may still use the 'cli' hint, so we pass it along.
+        const finalData = parseAndConstructData(rawOutput, mode, cli);
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let fullContent = '';
-
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value, { stream: true });
-            const dataLines = chunk.split('\n').filter(line => line.startsWith('data: '));
-            for (const line of dataLines) {
-                const jsonPart = line.substring(5).trim();
-                if (jsonPart && jsonPart !== "[DONE]") {
-                    try {
-                        const p = JSON.parse(jsonPart);
-                        fullContent += p.choices[0].delta.content || '';
-                    } catch {}
-                }
-            }
-        }
-
-        const finalData = parseAndConstructData(fullContent, mode, cli);
         if (!finalData) {
             toast.error(t.errorParse);
             return null;
         }
 
+        // 5. Return data in the original format expected by App.js
         const result = { type: mode, data: finalData };
         sessionCache.set(cacheKey, result);
         return result;
 
     } catch (err) {
+        // Catch any unexpected critical errors (e.g., network failure)
         handleError(err, lang);
         return null;
     }
