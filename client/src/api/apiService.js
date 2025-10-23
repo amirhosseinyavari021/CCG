@@ -1,42 +1,45 @@
 import axios from "axios";
 
 /**
- * Validates the request parameters against allowed values and blocklists.
- */
-function validateRequest(params) {
-    const allowedModes = ["generate", "script", "analyze", "error", "compare", "merge"];
-    const allowedLangs = ["fa", "en"];
-    const BLOCKED_KEYWORDS = ["rm -rf", "format", "mkfs", "dd if=", "del /s", ":(){:|:&};:"];
-
-    if (!allowedModes.includes(params.mode) || !allowedLangs.includes(params.lang))
-        return "⚠️ Invalid request parameters.";
-
-    const all = `${params.user_request || ""} ${params.input_a || ""} ${params.input_b || ""}`.toLowerCase();
-    for (const word of BLOCKED_KEYWORDS)
-        if (all.includes(word))
-            return "⚠️ Request blocked: potentially destructive command detected.";
-
-    return true;
-}
-
-/**
  * Handles communication between the React web client and
- * the backend proxy connected to the CCG AI Assistant.
+ * the backend proxy using the new OpenAI prompt structure.
+ *
+ * @param {object} params - An object containing all user parameters.
+ * @returns {Promise<string>} The AI's direct string output or an error message.
  */
 export async function fetchCCGResponse(params) {
-    const valid = validateRequest(params);
-    if (valid !== true) return valid; // Return error string for the UI
+    // Construct the payload based on the new API structure
+    const payload = {
+        prompt: {
+            id: "pmpt_68fa6a905dac8195b749aa47ea94d4d8001f6f48395546cd",
+            version: "3",
+            variables: {
+                mode: params.mode || "",
+                os: params.os || "",
+                lang: params.lang || "",
+                user_request: params.user_request || "",
+                input_a: params.input_a || "",
+                input_b: params.input_b || "",
+                error_message: params.error_message || ""
+            }
+        }
+    };
 
     try {
         // Primary attempt to the relative backend proxy
-        const response = await axios.post("/api/ccg", params, { timeout: 15000 });
-        return response.data.output; // Return the string output directly
+        const response = await axios.post("/api/ccg", payload, {
+            timeout: 15000
+        });
+        // Return the direct output string for the UI
+        return response.data.output;
     } catch (error) {
         console.error("CCG Web API error:", error.message);
 
         // Retry once with the backup relative proxy
         try {
-            const retry = await axios.post("/api/ccg-backup", params, { timeout: 15000 });
+            const retry = await axios.post("/api/ccg-backup", payload, {
+                timeout: 15000
+            });
             return retry.data.output;
         } catch (retryErr) {
             // Return a final error string for the UI
