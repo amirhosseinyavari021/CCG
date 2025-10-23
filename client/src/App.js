@@ -189,7 +189,7 @@ function AppContent() {
             onClick={() => setAppMode('compare')}
             className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-semibold transition-colors ${appMode === 'compare'
               ? 'bg-white dark:bg-gray-800 text-amber-600 dark:text-amber-400 shadow'
-              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100/50 dark:hover:bg-gray-600/50'
+              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100/50 dark:hover:bg-gray-600/5AN'
               }`}
           >
             <GitCompare size={16} />
@@ -279,7 +279,7 @@ function AppContent() {
 
       <footer className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-lg py-3 text-center font-semibold text-gray-900 dark:text-gray-300 text-xs border-t border-gray-200/50 dark:border-gray-800/50">
         <div className="flex justify-center items-center gap-4 mb-2">
-          <a href="https://github.com/amirhosseinyavari021/CCG" target="_blank" rel="noopener noreferrer" className="text-gray-700 hover:text-black dark:text-gray-400 dark:hover:text-gray-300">
+          <a href="httpsm://github.com/amirhosseinyavari021/CCG" target="_blank" rel="noopener noreferrer" className="text-gray-700 hover:text-black dark:text-gray-400 dark:hover:text-gray-300">
             <Github size={20} />
           </a>
         </div>
@@ -288,7 +288,7 @@ function AppContent() {
         </p>
         <p className="mt-1">
           Created and designed by <a href="mailto:amirhosseinyavari61@gmail.com" className="font-semibold text-amber-600 hover:underline">Amirhossein Yavari</a>.
-        </warning>
+        </p>
       </footer>
     </div>
   );
