@@ -119,24 +119,24 @@ ${goldenRules}
 ${codeA}`; // Use codeA as the generic code parameter
 
         case 'compare-diff':
-            return `You are an expert code analyst. Compare Code A and Code B. Explain the **logical differences** in behavior, not just the syntax changes. Respond in **${language}**.
+            return `You are an expert code analyst. Compare Code A and Code B. Explain the logical differences in behavior, not just the syntax changes. Respond in **${language}**.
 **LANGUAGE A:** ${langA}
 **LANGUAGE B:** ${langB}
 **CODE A (Original):**
 ${codeA}
 **CODE B (Modified):**
 ${codeB}
-**MISSION:** Provide a bulleted list of the logical changes, new features, or bug fixes.`;
+**MISSION:** Provide a **detailed, step-by-step breakdown** of the logical differences between Code A and Code B. Explain *why* a change was likely made (e.g., 'Bug Fix', 'Performance Enhancement', 'Refactor'). Use clear headings and bullet points. Be technical but easy to understand.`;
 
         case 'compare-quality':
-            return `You are a senior code reviewer. Compare Code A and Code B for quality, efficiency, readability, and security. State which version is better and why. Respond in **${language}**.
+            return `You are a senior code reviewer. Compare Code A and Code B for quality, efficiency, readability, and security. Respond in **${language}**.
 **LANGUAGE A:** ${langA}
 **LANGUAGE B:** ${langB}
 **CODE A (Original):**
 ${codeA}
 **CODE B (Modified):**
 ${codeB}
-**MISSION:** Provide a concise review and a final recommendation.`;
+**MISSION:** Provide a **comprehensive, senior-level code review**. Analyze **Code Quality, Readability, Performance, and Security**. Identify any potential bugs, risks, or anti-patterns. State **which version is objectively better and provide a clear, actionable recommendation**.`;
 
         case 'compare-merge':
             return `You are an expert developer. You are given two code versions and an analysis of their differences. Generate an optimized merged version that combines the best features of both.
