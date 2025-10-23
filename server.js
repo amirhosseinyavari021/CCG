@@ -25,7 +25,6 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // --- ENHANCED LOGGING MIDDLEWARE ---
-// Adds structured logging context to all API requests
 app.use('/api/', (req, res, next) => {
   req.startTime = Date.now();
   req.sessionId = crypto.randomBytes(8).toString('hex');
@@ -37,139 +36,93 @@ app.use('/api/', (req, res, next) => {
     endpoint: req.path
   };
 
-  // Log incoming request
   console.log(JSON.stringify({
     ...req.logContext,
     event: 'api_request_start',
     method: req.method,
-    body: req.path === '/proxy' ? { messageCount: req.body?.messages?.length || 0 } : req.body
   }));
 
   next();
 });
-// ------------------------------------
 
-// --- ENHANCED Analytics Endpoint ---
+// --- Analytics Endpoint (Unchanged) ---
 app.post('/api/ping', (req, res) => {
   const { event, source } = req.body || {};
-
-  // Structured analytics logging
   console.log(JSON.stringify({
     ...req.logContext,
     event: 'analytics_ping',
     analyticsEvent: event,
     source: source,
-    timestamp: new Date().toISOString()
   }));
-
   res.status(200).send({ status: 'ok' });
 });
-// ------------------------------------
 
-// --- ENHANCED API Proxy with Complete Logging ---
-app.post('/api/proxy', async (req, res) => {
+
+// --- NEW UNIFIED API HANDLER ---
+// This function handles all AI requests
+const handleApiRequest = async (req, res) => {
   if (!apiKey) {
-    const errorLog = {
-      ...req.logContext,
-      event: 'api_error',
-      error: 'SERVER_CONFIG_ERROR',
-      message: 'API key not configured'
-    };
+    const errorLog = { ...req.logContext, event: 'api_error', error: 'SERVER_CONFIG_ERROR', message: 'API key not configured' };
     console.error(JSON.stringify(errorLog));
     return res.status(500).json({ error: { code: 'SERVER_CONFIG_ERROR', message: 'API key is not configured on the server.' } });
   }
 
   try {
-    const { messages } = req.body;
-    if (!messages) {
-      const errorLog = {
-        ...req.logContext,
-        event: 'api_error',
-        error: 'INVALID_PAYLOAD',
-        message: 'Missing messages field'
-      };
+    // 1. Get the new 'prompt' object from the client request
+    const { prompt } = req.body;
+
+    if (!prompt || !prompt.id || !prompt.variables) {
+      const errorLog = { ...req.logContext, event: 'api_error', error: 'INVALID_PAYLOAD', message: 'Missing or invalid prompt object' };
       console.error(JSON.stringify(errorLog));
-      return res.status(400).json({ error: { code: 'INVALID_PAYLOAD', message: 'Request payload is missing "messages" field.' } });
+      return res.status(400).json({ error: { code: 'INVALID_PAYLOAD', message: 'Request payload is missing the "prompt" object.' } });
     }
 
-    // Extract request details for logging
-    const systemMessage = messages.find(m => m.role === 'system');
-    const userMessage = messages.find(m => m.role === 'user');
-
-    // Updated mode detection for new compare features
-    const systemContent = systemMessage?.content || '';
-    let mode = 'unknown';
-    if (systemContent.includes('MISSION:** Provide 3')) mode = 'generate';
-    else if (systemContent.includes('MISSION:** Generate a complete, executable script')) mode = 'script';
-    else if (systemContent.includes('MISSION:** Analyze the user\'s command/script')) mode = 'explain';
-    else if (systemContent.includes('MISSION:** Analyze the user\'s error message')) mode = 'error';
-    else if (systemContent.includes('MISSION:** Detect the language')) mode = 'detect-lang';
-    else if (systemContent.includes('MISSION:** Provide a bulleted list of the logical changes')) mode = 'compare-diff';
-    else if (systemContent.includes('MISSION:** Provide a concise review')) mode = 'compare-quality';
-    else if (systemContent.includes('MISSION:** Respond with **ONLY** the raw, merged')) mode = 'compare-merge';
-
+    // 2. Log the new request structure
     const requestLog = {
       ...req.logContext,
-      event: 'command_generation_start', // Keeping event name generic
-      mode: mode,
-      userPrompt: userMessage?.content?.substring(0, 100) + (userMessage?.content?.length > 100 ? '...' : ''),
-      messageCount: messages.length
+      event: 'command_generation_start',
+      mode: prompt.variables.mode || 'unknown',
+      promptId: prompt.id,
     };
     console.log(JSON.stringify(requestLog));
 
     const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
 
-    // --- MODIFIED LINE ---
-    // Changed model to the free testing model as requested
-    const payload = { model: 'openai/gpt-oss-20b:free', messages, stream: true };
-    // --- END MODIFICATION ---
+    // 3. Create the payload for OpenRouter
+    // We combine the required model with the new prompt object
+    // We set stream: false, as the new client expects a single response
+    const payload = {
+      model: 'openai/gpt-oss-20b:free',
+      prompt,
+      stream: false // <-- IMPORTANT: Changed to non-streaming
+    };
 
+    // 4. Make the non-streaming call to the AI provider
     const apiResponse = await axios.post(openRouterUrl, payload, {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://cmdgen.onrender.com',
+        'HTTP-Referer': 'https://ccg.cando.ac/', // <-- MODIFIED
         'X-Title': 'AY-CMDGEN',
       },
-      responseType: 'stream'
+      timeout: 15000 // 15 second timeout
     });
 
-    res.setHeader('Content-Type', 'text/event-stream');
+    // 5. Extract the content from the non-streaming response
+    // (Adjust this path if OpenRouter's 'prompt' response is different)
+    const aiContent = apiResponse.data.choices[0].message.content;
 
-    // Track response streaming
-    let responseChunks = 0;
-    let totalResponseLength = 0;
+    // 6. Log success and send response back in the format apiService.js expects
+    const successLog = {
+      ...req.logContext,
+      event: 'command_generation_complete',
+      mode: prompt.variables.mode,
+      responseTime: Date.now() - req.startTime,
+      success: true
+    };
+    console.log(JSON.stringify(successLog));
 
-    apiResponse.data.on('data', (chunk) => {
-      responseChunks++;
-      totalResponseLength += chunk.length;
-      res.write(chunk);
-    });
-
-    apiResponse.data.on('end', () => {
-      // Log successful completion
-      const successLog = {
-        ...req.logContext,
-        event: 'command_generation_complete',
-        mode: mode,
-        responseTime: Date.now() - req.startTime,
-        responseChunks: responseChunks,
-        responseLength: totalResponseLength,
-        success: true
-      };
-      console.log(JSON.stringify(successLog));
-      res.end();
-    });
-
-    apiResponse.data.on('error', (streamError) => {
-      const errorLog = {
-        ...req.logContext,
-        event: 'api_stream_error',
-        error: streamError.message,
-        responseTime: Date.now() - req.startTime
-      };
-      console.error(JSON.stringify(errorLog));
-      res.end();
-    });
+    // 7. Send the final string output to the client
+    res.json({ output: aiContent });
 
   } catch (error) {
     const errorLog = {
@@ -185,8 +138,14 @@ app.post('/api/proxy', async (req, res) => {
     const statusCode = error.response?.status || 500;
     res.status(statusCode).json({ error: { code: `PROXY_ERROR_${statusCode}`, message: error.message } });
   }
-});
+};
 
+// --- NEW: Define the API routes
+app.post('/api/ccg', handleApiRequest);
+app.post('/api/ccg-backup', handleApiRequest); // Alias route points to the same handler
+
+
+// --- Static File Serving (Unchanged) ---
 const staticPath = path.join(__dirname, 'client/build');
 app.use(express.static(staticPath));
 
@@ -205,6 +164,6 @@ app.listen(PORT, () => {
     event: 'server_start',
     port: PORT,
     timestamp: new Date().toISOString(),
-    version: '2.9.4'
+    version: '2.9.5'
   }));
 });

@@ -2,7 +2,6 @@
 
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
-const axios = require('axios/dist/node/axios.cjs');
 const { spawn } = require('child_process');
 const os = require('os');
 const path = require('path');
@@ -11,10 +10,13 @@ const semver = require('semver');
 const readline = require('readline');
 const chalk = require('chalk');
 const open = require('open');
+const axios = require('axios/dist/node/axios.cjs'); // Keep for update check
 
-const { getSystemPrompt } = require('./apiService-cli.js');
+// --- MODIFIED IMPORTS ---
+const { sendToCCGServer } = require('./apiService-cli.js');
 const { parseAndConstructData } = require('./responseParser-cli.js');
-const { runComparer } = require('./modules/codeCompare.js'); // New Compare Logic
+const { runComparer } = require('./modules/codeCompare.js');
+// --------------------------
 
 const packageJson = require('./package.json');
 const currentVersion = packageJson.version;
@@ -257,75 +259,8 @@ async function checkForUpdates() {
     } catch (error) { /* Silently fail */ }
 }
 
-const primaryServerUrl = 'https://ay-cmdgen-cli.onrender.com';
-const fallbackServerUrl = 'https://cmdgen.onrender.com';
-
-const callApi = async (params) => {
-    const { mode, userInput, os, osVersion, cli, lang, options = {} } = params;
-
-    // Pass codeA/codeB for compare modes
-    const promptOptions = { ...options };
-    if (mode === 'detect-lang') {
-        promptOptions.codeA = userInput;
-    } else if (['compare-diff', 'compare-quality', 'compare-merge'].includes(mode)) {
-        const [codeA, codeB, langA, langB, analysis] = userInput.split('|||');
-        promptOptions.codeA = codeA;
-        promptOptions.codeB = codeB;
-        promptOptions.langA = langA;
-        promptOptions.langB = langB;
-        promptOptions.analysis = analysis;
-    }
-
-    const systemPrompt = getSystemPrompt(mode, os, osVersion, cli, lang, promptOptions);
-
-    // For compare modes, user input is just a trigger
-    const userContent = ['detect-lang', 'compare-diff', 'compare-quality', 'compare-merge'].includes(mode)
-        ? "Analyze the code provided in the system prompt."
-        : userInput;
-
-    const payload = { messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userContent }] };
-
-    const attemptRequest = (url) => new Promise(async (resolve, reject) => {
-        try {
-            const response = await axios.post(`${url}/api/proxy`, payload, { responseType: 'stream', timeout: 60000 });
-            stopSpinner();
-            startSpinner('Generating response...');
-            let fullContent = '';
-            response.data.on('data', chunk => {
-                const textChunk = new TextDecoder().decode(chunk);
-                textChunk.split('\n').filter(line => line.startsWith('data: ')).forEach(line => {
-                    const jsonPart = line.substring(5).trim();
-                    if (jsonPart && jsonPart !== "[DONE]") {
-                        try { fullContent += JSON.parse(jsonPart).choices[0].delta.content || ''; } catch (e) { }
-                    }
-                });
-            });
-            response.data.on('end', () => {
-                stopSpinner();
-                const finalData = parseAndConstructData(fullContent, mode, cli);
-                if (!finalData) reject(new Error("Parsing failed"));
-                else resolve({ type: mode, finalData });
-            });
-            response.data.on('error', reject);
-        } catch (err) { reject(err); }
-    });
-
-    try {
-        startSpinner('Connecting to primary server...');
-        return await attemptRequest(primaryServerUrl);
-    } catch (primaryError) {
-        stopSpinner();
-        console.warn(chalk.yellow(`\n⚠️  Primary server failed. Trying fallback...`));
-        startSpinner('Connecting to fallback server...');
-        try {
-            return await attemptRequest(fallbackServerUrl);
-        } catch (fallbackError) {
-            stopSpinner();
-            console.error(chalk.red(`\n❌ Error: Could not connect to any server.`));
-            return null;
-        }
-    }
-};
+// --- REMOVED old callApi function ---
+// --- REMOVED primaryServerUrl and fallbackServerUrl constants ---
 
 const executeCommand = (command, shell) => {
     return new Promise((resolve) => {
@@ -378,9 +313,27 @@ const run = async () => {
                 console.error(chalk.red('Error: --device is required for Cisco OS (e.g., --device router).'));
                 process.exit(1);
             }
-            const initialResult = await callApi({ userInput: argv.request, mode: 'generate', os: context.os, osVersion: context.osVersion, cli: context.shell, lang: context.lang, options: { knowledgeLevel: context.level, deviceType: context.device } });
 
-            if (!initialResult?.finalData?.commands?.length) {
+            // --- REFACTORED API CALL ---
+            startSpinner('Generating response...');
+            const rawOutput = await sendToCCGServer({
+                mode: 'generate',
+                user_request: argv.request,
+                os: context.os,
+                lang: context.lang
+                // Note: osVersion, cli, level, device are no longer sent
+            });
+            stopSpinner();
+
+            if (rawOutput.startsWith('⚠️')) {
+                console.log(chalk.red(`\n❌ API Error: ${rawOutput}`));
+                process.exit(1);
+            }
+
+            const initialResult = parseAndConstructData(rawOutput, 'generate', context.shell);
+            // --- END REFACTOR ---
+
+            if (!initialResult?.commands?.length) {
                 console.log(chalk.red("\n❌ Failed to generate valid commands."));
                 process.exit(1);
             }
@@ -388,7 +341,7 @@ const run = async () => {
             await setConfig({ usageCount: (config.usageCount || 0) + 1 });
 
             const startInteractiveSession = async () => {
-                let allCommands = initialResult.finalData.commands;
+                let allCommands = initialResult.commands;
                 await Promise.all(allCommands.map(cmd => addToHistory(cmd)));
                 displayNewSuggestions(allCommands.map((cmd, idx) => ({ ...cmd, displayIndex: idx + 1 })), true);
 
@@ -423,9 +376,27 @@ const run = async () => {
             };
             const getMoreSuggestions = async (request, allCommands, context) => {
                 console.log(chalk.blue("\n🔄 Getting more suggestions..."));
-                const existing = allCommands.map(c => c.command);
-                const result = await callApi({ userInput: request, mode: 'generate', os: context.os, osVersion: context.osVersion, cli: context.shell, lang: context.lang, options: { existingCommands: existing, knowledgeLevel: context.level, deviceType: context.device } });
-                return result?.finalData?.commands || [];
+
+                // --- REFACTORED API CALL ---
+                startSpinner('Generating response...');
+                // Note: The new API doesn't have a mechanism for "existingCommands",
+                // so we just call 'generate' again. The AI *should* give variations.
+                const rawOutput = await sendToCCGServer({
+                    mode: 'generate',
+                    user_request: request,
+                    os: context.os,
+                    lang: context.lang
+                });
+                stopSpinner();
+
+                if (rawOutput.startsWith('⚠️')) {
+                    console.log(chalk.red(`\n❌ API Error: ${rawOutput}`));
+                    return [];
+                }
+
+                const result = parseAndConstructData(rawOutput, 'generate', context.shell);
+                return result?.commands || [];
+                // --- END REFACTOR ---
             };
             const promptUser = (commands) => new Promise(resolve => {
                 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -450,41 +421,98 @@ const run = async () => {
             await startInteractiveSession();
         })
         .command(['script <request>', 's'], 'Generate a full script', {}, async (argv) => {
-            const { os, osVersion, shell, lang, level, device, request } = { ...config, ...argv };
-            const result = await callApi({ userInput: request, mode: 'script', os, osVersion, cli: shell, lang, options: { knowledgeLevel: level, deviceType: device } });
-            if (result?.finalData?.explanation) {
+            const { os, shell, lang, request } = { ...config, ...argv };
+
+            // --- REFACTORED API CALL ---
+            startSpinner('Generating response...');
+            const rawOutput = await sendToCCGServer({
+                mode: 'script',
+                user_request: request,
+                os,
+                lang
+            });
+            stopSpinner();
+
+            if (rawOutput.startsWith('⚠️')) {
+                console.log(chalk.red(`\n❌ API Error: ${rawOutput}`));
+                gracefulExit();
+                return;
+            }
+
+            const result = parseAndConstructData(rawOutput, 'script', shell);
+            // --- END REFACTOR ---
+
+            if (result?.explanation) {
                 await setConfig({ usageCount: (config.usageCount || 0) + 1 });
                 console.log(chalk.cyan.bold('\n--- Generated Script ---'));
-                console.log(chalk.green(result.finalData.explanation));
-                await addToHistory({ command: result.finalData.explanation, explanation: `Script for: "${request}"` });
+                console.log(chalk.green(result.explanation));
+                await addToHistory({ command: result.explanation, explanation: `Script for: "${request}"` });
             } else { console.log(chalk.red("\n❌ Failed to generate a script.")); }
             gracefulExit();
         })
         .command(['analyze <command>', 'a'], 'Explain a command', {}, async (argv) => {
-            const { os, osVersion, shell, lang, level, device, command } = { ...config, ...argv };
-            const result = await callApi({ userInput: command, mode: 'explain', os, osVersion, cli: shell, lang, options: { knowledgeLevel: level, deviceType: device } });
-            if (result?.finalData?.explanation) {
+            const { os, shell, lang, command } = { ...config, ...argv };
+
+            // --- REFACTORED API CALL ---
+            startSpinner('Generating response...');
+            const rawOutput = await sendToCCGServer({
+                mode: 'analyze', // <-- Mode changed from 'explain'
+                user_request: command,
+                os,
+                lang
+            });
+            stopSpinner();
+
+            if (rawOutput.startsWith('⚠️')) {
+                console.log(chalk.red(`\n❌ API Error: ${rawOutput}`));
+                gracefulExit();
+                return;
+            }
+
+            const result = parseAndConstructData(rawOutput, 'explain', shell); // Parser still uses 'explain'
+            // --- END REFACTOR ---
+
+            if (result?.explanation) {
                 await setConfig({ usageCount: (config.usageCount || 0) + 1 });
                 console.log(chalk.cyan.bold('\n--- Analysis ---'));
-                console.log(result.finalData.explanation);
+                console.log(result.explanation);
             } else { console.log(chalk.red("\n❌ Failed to get an explanation.")); }
             gracefulExit();
         })
         .command(['error <message>', 'e'], 'Get help for an error', {}, async (argv) => {
-            const { os, osVersion, shell, lang, level, device, message } = { ...config, ...argv };
-            const result = await callApi({ userInput: message, mode: 'error', os, osVersion, cli: shell, lang, options: { knowledgeLevel: level, deviceType: device } });
-            if (result?.finalData?.cause) {
+            const { os, shell, lang, message } = { ...config, ...argv };
+
+            // --- REFACTORED API CALL ---
+            startSpinner('Generating response...');
+            const rawOutput = await sendToCCGServer({
+                mode: 'error',
+                error_message: message, // <-- Param name changed
+                os,
+                lang
+            });
+            stopSpinner();
+
+            if (rawOutput.startsWith('⚠️')) {
+                console.log(chalk.red(`\n❌ API Error: ${rawOutput}`));
+                gracefulExit();
+                return;
+            }
+
+            const result = parseAndConstructData(rawOutput, 'error', shell);
+            // --- END REFACTOR ---
+
+            if (result?.cause) {
                 await setConfig({ usageCount: (config.usageCount || 0) + 1 });
-                console.log(chalk.red.bold('\nProbable Cause:'), result.finalData.cause);
-                console.log(chalk.yellow.bold('\nExplanation:'), result.finalData.explanation);
-                if (result.finalData.solution?.length) {
+                console.log(chalk.red.bold('\nProbable Cause:'), result.cause);
+                console.log(chalk.yellow.bold('\nExplanation:'), result.explanation);
+                if (result.solution?.length) {
                     console.log(chalk.green.bold('\nSolution:'));
-                    result.finalData.solution.forEach(step => console.log(`  - ${step.replace(/^CMD: /i, chalk.cyan('Run: '))}`));
+                    result.solution.forEach(step => console.log(`  - ${step.replace(/^CMD: /i, chalk.cyan('Run: '))}`));
                 }
             } else { console.log(chalk.red("\n❌ Failed to analyze the error.")); }
             gracefulExit();
         })
-        // --- NEW 'compare' COMMAND ---
+        // --- 'compare' COMMAND ---
         .command(['compare <fileA> <fileB>', 'c'], 'Compare two code files with AI', {}, async (argv) => {
             const { fileA, fileB, lang } = { ...config, ...argv };
 
@@ -508,7 +536,9 @@ const run = async () => {
             }
 
             await setConfig({ usageCount: (config.usageCount || 0) + 1 });
-            await runComparer(contentA, contentB, { lang: lang || 'en' }, config, callApi);
+
+            // --- REFACTORED: Pass sendToCCGServer, not old callApi ---
+            await runComparer(contentA, contentB, { lang: lang || 'en' }, config, sendToCCGServer, startSpinner, stopSpinner);
             gracefulExit();
         })
         // --- End of 'compare' command ---

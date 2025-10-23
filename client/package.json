@@ -1,8 +1,8 @@
 {
   "name": "client",
-  "version": "2.9.4",
+  "version": "2.9.5",
   "private": true,
-  "homepage": "https://cmdgen.onrender.com",
+  "homepage": "https://ccg.cando.ac/",
   "description": "The web interface for CCG (Cando Command Generator)",
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
