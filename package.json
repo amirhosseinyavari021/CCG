@@ -1,6 +1,6 @@
 {
   "name": "CCG-server",
-  "version": "2.9.1",
+  "version": "2.9.2",
   "private": true,
   "description": "The server and web component for CCG",
   "main": "server.js",
