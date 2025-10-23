@@ -47,7 +47,7 @@ app.use('/api/', (req, res, next) => {
   next();
 });
 
-// --- Analytics Endpoint (Unchanged) ---
+// --- Analytics Endpoint ---
 app.post('/api/ping', (req, res) => {
   const { event, source } = req.body || {};
   console.log(JSON.stringify({
@@ -59,10 +59,9 @@ app.post('/api/ping', (req, res) => {
   res.status(200).send({ status: 'ok' });
 });
 
-// --- REFACTORED: Unified API Handler ---
+// --- Unified API Handler ---
 const handleApiRequest = async (req, res) => {
   try {
-    // 1. Get the 'prompt' object from the client
     const { prompt } = req.body;
 
     if (!prompt || !prompt.id || !prompt.variables) {
@@ -71,7 +70,6 @@ const handleApiRequest = async (req, res) => {
       return res.status(400).json({ error: { code: 'INVALID_PAYLOAD', message: 'Request payload is missing the "prompt" object.' } });
     }
 
-    // 2. Log the request
     const requestLog = {
       ...req.logContext,
       event: 'command_generation_start',
@@ -80,12 +78,8 @@ const handleApiRequest = async (req, res) => {
     };
     console.log(JSON.stringify(requestLog));
 
-    // 3. Delegate the entire AI call to the new router
-    // The router handles logic for local vs. OpenAI, transforms the prompt,
-    // and returns the final string.
     const aiContent = await routeRequest(prompt);
 
-    // 4. Log success
     const successLog = {
       ...req.logContext,
       event: 'command_generation_complete',
@@ -95,16 +89,14 @@ const handleApiRequest = async (req, res) => {
     };
     console.log(JSON.stringify(successLog));
 
-    // 5. Send the final string output to the client
     res.json({ output: aiContent });
 
   } catch (error) {
-    // This catches errors from the aiRouter (e.g., API key issue, network error)
     const errorLog = {
       ...req.logContext,
       event: 'api_proxy_error',
       error: error.message,
-      statusCode: 500, // Generic server error for AI failures
+      statusCode: 500,
       responseTime: Date.now() - req.startTime,
       success: false
     };
@@ -114,19 +106,17 @@ const handleApiRequest = async (req, res) => {
   }
 };
 
-// --- API Routes (Point to the same handler) ---
+// --- API Routes ---
 app.post('/api/ccg', handleApiRequest);
-// --- REMOVED /api/ccg-backup route ---
 
-
-// --- Static File Serving (Unchanged) ---
+// --- Static File Serving ---
 const staticPath = path.join(__dirname, 'client/build');
 app.use(express.static(staticPath));
 
 app.get('*', (req, res) => {
   res.sendFile(path.join(staticPath, 'index.html'), (err) => {
     if (err) {
-      res.status(4S04).send('Web interface not found. API is running correctly.');
+      res.status(404).send('Web interface not found. API is running correctly.');
     }
   });
 });
