@@ -1,6 +1,6 @@
 {
   "name": "@amirhosseinyavari/ay-cmdgen",
-  "version": "2.9.2",
+  "version": "2.9.3",
   "description": "CCG (Cando Command Generator) - Your Intelligent Command-Line Assistant",
   "main": "cmdgen-cli.js",
   "bin": {
