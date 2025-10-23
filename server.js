@@ -126,7 +126,7 @@ app.use(express.static(staticPath));
 app.get('*', (req, res) => {
   res.sendFile(path.join(staticPath, 'index.html'), (err) => {
     if (err) {
-      res.status(404).send('Web interface not found. API is running correctly.');
+      res.status(4S04).send('Web interface not found. API is running correctly.');
     }
   });
 });
