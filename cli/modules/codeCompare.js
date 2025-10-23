@@ -26,7 +26,7 @@ const generateTextDiff = (codeA, codeB) => {
             if (part.added) {
                 output += chalk.green(`+ ${line}`) + '\n';
             } else if (part.removed) {
-                output += chalk.red(`- ${line}`) + '\n';
+                output += chalk.red(`- ${line}`)D + '\n';
             } else {
                 output += chalk.dim(`  ${line}`) + '\n';
             }
@@ -43,49 +43,51 @@ const generateTextDiff = (codeA, codeB) => {
  * @param {string} codeB - The content of the second file.
  * @param {object} options - Compiler options (e.g., lang).
  * @param {object} config - The user's CCG config.
- * @param {function} callApi - The callApi function from cmdgen-cli.js.
+ * @param {function} sendToCCGServer - The NEW sendToCCGServer function.
+ * @param {function} startSpinner - The spinner start function.
+ * @param {function} stopSpinner - The spinner stop function.
  */
-const runComparer = async (codeA, codeB, options, config, callApi) => {
+const runComparer = async (codeA, codeB, options, config, sendToCCGServer, startSpinner, stopSpinner) => {
     const { lang } = options;
-    const apiParams = { ...config, ...options, os: 'other', cli: 'cli' }; // Use generic OS for compare
+
+    // Map config and options to the new API params
+    const apiParams = {
+        lang: lang || config.lang || 'en',
+        os: config.os || 'other',
+        input_a: codeA,
+        input_b: codeB,
+    };
 
     console.log(chalk.bold('🧠 Initializing Smart Code Compare...'));
 
     try {
-        // --- NEW: Section 1. Generate and Print Visual Diff ---
-        // This is done locally first, as it's not an AI task.
+        // 1. Generate and Print Visual Diff (local)
         printSection('Visual Side-by-Side Diff (Unified)', generateTextDiff(codeA, codeB), 'white');
 
+        // 2. Run AI 'compare' analysis
+        startSpinner('Analyzing logical differences...');
+        const compareOutput = await sendToCCGServer({ ...apiParams, mode: 'compare' });
+        stopSpinner();
 
-        // --- EXISTING: Section 2. AI Language Detection & Analysis ---
-        // 1. Detect Languages in parallel
-        const [langAResult, langBResult] = await Promise.all([
-            callApi({ ...apiParams, mode: 'detect-lang', userInput: codeA }, 'Detecting language of File A...'),
-            callApi({ ...apiParams, mode: 'detect-lang', userInput: codeB }, 'Detecting language of File B...')
-        ]);
-
-        const langA = langAResult?.finalData?.explanation?.trim() || 'Unknown';
-        const langB = langBResult?.finalData?.explanation?.trim() || 'Unknown';
-
-        console.log(chalk.bold(`\nLanguages Detected: ${chalk.yellow(langA)} (File A) vs ${chalk.yellow(langB)} (File B)`));
-        if (langA !== langB) {
-            console.log(chalk.yellow('Warning: Language mismatch detected. Analysis may be less accurate.'));
+        if (compareOutput.startsWith('⚠️')) {
+            printSection('AI Analysis (Compare)', chalk.red(compareOutput), 'red');
+        } else {
+            printSection('AI Analysis (Compare)', compareOutput, 'cyan');
         }
 
-        // 2. Run analysis and merge in parallel
-        const [diffResult, qualityResult, mergeResult] = await Promise.all([
-            callApi({ ...apiParams, mode: 'compare-diff', userInput: `${codeA}|||${codeB}|||${langA}|||${langB}` }, 'Analyzing logical differences...'),
-            callApi({ ...apiParams, mode: 'compare-quality', userInput: `${codeA}|||${codeB}|||${langA}|||${langB}` }, 'Reviewing code quality...'),
-            callApi({ ...apiParams, mode: 'compare-merge', userInput: `${codeA}|||${codeB}|||${langA}|||${langB}|||` }, 'Generating merge suggestion...')
-        ]);
+        // 3. Run AI 'merge'
+        startSpinner('Generating merge suggestion...');
+        const mergeOutput = await sendToCCGServer({ ...apiParams, mode: 'merge' });
+        stopSpinner();
 
-        // 3. Print all AI results (BELOW the visual diff)
-        printSection('Logical Differences', diffResult?.finalData?.explanation, 'cyan');
-        printSection('AI Quality Review', qualityResult?.finalData?.explanation, 'yellow');
-        printSection('AI Suggested Merge', mergeResult?.finalData?.explanation, 'green');
+        if (mergeOutput.startsWith('⚠️')) {
+            printSection('AI Suggested Merge', chalk.red(mergeOutput), 'red');
+        } else {
+            printSection('AI Suggested Merge', mergeOutput, 'green');
+        }
 
     } catch (err) {
-        // stopSpinner() is in callApi, so we just log the error
+        stopSpinner();
         console.error(chalk.red(`\n❌ A critical compare error occurred: ${err.message}`));
     }
 };
