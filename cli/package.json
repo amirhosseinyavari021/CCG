@@ -1,10 +1,10 @@
 {
-  "name": "@amirhosseinyavari/ay-cmdgen",
-  "version": "3.0.2",
+  "name": "@amirhosseinyavari/ccg",
+  "version": "3.0.3",
   "description": "CCG (Cando Command Generator) - Your Intelligent Command-Line Assistant",
   "main": "cmdgen-cli.js",
   "bin": {
-    "cmdgen": "./cmdgen-cli.js"
+    "ccg": "./cmdgen-cli.js"
   },
   "publishConfig": {
     "access": "public"
