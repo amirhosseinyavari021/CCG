@@ -13,6 +13,7 @@ const open = require('open');
 const axios = require('axios/dist/node/axios.cjs'); // Keep for update check
 
 // --- MODIFIED IMPORTS ---
+// -- Requires the CJS version of apiService-cli.js (FIX for PKG) --
 const { sendToCCGServer } = require('./apiService-cli.js');
 const { parseAndConstructData } = require('./responseParser-cli.js');
 const { runComparer } = require('./modules/codeCompare.js');
@@ -314,14 +315,18 @@ const run = async () => {
                 process.exit(1);
             }
 
-            // --- REFACTORED API CALL ---
+            // --- REFACTORED API CALL (UPDATED with all context) ---
             startSpinner('Generating response...');
             const rawOutput = await sendToCCGServer({
                 mode: 'generate',
                 user_request: argv.request,
                 os: context.os,
-                lang: context.lang
-                // Note: osVersion, cli, level, device are no longer sent
+                lang: context.lang,
+                // --- NEWLY ADDED ---
+                cli: context.shell,
+                osVersion: context.osVersion,
+                knowledgeLevel: context.level,
+                deviceType: context.deviceType
             });
             stopSpinner();
 
@@ -377,15 +382,19 @@ const run = async () => {
             const getMoreSuggestions = async (request, allCommands, context) => {
                 console.log(chalk.blue("\n🔄 Getting more suggestions..."));
 
-                // --- REFACTORED API CALL ---
+                // --- REFACTORED API CALL (UPDATED with existingCommands and all context) ---
                 startSpinner('Generating response...');
-                // Note: The new API doesn't have a mechanism for "existingCommands",
-                // so we just call 'generate' again. The AI *should* give variations.
                 const rawOutput = await sendToCCGServer({
                     mode: 'generate',
                     user_request: request,
                     os: context.os,
-                    lang: context.lang
+                    lang: context.lang,
+                    // --- NEWLY ADDED ---
+                    cli: context.shell,
+                    osVersion: context.osVersion,
+                    knowledgeLevel: context.level,
+                    deviceType: context.deviceType,
+                    existingCommands: allCommands.map(c => c.command) // Tell AI what not to repeat
                 });
                 stopSpinner();
 
@@ -421,15 +430,19 @@ const run = async () => {
             await startInteractiveSession();
         })
         .command(['script <request>', 's'], 'Generate a full script', {}, async (argv) => {
-            const { os, shell, lang, request } = { ...config, ...argv };
+            const { os, shell, lang, request, level, deviceType, osVersion } = { ...config, ...argv };
 
-            // --- REFACTORED API CALL ---
+            // --- REFACTORED API CALL (UPDATED with all context) ---
             startSpinner('Generating response...');
             const rawOutput = await sendToCCGServer({
                 mode: 'script',
                 user_request: request,
                 os,
-                lang
+                lang,
+                cli: shell,
+                osVersion,
+                knowledgeLevel: level,
+                deviceType
             });
             stopSpinner();
 
@@ -451,15 +464,19 @@ const run = async () => {
             gracefulExit();
         })
         .command(['analyze <command>', 'a'], 'Explain a command', {}, async (argv) => {
-            const { os, shell, lang, command } = { ...config, ...argv };
+            const { os, shell, lang, command, level, deviceType, osVersion } = { ...config, ...argv };
 
-            // --- REFACTORED API CALL ---
+            // --- REFACTORED API CALL (UPDATED with all context) ---
             startSpinner('Generating response...');
             const rawOutput = await sendToCCGServer({
                 mode: 'analyze', // <-- Mode changed from 'explain'
                 user_request: command,
                 os,
-                lang
+                lang,
+                cli: shell,
+                osVersion,
+                knowledgeLevel: level,
+                deviceType
             });
             stopSpinner();
 
@@ -480,15 +497,19 @@ const run = async () => {
             gracefulExit();
         })
         .command(['error <message>', 'e'], 'Get help for an error', {}, async (argv) => {
-            const { os, shell, lang, message } = { ...config, ...argv };
+            const { os, shell, lang, message, level, deviceType, osVersion } = { ...config, ...argv };
 
-            // --- REFACTORED API CALL ---
+            // --- REFACTORED API CALL (UPDATED with all context) ---
             startSpinner('Generating response...');
             const rawOutput = await sendToCCGServer({
                 mode: 'error',
                 error_message: message, // <-- Param name changed
                 os,
-                lang
+                lang,
+                cli: shell,
+                osVersion,
+                knowledgeLevel: level,
+                deviceType
             });
             stopSpinner();
 
@@ -538,6 +559,7 @@ const run = async () => {
             await setConfig({ usageCount: (config.usageCount || 0) + 1 });
 
             // --- REFACTORED: Pass sendToCCGServer, not old callApi ---
+            // -- UPDATED: config now includes all context --
             await runComparer(contentA, contentB, { lang: lang || 'en' }, config, sendToCCGServer, startSpinner, stopSpinner);
             gracefulExit();
         })
