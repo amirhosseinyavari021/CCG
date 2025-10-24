@@ -20,26 +20,29 @@ const handleError = (error, lang) => {
 /**
  * Acts as an adapter between the UI components (App.js, useCodeCompare)
  * and the new `fetchCCGResponse` API service.
- * It maps UI-layer parameters to the new API structure and parses
- * the string response back into the data structure the UI expects.
+ * -- UPDATED to pass all variables to the API --
  */
 export const callApi = async ({
     mode,
     userInput,
     os,
-    osVersion, // No longer sent to API, but kept for cache key
-    cli,        // No longer sent to API, but kept for cache key & parser
+    osVersion,
+    cli,
     lang,
-    iteration = 0, // No longer sent to API, but kept for cache key
+    iteration = 0,
     codeA = '',
     codeB = '',
-    // other params ignored by new API (e.g., existingCommands)
+    // --- NEWLY ADDED ---
+    knowledgeLevel,
+    deviceType,
+    existingCommands,
+    analysis,
     ...otherProps
 }, onUpdate) => {
 
     const t = translations[lang];
     // Create a cache key from all unique request params
-    const cacheKey = `${lang}-${mode}-${os}-${osVersion}-${cli}-${userInput}-${iteration}-${codeA.length}-${codeB.length}`;
+    const cacheKey = `${lang}-${mode}-${os}-${osVersion}-${cli}-${userInput}-${iteration}-${codeA.length}-${codeB.length}-${knowledgeLevel}-${deviceType}-${existingCommands?.length}`;
 
     if (sessionCache.has(cacheKey)) {
         return sessionCache.get(cacheKey);
@@ -49,15 +52,23 @@ export const callApi = async ({
     onUpdate?.('fetching');
 
     // 1. Map UI-layer state to the new API 'variables'
+    // -- UPDATED to include all new fields --
     const apiParams = {
         mode,
-        os, // The new API just takes the OS name
+        os,
         lang,
         // Map userInput to the correct API variable based on mode
         user_request: (mode !== 'error' && mode !== 'detect-lang') ? userInput : '',
         input_a: codeA,
         input_b: codeB,
-        error_message: (mode === 'error') ? userInput : ''
+        error_message: (mode === 'error') ? userInput : '',
+        // --- NEWLY ADDED FIELDS ---
+        osVersion: osVersion || '',
+        cli: cli || '',
+        knowledgeLevel: knowledgeLevel || 'intermediate',
+        deviceType: deviceType || '',
+        existingCommands: existingCommands || [],
+        analysis: analysis || ''
     };
 
     try {
