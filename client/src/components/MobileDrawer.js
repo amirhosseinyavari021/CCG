@@ -1,21 +1,22 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { X, MessageSquare } from 'lucide-react'; // <-- Added MessageSquare
 import { translations } from '../constants/translations';
 
 const MobileDrawer = ({ isOpen, onClose, lang, onLangChange }) => {
     const t = translations[lang];
+    const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfkigw8FoqPI2KpIg7Xhy_3CqXAovCVwuPXQGCeKnVaV1PLAg/viewform?usp=dialog'; // <-- Feedback URL
 
     const handleContentClick = (e) => e.stopPropagation();
 
     return (
         <>
             {/* Overlay */}
-            <div 
-                onClick={onClose} 
+            <div
+                onClick={onClose}
                 className={`fixed inset-0 bg-black/50 z-50 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
             />
             {/* Drawer */}
-            <div 
+            <div
                 className={`fixed top-0 bottom-0 ${lang === 'fa' ? 'right-0' : 'left-0'} w-64 bg-white dark:bg-gray-800 shadow-lg z-50 transform transition-transform duration-300 ${isOpen ? 'translate-x-0' : (lang === 'fa' ? 'translate-x-full' : '-translate-x-full')}`}
                 onClick={handleContentClick}
             >
@@ -28,11 +29,27 @@ const MobileDrawer = ({ isOpen, onClose, lang, onLangChange }) => {
                 <div className="p-4 space-y-4">
                     <div className="pt-2">
                         <p className="text-xs text-gray-500 dark:text-gray-400 px-2 mb-2">Language</p>
-                         <div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5">
+                        <div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5">
                             <button onClick={() => onLangChange('en')} className={`flex-1 text-center px-3 py-1 rounded-full text-xs ${lang === 'en' ? 'bg-amber-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>EN</button>
                             <button onClick={() => onLangChange('fa')} className={`flex-1 text-center px-3 py-1 rounded-full text-xs ${lang === 'fa' ? 'bg-amber-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>FA</button>
                         </div>
                     </div>
+
+                    {/* --- NEW FEEDBACK BUTTON --- */}
+                    <div className="pt-2">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 px-2 mb-2">{t.feedbackButton}</p>
+                        <a
+                            href={FEEDBACK_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                        >
+                            <MessageSquare size={16} />
+                            {t.feedbackButton}
+                        </a>
+                    </div>
+                    {/* --- END NEW BUTTON --- */}
+
                 </div>
             </div>
         </>

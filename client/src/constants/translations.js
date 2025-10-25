@@ -87,6 +87,7 @@ export const translations = {
     feedbackSubheader: "You've used CCG several times. Would you mind sharing your thoughts to help us improve?",
     feedbackAction: "Provide Feedback",
     feedbackDismiss: "Maybe Later",
+    feedbackButton: "Feedback", // <-- NEW
     // Smart Code Compare Translations
     compareSubheader: "Compare two code snippets with AI to understand logical differences, review quality, and merge changes.",
     pasteCodeA: "Paste Code A (Original)",
@@ -187,11 +188,12 @@ export const translations = {
     errorInput: "درخواست شما قابل پردازش نبود. لطفاً ورودی خود را بررسی کنید.",
     errorParse: "پاسخ غیرمنتظره‌ای از هوش مصنوعی دریافت شد. لطفاً درخواست خود را با بیانی دیگر مطرح کنید.",
     errorTooManyRequests: "تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید.",
-    errorDefault: "یک خطای غیرمنتکاری رخ داد. در حال بررسی آن هستیم. لطفاً بعداً تلاش کنید.",
+    errorDefault: "یک خطای غیر منتظره رخ داد. در حال بررسی آن هستیم. لطفاً بعداً تلاش کنید.",
     feedbackTitle: "نظر شما برای ما ارزشمند است!",
     feedbackSubheader: "شما چندین بار از CCG استفاده کرده‌اید. برای کمک به بهبود ابزار، نظر خود را با ما در میان می‌گذارید؟",
     feedbackAction: "ثبت بازخورد",
     feedbackDismiss: "بعداً",
+    feedbackButton: "بازخورد", // <-- NEW
     // Smart Code Compare Translations (Persian)
     compareSubheader: "دو قطعه کد را با هوش مصنوعی مقایسه کنید تا تفاوت‌های منطقی، کیفیت و تغییرات را درک کنید.",
     pasteCodeA: "کد A (نسخه اصلی)",

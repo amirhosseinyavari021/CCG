@@ -1,9 +1,12 @@
 import React from 'react';
-import { Menu } from 'lucide-react';
+import { Menu, MessageSquare } from 'lucide-react'; // <-- Added MessageSquare
+import { translations } from '../constants/translations'; // <-- Added translations
 
 const Header = ({ lang, onMenuClick, onLangChange }) => {
 
-    const appVersion = process.env.REACT_APP_VERSION || '3.0.5';
+    const appVersion = process.env.REACT_APP_VERSION || '3.0.7';
+    const t = translations[lang]; // <-- Get translation object
+    const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfkigw8FoqPI2KpIg7Xhy_3CqXAovCVwuPXQGCeKnVaV1PLAg/viewform?usp=dialog'; // <-- Feedback URL
 
     return (
         <header className="bg-white/70 dark:bg-gray-900/70 shadow-sm sticky top-0 z-40 backdrop-blur-lg">
@@ -21,9 +24,22 @@ const Header = ({ lang, onMenuClick, onLangChange }) => {
                         </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4"> {/* <-- Increased gap */}
                     {/* Desktop buttons */}
-                    <div className="hidden md:flex items-center gap-3">
+                    <div className="hidden md:flex items-center gap-4"> {/* <-- Increased gap */}
+
+                        {/* --- NEW FEEDBACK BUTTON --- */}
+                        <a
+                            href={FEEDBACK_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 text-gray-600 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400 text-xs font-semibold"
+                        >
+                            <MessageSquare size={14} />
+                            {t.feedbackButton}
+                        </a>
+                        {/* --- END NEW BUTTON --- */}
+
                         <div className="flex items-center bg-gray-200/70 dark:bg-gray-700/70 rounded-full p-0.5">
                             <button onClick={() => onLangChange('en')} className={`px-2.5 py-1 rounded-full text-xs ${lang === 'en' ? 'bg-amber-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>EN</button>
                             <button onClick={() => onLangChange('fa')} className={`px-2.5 py-1 rounded-full text-xs ${lang === 'fa' ? 'bg-amber-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>FA</button>
