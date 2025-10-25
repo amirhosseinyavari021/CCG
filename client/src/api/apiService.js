@@ -32,7 +32,7 @@ export async function fetchCCGResponse(params) {
      * @returns {string} A user-friendly error message.
      */
     const handleApiError = (error) => {
-        console.error(`CCG Web API error:`, error.message);
+        console.error(`CCG Web server error:`, error.message);
 
         if (error.response) {
             // The request was made and the server responded with a status code

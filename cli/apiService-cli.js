@@ -25,12 +25,6 @@ async function sendToCCGServer(params) {
                 input_b: params.input_b || "",
                 error_message: params.error_message || ""
                 // --- REMOVED FIELDS to match version 5 spec ---
-                // cli: params.cli || "",
-                // osVersion: params.osVersion || "",
-                // knowledgeLevel: params.knowledgeLevel || "intermediate",
-                // deviceType: params.deviceType || "",
-                // existingCommands: params.existingCommands || [],
-                // analysis: params.analysis || ""
             }
         }
     };
