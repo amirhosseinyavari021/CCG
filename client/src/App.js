@@ -68,7 +68,10 @@ function AppContent() {
 
     const usageCount = parseInt(localStorage.getItem('usageCount') || '0', 10);
     const feedbackRequested = localStorage.getItem('feedbackRequested') === 'true';
-    if (usageCount >= 15 && !feedbackRequested) {
+
+    // --- MODIFICATION: Changed threshold to 20 ---
+    if (usageCount >= 20 && !feedbackRequested) {
+      // --- END MODIFICATION ---
       setShowFeedback(true);
     }
   }, []); // Empty dependency array ensures this runs only once on mount
@@ -93,7 +96,10 @@ function AppContent() {
     const currentCount = parseInt(localStorage.getItem('usageCount') || '0', 10);
     const newCount = currentCount + 1;
     localStorage.setItem('usageCount', newCount);
-    if (newCount >= 15 && localStorage.getItem('feedbackRequested') !== 'true') {
+
+    // --- MODIFICATION: Changed threshold to 20 ---
+    if (newCount >= 20 && localStorage.getItem('feedbackRequested') !== 'true') {
+      // --- END MODIFICATION ---
       setShowFeedback(true);
     }
   };
@@ -189,7 +195,7 @@ function AppContent() {
             onClick={() => setAppMode('compare')}
             className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-semibold transition-colors ${appMode === 'compare'
               ? 'bg-white dark:bg-gray-800 text-amber-600 dark:text-amber-400 shadow'
-              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100/50 dark:hover:bg-gray-600/5AN'
+              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100/50 dark:hover:bg-gray-600/AN'
               }`}
           >
             <GitCompare size={16} />

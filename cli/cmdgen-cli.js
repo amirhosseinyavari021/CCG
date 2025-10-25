@@ -23,7 +23,9 @@ const packageJson = require('./package.json');
 const currentVersion = packageJson.version;
 const packageName = packageJson.name;
 
-const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfkigw8FoqPI2KpIg7Xhy_3CqXAovCVwuPXQGCeKnVaV1PLAg/viewform?usp=header';
+// --- MODIFICATION: Updated Feedback URL ---
+const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfkigw8FoqPI2KpIg7Xhy_3CqXAovCVwuPXQGCeKnVaV1PLAg/viewform?usp=dialog';
+// --- END MODIFICATION ---
 const USAGE_THRESHOLD_FOR_FEEDBACK = 20;
 
 const configDir = path.join(os.homedir(), '.config', 'ccg');
@@ -36,14 +38,25 @@ async function getConfig() {
         try {
             const config = await fs.readJson(configFile);
             if (!config.history) config.history = [];
+            // --- MODIFICATION: Ensure all keys exist ---
+            if (!config.sessionStats) config.sessionStats = {};
+            if (config.usageCount === undefined) config.usageCount = 0; // <-- Ensures usageCount exists
+            if (config.feedbackRequested === undefined) config.feedbackRequested = false;
+            if (config.isFirstRun === undefined) config.isFirstRun = false;
+            if (config.last_update_check) delete config.last_update_check; // <-- Remove old timestamp key
+            // --- END MODIFICATION ---
             return config;
         } catch (error) {
             console.error(chalk.yellow('Warning: Configuration file was corrupted and has been reset.'));
             await fs.remove(configFile);
-            return { history: [], usageCount: 0, feedbackRequested: false, isFirstRun: true };
+            // --- MODIFICATION: Reset with all keys ---
+            return { history: [], usageCount: 0, feedbackRequested: false, isFirstRun: true, sessionStats: {} };
+            // --- END MODIFICATION ---
         }
     }
-    return { history: [], usageCount: 0, feedbackRequested: false, isFirstRun: true };
+    // --- MODIFICATION: Reset with all keys ---
+    return { history: [], usageCount: 0, feedbackRequested: false, isFirstRun: true, sessionStats: {} };
+    // --- END MODIFICATION ---
 }
 
 async function setConfig(newConfig) {
@@ -71,7 +84,10 @@ async function handleFeedback() {
         const answer = await new Promise(resolve => rl.question(chalk.yellow('Open feedback form in browser? (y/N) '), resolve));
         rl.close();
         if (answer.toLowerCase() === 'y') {
+            // --- MODIFICATION: Added fallback text ---
+            console.log(chalk.cyan(`Opening: ${FEEDBACK_URL}`));
             await open(FEEDBACK_URL).catch(() => console.log(chalk.yellow('Could not open browser. Please visit the URL manually.')));
+            // --- END MODIFICATION ---
         }
         await setConfig({ feedbackRequested: true });
     }
@@ -211,7 +227,7 @@ const handleConfigCommand = async (action, key, value) => {
     if (action === 'show') {
         console.log(chalk.bold('\nCurrent CCG Configuration:'));
         Object.entries(config).forEach(([k, v]) => {
-            if (!['history', 'last_update_check', 'isFirstRun'].includes(k) && v) {
+            if (!['history', 'isFirstRun', 'sessionStats'].includes(k) && v) {
                 console.log(`  ${chalk.cyan(k)}: ${chalk.yellow(String(v))}`);
             }
         });
@@ -249,16 +265,29 @@ const stopSpinner = () => {
     process.stdout.write('\x1B[?25h');
 };
 
+// --- MODIFICATION: Update Check based on usageCount % 50 ---
 async function checkForUpdates() {
+    const config = await getConfig();
+    const usageCount = config.usageCount || 0;
+
+    // Only check on first use (0) and every 50 uses (50, 100, 150...)
+    if (usageCount !== 0 && (usageCount % 50 !== 0)) {
+        return; // Not time to check
+    }
+
     try {
-        const response = await axios.get(`https://registry.npmjs.org/${packageName}/latest`, { timeout: 2000 });
+        const response = await axios.get(`https://registry.npmjs.org/${packageName}/latest`, { timeout: 3000 });
         const latestVersion = response.data.version;
+
         if (semver.gt(latestVersion, currentVersion)) {
             console.log(chalk.green(`\n💡 New version available! (${currentVersion} -> ${latestVersion})`));
             console.log(`   Run ${chalk.cyan('ccg update')} to get the latest version.\n`);
         }
-    } catch (error) { /* Silently fail */ }
+    } catch (error) {
+        /* Silently fail, don't nag user on network error */
+    }
 }
+// --- END MODIFICATION ---
 
 // --- REMOVED old callApi function ---
 // --- REMOVED primaryServerUrl and fallbackServerUrl constants ---
@@ -297,6 +326,15 @@ const run = async () => {
     }
 
     const command = args[0]?.toLowerCase();
+
+    // --- MODIFICATION: Moved Update Check ---
+    // Run update check on every command *except* 'update' itself.
+    // The function now has its own (usageCount % 50) throttle.
+    if (command !== 'update') {
+        await checkForUpdates();
+    }
+    // --- END MODIFICATION ---
+
     const needsConfig = !['config', 'update', 'feedback', 'f', 'compare', 'c', undefined, '--help', '-h', '--version', '-v'].includes(command);
 
     if (needsConfig && (!config.os || !config.shell)) {
@@ -315,20 +353,17 @@ const run = async () => {
                 process.exit(1);
             }
 
-            // --- REFACTORED API CALL (UPDATED with all context) ---
+            // --- REFACTORED API CALL (Now uses v5 payload) ---
             startSpinner('Generating response...');
             const rawOutput = await sendToCCGServer({
                 mode: 'generate',
                 user_request: argv.request,
                 os: context.os,
-                lang: context.lang,
-                // --- NEWLY ADDED ---
-                cli: context.shell,
-                osVersion: context.osVersion,
-                knowledgeLevel: context.level,
-                deviceType: context.deviceType
+                lang: context.lang
+                // Note: Extra fields are removed by apiService-cli.js
             });
             stopSpinner();
+            // --- END REFACTOR ---
 
             if (rawOutput.startsWith('⚠️')) {
                 console.log(chalk.red(`\n❌ API Error: ${rawOutput}`));
@@ -336,7 +371,6 @@ const run = async () => {
             }
 
             const initialResult = parseAndConstructData(rawOutput, 'generate', context.shell);
-            // --- END REFACTOR ---
 
             if (!initialResult?.commands?.length) {
                 console.log(chalk.red("\n❌ Failed to generate valid commands."));
@@ -382,21 +416,17 @@ const run = async () => {
             const getMoreSuggestions = async (request, allCommands, context) => {
                 console.log(chalk.blue("\n🔄 Getting more suggestions..."));
 
-                // --- REFACTORED API CALL (UPDATED with existingCommands and all context) ---
+                // --- REFACTORED API CALL (Now uses v5 payload) ---
                 startSpinner('Generating response...');
                 const rawOutput = await sendToCCGServer({
                     mode: 'generate',
                     user_request: request,
                     os: context.os,
-                    lang: context.lang,
-                    // --- NEWLY ADDED ---
-                    cli: context.shell,
-                    osVersion: context.osVersion,
-                    knowledgeLevel: context.level,
-                    deviceType: context.deviceType,
-                    existingCommands: allCommands.map(c => c.command) // Tell AI what not to repeat
+                    lang: context.lang
+                    // Note: Extra fields are removed by apiService-cli.js
                 });
                 stopSpinner();
+                // --- END REFACTOR ---
 
                 if (rawOutput.startsWith('⚠️')) {
                     console.log(chalk.red(`\n❌ API Error: ${rawOutput}`));
@@ -405,7 +435,6 @@ const run = async () => {
 
                 const result = parseAndConstructData(rawOutput, 'generate', context.shell);
                 return result?.commands || [];
-                // --- END REFACTOR ---
             };
             const promptUser = (commands) => new Promise(resolve => {
                 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -430,21 +459,18 @@ const run = async () => {
             await startInteractiveSession();
         })
         .command(['script <request>', 's'], 'Generate a full script', {}, async (argv) => {
-            const { os, shell, lang, request, level, deviceType, osVersion } = { ...config, ...argv };
+            const { os, lang, request } = { ...config, ...argv };
 
-            // --- REFACTORED API CALL (UPDATED with all context) ---
+            // --- REFACTORED API CALL (v5) ---
             startSpinner('Generating response...');
             const rawOutput = await sendToCCGServer({
                 mode: 'script',
                 user_request: request,
                 os,
-                lang,
-                cli: shell,
-                osVersion,
-                knowledgeLevel: level,
-                deviceType
+                lang
             });
             stopSpinner();
+            // --- END REFACTOR ---
 
             if (rawOutput.startsWith('⚠️')) {
                 console.log(chalk.red(`\n❌ API Error: ${rawOutput}`));
@@ -452,8 +478,7 @@ const run = async () => {
                 return;
             }
 
-            const result = parseAndConstructData(rawOutput, 'script', shell);
-            // --- END REFACTOR ---
+            const result = parseAndConstructData(rawOutput, 'script', config.shell);
 
             if (result?.explanation) {
                 await setConfig({ usageCount: (config.usageCount || 0) + 1 });
@@ -464,21 +489,18 @@ const run = async () => {
             gracefulExit();
         })
         .command(['analyze <command>', 'a'], 'Explain a command', {}, async (argv) => {
-            const { os, shell, lang, command, level, deviceType, osVersion } = { ...config, ...argv };
+            const { os, lang, command } = { ...config, ...argv };
 
-            // --- REFACTORED API CALL (UPDATED with all context) ---
+            // --- REFACTORED API CALL (v5) ---
             startSpinner('Generating response...');
             const rawOutput = await sendToCCGServer({
                 mode: 'analyze', // <-- Mode changed from 'explain'
                 user_request: command,
                 os,
-                lang,
-                cli: shell,
-                osVersion,
-                knowledgeLevel: level,
-                deviceType
+                lang
             });
             stopSpinner();
+            // --- END REFACTOR ---
 
             if (rawOutput.startsWith('⚠️')) {
                 console.log(chalk.red(`\n❌ API Error: ${rawOutput}`));
@@ -486,8 +508,7 @@ const run = async () => {
                 return;
             }
 
-            const result = parseAndConstructData(rawOutput, 'explain', shell); // Parser still uses 'explain'
-            // --- END REFACTOR ---
+            const result = parseAndConstructData(rawOutput, 'explain', config.shell); // Parser still uses 'explain'
 
             if (result?.explanation) {
                 await setConfig({ usageCount: (config.usageCount || 0) + 1 });
@@ -497,21 +518,18 @@ const run = async () => {
             gracefulExit();
         })
         .command(['error <message>', 'e'], 'Get help for an error', {}, async (argv) => {
-            const { os, shell, lang, message, level, deviceType, osVersion } = { ...config, ...argv };
+            const { os, lang, message } = { ...config, ...argv };
 
-            // --- REFACTORED API CALL (UPDATED with all context) ---
+            // --- REFACTORED API CALL (v5) ---
             startSpinner('Generating response...');
             const rawOutput = await sendToCCGServer({
                 mode: 'error',
                 error_message: message, // <-- Param name changed
                 os,
-                lang,
-                cli: shell,
-                osVersion,
-                knowledgeLevel: level,
-                deviceType
+                lang
             });
             stopSpinner();
+            // --- END REFACTOR ---
 
             if (rawOutput.startsWith('⚠️')) {
                 console.log(chalk.red(`\n❌ API Error: ${rawOutput}`));
@@ -519,8 +537,7 @@ const run = async () => {
                 return;
             }
 
-            const result = parseAndConstructData(rawOutput, 'error', shell);
-            // --- END REFACTOR ---
+            const result = parseAndConstructData(rawOutput, 'error', config.shell);
 
             if (result?.cause) {
                 await setConfig({ usageCount: (config.usageCount || 0) + 1 });
@@ -558,8 +575,9 @@ const run = async () => {
 
             await setConfig({ usageCount: (config.usageCount || 0) + 1 });
 
-            // --- REFACTORED: Pass sendToCCGServer, not old callApi ---
-            // -- UPDATED: config now includes all context --
+            // --- REFACTORED: Pass sendToCCGServer ---
+            // Note: codeCompare.js passes extra fields, but apiService-cli.js filters them
+            // before sending the v5 payload.
             await runComparer(contentA, contentB, { lang: lang || 'en' }, config, sendToCCGServer, startSpinner, stopSpinner);
             gracefulExit();
         })
@@ -597,7 +615,10 @@ const run = async () => {
             });
         })
         .command(['feedback', 'f'], 'Provide feedback on the tool', {}, async () => {
+            // --- MODIFICATION: Added fallback text ---
+            console.log(chalk.cyan(`Opening: ${FEEDBACK_URL}`));
             await open(FEEDBACK_URL).catch(() => console.log(chalk.yellow('Please visit: ' + FEEDBACK_URL)));
+            // --- END MODIFICATION ---
             gracefulExit();
         });
 
@@ -609,10 +630,13 @@ const run = async () => {
         console.log(currentVersion);
     }
 
-    if (command && !['config', 'update', 'feedback', 'f'].includes(command)) {
-        await checkForUpdates();
+    // --- MODIFICATION: Moved Feedback Check ---
+    // Handle feedback check *after* a command has been processed,
+    // but not for auxiliary commands.
+    if (command && !['config', 'update', 'feedback', 'f', 'history', 'h', undefined, '--help', '-h', '--version', '-v'].includes(command)) {
         await handleFeedback();
     }
+    // --- END MODIFICATION ---
 };
 
 run().catch(err => {
