@@ -3,7 +3,7 @@ import { Menu } from 'lucide-react';
 
 const Header = ({ lang, onMenuClick, onLangChange }) => {
 
-    const appVersion = process.env.REACT_APP_VERSION || '3.0.3';
+    const appVersion = process.env.REACT_APP_VERSION || '3.0.5';
 
     return (
         <header className="bg-white/70 dark:bg-gray-900/70 shadow-sm sticky top-0 z-40 backdrop-blur-lg">
