@@ -11,11 +11,11 @@ const axios = require("axios/dist/node/axios.cjs");
 // 2. CJS module export
 async function sendToCCGServer(params) {
     // Construct the payload based on the new API structure
-    // -- UPDATED to include ALL fields from params --
+    // -- MODIFICATION: Updated to version 5 and removed extra keys --
     const payload = {
         prompt: {
             id: "pmpt_68fa6a905dac8195b749aa47ea94d4d8001f6f48395546cd",
-            version: "3",
+            version: "5",
             variables: {
                 mode: params.mode || "",
                 os: params.os || "",
@@ -23,17 +23,18 @@ async function sendToCCGServer(params) {
                 user_request: params.user_request || "",
                 input_a: params.input_a || "",
                 input_b: params.input_b || "",
-                error_message: params.error_message || "",
-                // --- NEWLY ADDED FIELDS ---
-                cli: params.cli || "",
-                osVersion: params.osVersion || "",
-                knowledgeLevel: params.knowledgeLevel || "intermediate",
-                deviceType: params.deviceType || "",
-                existingCommands: params.existingCommands || [],
-                analysis: params.analysis || ""
+                error_message: params.error_message || ""
+                // --- REMOVED FIELDS to match version 5 spec ---
+                // cli: params.cli || "",
+                // osVersion: params.osVersion || "",
+                // knowledgeLevel: params.knowledgeLevel || "intermediate",
+                // deviceType: params.deviceType || "",
+                // existingCommands: params.existingCommands || [],
+                // analysis: params.analysis || ""
             }
         }
     };
+    // --- END MODIFICATION ---
 
     try {
         // Primary attempt to the main production endpoint
