@@ -1,6 +1,6 @@
 {
   "name": "@amirhosseinyavari/ccg",
-  "version": "3.0.5",
+  "version": "3.0.6",
   "description": "CCG (Cando Command Generator) - Your Intelligent Command-Line Assistant",
   "main": "cmdgen-cli.js",
   "bin": {
