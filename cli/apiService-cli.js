@@ -11,11 +11,11 @@ const axios = require("axios/dist/node/axios.cjs");
 // 2. CJS module export
 async function sendToCCGServer(params) {
     // Construct the payload based on the new API structure
-    // -- MODIFICATION: Updated to version 5 and removed extra keys --
+    // -- MODIFICATION: Updated to version 6 --
     const payload = {
         prompt: {
             id: "pmpt_68fa6a905dac8195b749aa47ea94d4d8001f6f48395546cd",
-            version: "5",
+            version: "6",
             variables: {
                 mode: params.mode || "",
                 os: params.os || "",
@@ -24,7 +24,7 @@ async function sendToCCGServer(params) {
                 input_a: params.input_a || "",
                 input_b: params.input_b || "",
                 error_message: params.error_message || ""
-                // --- REMOVED FIELDS to match version 5 spec ---
+                // --- Extra fields are intentionally removed for v5/v6 ---
             }
         }
     };
@@ -39,7 +39,6 @@ async function sendToCCGServer(params) {
         return res.data.output;
     } catch (err) {
         console.error("CCG CLI API error:", err.message);
-        // --- REMOVED Retry Logic ---
         // Return a final error string if the primary fails
         if (err.response) {
             return `⚠️ AI service unavailable (Error ${err.response.status}).`;

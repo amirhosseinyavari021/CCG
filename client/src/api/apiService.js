@@ -12,7 +12,7 @@ export async function fetchCCGResponse(params) {
     const payload = {
         prompt: {
             id: "pmpt_68fa6a905dac8195b749aa47ea94d4d8001f6f48395546cd",
-            version: "5", // <-- MODIFICATION: Version updated to 5
+            version: "6", // <-- MODIFICATION: Version updated to 6
             variables: {
                 mode: params.mode || "",
                 os: params.os || "",
@@ -32,7 +32,7 @@ export async function fetchCCGResponse(params) {
      * @returns {string} A user-friendly error message.
      */
     const handleApiError = (error) => {
-        console.error(`CCG Web server error:`, error.message);
+        console.error(`CCG Web API error:`, error.message);
 
         if (error.response) {
             // The request was made and the server responded with a status code
@@ -65,7 +65,6 @@ export async function fetchCCGResponse(params) {
         // Return the direct output string for the UI
         return response.data.output;
     } catch (error) {
-        // --- REMOVED Retry Logic ---
         // If the primary call fails, report the error directly.
         return handleApiError(error);
     }
