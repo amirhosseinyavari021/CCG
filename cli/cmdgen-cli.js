@@ -596,7 +596,9 @@ const run = async () => {
         })
         .command('update', 'Update CCG to the latest version', {}, () => {
             console.log(chalk.cyan('Attempting to update CCG via npm...'));
-            const command = `npm install -g ${packageName}`;
+            // --- MODIFICATION: Added @latest to force cache bypass ---
+            const command = `npm install -g ${packageName}@latest`;
+            // --- END MODIFICATION ---
             const fullCommand = process.platform !== 'win32' && process.getuid() !== 0 ? `sudo ${command}` : command;
 
             console.log(chalk.yellow(`Executing: ${fullCommand}`));
