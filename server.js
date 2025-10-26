@@ -129,6 +129,6 @@ app.listen(PORT, () => {
     event: 'server_start',
     port: PORT,
     timestamp: new Date().toISOString(),
-    version: process.env.VERSION || '3.0.8'
+    version: process.env.VERSION || '3.0.9'
   }));
 });
