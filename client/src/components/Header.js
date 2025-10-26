@@ -4,7 +4,7 @@ import { translations } from '../constants/translations'; // <-- Added translati
 
 const Header = ({ lang, onMenuClick, onLangChange }) => {
 
-    const appVersion = process.env.REACT_APP_VERSION || '3.0.8';
+    const appVersion = process.env.REACT_APP_VERSION || '3.0.9';
     const t = translations[lang]; // <-- Get translation object
     const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfkigw8FoqPI2KpIg7Xhy_3CqXAovCVwuPXQGCeKnVaV1PLAg/viewform?usp=dialog'; // <-- Feedback URL
 

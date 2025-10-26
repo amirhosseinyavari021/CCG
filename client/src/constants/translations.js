@@ -17,13 +17,14 @@ export const translations = {
     os_ubuntu: "Ubuntu",
     os_debian: "Debian",
     os_fedora: "Fedora",
-    'os_centos-stream': "CentOS Stream",
+    // 'os_centos-stream': "CentOS Stream", // REMOVED as requested
     os_centos: "CentOS",
     os_arch: "Arch Linux",
     os_windows: "Windows",
     os_macos: "macOS",
     os_cisco: "Cisco",
     os_mikrotik: "MikroTik",
+    os_fortigate: "FortiGate", // ADDED as requested
     os_python: "Python",
     os_other: "Other...",
     osVersion: "Version (Optional)",
@@ -123,13 +124,14 @@ export const translations = {
     os_ubuntu: "اوبونتو",
     os_debian: "دبیان",
     os_fedora: "فدورا",
-    'os_centos-stream': "CentOS Stream",
+    // 'os_centos-stream': "CentOS Stream", // REMOVED as requested
     os_centos: "CentOS",
     os_arch: "آرچ لینوکس",
     os_windows: "ویندوز",
     os_macos: "مک",
     os_cisco: "سیسکو",
     os_mikrotik: "میکروتیک",
+    os_fortigate: "FortiGate", // ADDED as requested
     os_python: "پایتون",
     os_other: "سایر...",
     osVersion: "نسخه (اختیاری)",

@@ -1,50 +1,41 @@
 export const osDetails = {
   ubuntu: {
-    versions: [], // Versions removed as per new logic
     clis: ['Bash', 'Zsh']
   },
   debian: {
-    versions: [],
     clis: ['Bash', 'Zsh']
   },
   fedora: {
-    versions: [],
     clis: ['Bash', 'Zsh']
   },
-  'centos-stream': {
-    versions: [],
-    clis: ['Bash', 'Zsh']
-  },
+  // 'centos-stream': { // REMOVED
+  //   clis: ['Bash', 'Zsh']
+  // },
   centos: {
-    versions: [],
     clis: ['Bash', 'Zsh']
   },
-  arch: {
-    versions: [],
+  arch: { // Assuming Arch Linux is meant, kept as 'arch' for consistency
     clis: ['Bash', 'Zsh']
   },
   windows: {
-    versions: [],
     clis: ['PowerShell 7', 'CMD']
   },
   macos: {
-    versions: [],
     clis: ['Zsh', 'Bash']
   },
   cisco: {
-    versions: [],
-    clis: ['CLI']
+    clis: ['CLI'] // Cisco IOS CLI
   },
-  mikrotik: {
-    versions: [],
-    clis: ['MikroTik CLI']
+  mikrotik: { // ADDED
+    clis: ['MikroTik CLI'] // RouterOS CLI
+  },
+  fortigate: { // ADDED
+    clis: ['FortiOS CLI'] // FortiOS CLI
   },
   python: {
-    versions: [],
     clis: ['Python 3']
   },
   other: {
-    versions: ['N/A'], // This field will be treated as optional text input
     clis: ['Bash', 'Zsh', 'PowerShell', 'CMD', 'Sh'] // Common shells
   }
 };
