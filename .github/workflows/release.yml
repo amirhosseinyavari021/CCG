@@ -21,18 +21,22 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '18'
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
+      - name: Clean build directories
+        run: |
+          rm -rf build dist
+          mkdir -p build/cli dist
+
       # ================================
-      #           OBFUSCATION
+      #        OBFUSCATE CLI SOURCE
       # ================================
       - name: Obfuscate CLI source
         run: |
-          mkdir -p build/cli
           npx javascript-obfuscator cli \
             --output build/cli \
             --compact true \
@@ -47,19 +51,19 @@ jobs:
             --disable-console-output true
 
       # ================================
-      #           BUILD BINARIES
+      #            BUILD BINARIES
       # ================================
       - name: Build Linux binary
-        run: npx pkg build/cli/cmdgen-cli.js --targets node20-linux-x64 --output dist/ccg-linux
+        run: npx pkg build/cli/cmdgen-cli.js --targets node18-linux-x64 --output dist/ccg-linux
 
       - name: Build macOS binary
-        run: npx pkg build/cli/cmdgen-cli.js --targets node20-macos-x64 --output dist/ccg-macos
+        run: npx pkg build/cli/cmdgen-cli.js --targets node18-macos-x64 --output dist/ccg-macos
 
       - name: Build Windows binary
-        run: npx pkg build/cli/cmdgen-cli.js --targets node20-win-x64 --output dist/ccg-win.exe
+        run: npx pkg build/cli/cmdgen-cli.js --targets node18-win-x64 --output dist/ccg-win.exe
 
       # ================================
-      #           CREATE RELEASE
+      #            CREATE RELEASE
       # ================================
       - name: Create Release
         id: create_release
@@ -69,17 +73,17 @@ jobs:
         with:
           tag_name: ${{ github.ref_name }}
           release_name: ${{ github.ref_name }}
-          body: "Secure CCG Build (No Source Code Included)"
+          body: "Secure CCG Build (no source code included)"
           draft: false
           prerelease: false
 
       # ================================
-      #            UPLOAD BINARIES
+      #              UPLOAD BINARIES
       # ================================
       - name: Upload Linux binary
         uses: actions/upload-release-asset@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.create_release.outputs.upload_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: dist/ccg-linux
