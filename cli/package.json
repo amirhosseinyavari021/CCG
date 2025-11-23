@@ -1,21 +1,24 @@
 {
-  "name": "@amirhosseinyavari/ccg",
-  "version": "3.0.9",
-  "description": "CCG (Cando Command Generator) - Your Intelligent Command-Line Assistant",
+  "name": "ccg-cli",
+  "version": "3.2.0",
   "main": "cmdgen-cli.js",
+  "type": "module",
   "bin": {
     "ccg": "./cmdgen-cli.js"
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "dependencies": {
     "axios": "^1.7.2",
-    "chalk": "^4.1.2",
-    "diff": "^5.2.0",
-    "fs-extra": "^11.2.0",
-    "open": "^8.4.0",
-    "semver": "^7.6.2",
-    "yargs": "^17.7.2"
+    "openai": "^4.52.2"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  },
+  "pkg": {
+    "scripts": "cmdgen-cli.js",
+    "targets": [
+      "latest-linux-x64",
+      "latest-win-x64",
+      "latest-macos-x64"
+    ]
   }
 }

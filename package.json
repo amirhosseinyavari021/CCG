@@ -1,8 +1,8 @@
 {
     "name": "CCG-server",
-    "version": "3.0.9",
+    "version": "3.2.0",
     "private": true,
-    "description": "The server and web component for CCG",
+    "description": "Backend + Web + CLI server for CCG (Command & Coding Generator)",
     "main": "server.js",
     "type": "module",
     "bin": {
@@ -10,6 +10,7 @@
     },
     "scripts": {
         "start": "node server.js",
+        "dev": "node server.js",
         "build": "cd client && npm install && cross-env REACT_APP_VERSION=$npm_package_version npm run build",
         "pkg:linux": "cd cli && npm install && pkg . --targets latest-linux-x64 --output ../dist/ccg-linux",
         "pkg:win": "cd cli && npm install && pkg . --targets latest-win-x64 --output ../dist/ccg-win.exe",
@@ -21,16 +22,21 @@
     },
     "dependencies": {
         "axios": "^1.7.2",
+        "bcryptjs": "^2.4.3",
         "dotenv": "^16.4.5",
         "express": "^4.18.2",
         "express-rate-limit": "^6.7.0",
         "express-validator": "^7.0.1",
+        "json5": "^2.2.3",
+        "jsonwebtoken": "^9.0.2",
+        "mongoose": "^8.0.0",
         "node-fetch": "^2.6.7",
-        "openai": "^4.52.2",
-        "open": "^10.2.0"
+        "open": "^10.2.0",
+        "openai": "^4.52.2"
     },
     "devDependencies": {
         "cross-env": "^7.0.3",
+        "javascript-obfuscator": "^4.1.1",
         "pkg": "^5.8.1"
     }
 }

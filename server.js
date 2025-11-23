@@ -4,127 +4,162 @@ import { fileURLToPath } from 'url';
 import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
-import { routeRequest } from './server/aiRouter.js'; // <-- NEW: Import the AI router
+import mongoose from 'mongoose';
 
-// Load .env variables
+import { routeRequest } from './server/aiRouter.js';
+import authRoutes from './server/routes/authRoutes.js';
+import { requireAuth } from './server/middleware/auth.js';
+import { usageLimit } from './server/middleware/usageLimit.js';
+import { domainGuard } from './server/middleware/domainGuard.js';
+
 dotenv.config();
 
-// --- ES Module equivalents for __dirname ---
+// --- ES Module dirname shim ---
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const {
+  MONGO_URI,
+  PORT: ENV_PORT
+} = process.env;
+
+// --- MongoDB connection ---
+if (!MONGO_URI) {
+  console.warn('⚠️ MONGO_URI is not set. MongoDB will not be connected and auth will fail.');
+} else {
+  mongoose.connect(MONGO_URI)
+    .then(() => console.log('✅ MongoDB connected'))
+    .catch(err => {
+      console.error('❌ MongoDB connection error:', err.message);
+    });
+}
+
 const app = express();
-app.set('trust proxy', 1);
-app.use(express.json());
 
-// --- Rate Limiter ---
-const limiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use('/api/', limiter);
+// --- Basic middleware ---
+app.use(express.json({ limit: '1mb' }));
 
-// --- Enhanced Logging Middleware ---
-app.use('/api/', (req, res, next) => {
+// Simple request context logging
+app.use((req, res, next) => {
   req.startTime = Date.now();
-  req.sessionId = crypto.randomBytes(8).toString('hex');
+  req.requestId = crypto.randomUUID();
   req.logContext = {
-    timestamp: new Date().toISOString(),
-    sessionId: req.sessionId,
-    userId: crypto.createHash('sha256').update(req.ip || 'unknown').digest('hex').slice(0, 16),
-    userAgent: req.headers['user-agent'],
-    endpoint: req.path
-  };
-
-  console.log(JSON.stringify({
-    ...req.logContext,
-    event: 'api_request_start',
+    requestId: req.requestId,
+    path: req.path,
     method: req.method,
-  }));
-
+    ip: req.ip
+  };
   next();
 });
 
-// --- Analytics Endpoint ---
+// --- Rate limiting for all API routes ---
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/', apiLimiter);
+
+// --- Healthcheck ---
 app.post('/api/ping', (req, res) => {
-  const { event, source } = req.body || {};
-  console.log(JSON.stringify({
-    ...req.logContext,
-    event: 'analytics_ping',
-    analyticsEvent: event,
-    source: source,
-  }));
-  res.status(200).send({ status: 'ok' });
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// --- Unified API Handler ---
-const handleApiRequest = async (req, res) => {
+// --- Simple analytics sink (optional) ---
+app.post('/api/analytics', (req, res) => {
   try {
-    const { prompt } = req.body;
+    const { event, source, payload } = req.body || {};
+    console.log(JSON.stringify({
+      event: event || 'analytics_event',
+      source: source || 'web',
+      payload: payload || {},
+      timestamp: new Date().toISOString()
+    }));
+  } catch (e) {
+    console.error('analytics parse error', e.message);
+  }
+  res.status(200).json({ status: 'ok' });
+});
+
+// --- Auth routes ---
+app.use('/api/auth', authRoutes);
+
+// --- Main CCG AI endpoint (protected + freemium + domain guard) ---
+app.post('/api/ccg', requireAuth, usageLimit({ maxFreeDaily: 30 }), domainGuard, async (req, res) => {
+  try {
+    const { prompt } = req.body || {};
 
     if (!prompt || !prompt.id || !prompt.variables) {
-      const errorLog = { ...req.logContext, event: 'api_error', error: 'INVALID_PAYLOAD', message: 'Missing or invalid prompt object' };
-      console.error(JSON.stringify(errorLog));
-      return res.status(400).json({ error: { code: 'INVALID_PAYLOAD', message: 'Request payload is missing the "prompt" object.' } });
+      console.error(JSON.stringify({
+        ...req.logContext,
+        event: 'api_error',
+        code: 'INVALID_PAYLOAD',
+        message: 'Missing or invalid prompt object'
+      }));
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_PAYLOAD',
+          message: 'Request payload must include a valid "prompt" object.'
+        }
+      });
     }
 
-    const requestLog = {
+    console.log(JSON.stringify({
       ...req.logContext,
-      event: 'command_generation_start',
-      mode: prompt.variables.mode || 'unknown',
-      promptId: prompt.id,
-    };
-    console.log(JSON.stringify(requestLog));
+      event: 'ccg_request_start',
+      mode: prompt.variables?.mode || 'unknown'
+    }));
 
     const aiContent = await routeRequest(prompt);
 
-    const successLog = {
+    if (req.incrementUsage) {
+      await req.incrementUsage();
+    }
+
+    console.log(JSON.stringify({
       ...req.logContext,
-      event: 'command_generation_complete',
-      mode: prompt.variables.mode,
-      responseTime: Date.now() - req.startTime,
-      success: true
-    };
-    console.log(JSON.stringify(successLog));
+      event: 'ccg_request_success',
+      mode: prompt.variables?.mode || 'unknown',
+      responseTimeMs: Date.now() - req.startTime
+    }));
 
     res.json({ output: aiContent });
-
   } catch (error) {
-    const errorLog = {
+    console.error(JSON.stringify({
       ...req.logContext,
-      event: 'api_proxy_error',
+      event: 'ccg_request_error',
       error: error.message,
-      statusCode: 500,
-      responseTime: Date.now() - req.startTime,
-      success: false
-    };
-    console.error(JSON.stringify(errorLog));
+      stack: error.stack,
+      responseTimeMs: Date.now() - req.startTime
+    }));
 
-    res.status(500).json({ error: { code: `AI_REQUEST_FAILED`, message: error.message } });
+    res.status(500).json({
+      error: {
+        code: 'AI_PROXY_ERROR',
+        message: 'خطا در پردازش درخواست توسط CCG.'
+      }
+    });
   }
-};
+});
 
-// --- API Routes ---
-app.post('/api/ccg', handleApiRequest);
-
-// --- Static File Serving ---
-const staticPath = path.join(__dirname, 'client/build');
-app.use(express.static(staticPath));
+// --- Static hosting for React client (production) ---
+const clientBuildPath = path.join(__dirname, 'client', 'build');
+app.use(express.static(clientBuildPath));
 
 app.get('*', (req, res) => {
-  res.sendFile(path.join(staticPath, 'index.html'), (err) => {
+  res.sendFile(path.join(clientBuildPath, 'index.html'), (err) => {
     if (err) {
-      res.status(404).send('Web interface not found. API is running correctly.');
+      console.error('Error sending index.html:', err.message);
+      res.status(404).send('Web interface not found. API is running.');
     }
   });
 });
 
 // --- Server Start ---
-const PORT = process.env.PORT || 50000;
+const PORT = ENV_PORT || 50000;
 app.listen(PORT, () => {
-  console.log(`Server is running and listening on port ${PORT}`);
+  console.log(`Server listening on port ${PORT}`);
   console.log(JSON.stringify({
     event: 'server_start',
     port: PORT,

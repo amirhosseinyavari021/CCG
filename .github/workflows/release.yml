@@ -1,111 +1,57 @@
-name: Secure Build & Release CCG
+name: Build Secure Binaries
 
 on:
   push:
     tags:
-      - 'v*'
-
-permissions:
-  contents: write
+      - "v*"
 
 jobs:
-  secure-build:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: 18
 
       - name: Install dependencies
-        run: npm ci
+      run: |
+          npm install
+          npm install --save-dev pkg javascript-obfuscator
 
-      - name: Clean build directories
+      - name: Obfuscate Source
         run: |
-          rm -rf build dist
-          mkdir -p build/cli dist
+          npx javascript-obfuscator cli/ --output cli-obf/ --compact true --control-flow-flattening true
 
-      # ================================
-      #        OBFUSCATE CLI SOURCE
-      # ================================
-      - name: Obfuscate CLI source
+      - name: Build binaries using pkg
         run: |
-          npx javascript-obfuscator cli \
-            --output build/cli \
-            --compact true \
-            --control-flow-flattening true \
-            --control-flow-flattening-threshold 1 \
-            --dead-code-injection true \
-            --dead-code-injection-threshold 1 \
-            --self-defending true \
-            --string-array true \
-            --string-array-encoding base64 \
-            --string-array-threshold 1 \
-            --disable-console-output true
+          mkdir -p dist
 
-      # ================================
-      #            BUILD BINARIES
-      # ================================
-      - name: Build Linux binary
-        run: npx pkg build/cli/cmdgen-cli.js --targets node18-linux-x64 --output dist/ccg-linux
+          # WINDOWS
+          npx pkg cli-obf/cmdgen-cli.js \
+            --targets node18-win-x64 \
+            --output dist/ccg-win.exe
 
-      - name: Build macOS binary
-        run: npx pkg build/cli/cmdgen-cli.js --targets node18-macos-x64 --output dist/ccg-macos
+          # LINUX
+          npx pkg cli-obf/cmdgen-cli.js \
+            --targets node18-linux-x64 \
+            --output dist/ccg-linux
 
-      - name: Build Windows binary
-        run: npx pkg build/cli/cmdgen-cli.js --targets node18-win-x64 --output dist/ccg-win.exe
+          # MACOS
+          npx pkg cli-obf/cmdgen-cli.js \
+            --targets node18-macos-x64 \
+            --output dist/ccg-macos
 
-      # ================================
-      #            CREATE RELEASE
-      # ================================
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload Release
+        uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref_name }}
-          release_name: ${{ github.ref_name }}
-          body: "Secure CCG Build (no source code included)"
-          draft: false
-          prerelease: false
-
-      # ================================
-      #              UPLOAD BINARIES
-      # ================================
-      - name: Upload Linux binary
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/ccg-linux
-          asset_name: ccg-linux
-          asset_content_type: application/octet-stream
-
-      - name: Upload macOS binary
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/ccg-macos
-          asset_name: ccg-macos
-          asset_content_type: application/octet-stream
-
-      - name: Upload Windows binary
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/ccg-win.exe
-          asset_name: ccg-win.exe
-          asset_content_type: application/vnd.microsoft.portable-executable
+          files: |
+            dist/ccg-win.exe
+            dist/ccg-linux
+            dist/ccg-macos
