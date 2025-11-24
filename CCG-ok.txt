@@ -1,0 +1,2779 @@
+===== FULL PROJECT SOURCE DUMP: CCG =====
+Generated on: Mon Nov 24 04:46:22 AM CST 2025
+
+----------------------------------------
+FILE: ./client/index.html
+----------------------------------------
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="CCG: AI-powered command generator" />
+
+  <title>CCG - Cando Command Generator</title>
+
+  <!-- Fonts -->
+  <link href="https://cdn.jsdelivr.net/npm/vazirmatn@33.0.3/Vazirmatn-font-face.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet" />
+
+  <!-- Icons -->
+  <link rel="icon" type="image/png" href="/favicon-32x32.png" />
+  <link rel="icon" type="image/png" href="/favicon-16x16.png" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/site.webmanifest" />
+</head>
+
+<body class="dark">
+  <div id="root"></div>
+
+  <!-- IMPORTANT: Vite entry point -->
+  <script type="module" src="/src/index.jsx"></script>
+</body>
+
+</html>
+
+----------------------------------------
+FILE: ./client/src/api/apiService.jsx
+----------------------------------------
+
+import axios from 'axios';
+
+/**
+ * Handles communication between the React web client and
+ * the backend proxy connected to the CCG AI Assistant.
+ *
+ * @param {object} params - An object containing all user parameters.
+ * @returns {Promise<string>} The AI's direct string output or an error message.
+ */
+export async function fetchCCGResponse(params) {
+    const payload = {
+        prompt: {
+            id: 'pmpt_68fa6a905dac8195b749aa47ea94d4d8001f6f48395546cd',
+            version: '9',
+            variables: {
+                mode: params.mode || '',
+                os: params.os || '',
+                lang: params.lang || '',
+                user_request: params.user_request || '',
+                input_a: params.input_a || '',
+                input_b: params.input_b || '',
+                error_message: params.error_message || ''
+            }
+        }
+    };
+
+    const token = typeof window !== 'undefined'
+        ? window.localStorage.getItem('ccg_token')
+        : null;
+
+    const headers = {};
+    if (token) {
+        headers.Authorization = `Bearer ${token}`;
+    }
+
+    const handleApiError = (error) => {
+        console.error('CCG Web API error:', error);
+
+        if (error.response) {
+            const { status, data } = error.response;
+
+            if (status === 401) {
+                return '⚠️ برای استفاده از CCG ابتدا باید وارد حساب کاربری شوید.';
+            }
+
+            if (status === 429) {
+                return data?.error || '⚠️ سقف استفاده امروز پلن رایگان شما تمام شده است.';
+            }
+
+            if (data?.error?.message) {
+                return `⚠️ ${data.error.message}`;
+            }
+
+            return '⚠️ خطایی در ارتباط با سرور CCG رخ داد.';
+        }
+
+        if (error.request) {
+            return '⚠️ ارتباط با سرور برقرار نشد. اتصال اینترنت یا سرور را بررسی کنید.';
+        }
+
+        return '⚠️ یک خطای ناشناخته هنگام تماس با سرویس CCG رخ داد.';
+    };
+
+    try {
+        const response = await axios.post('/api/ccg', payload, {
+            timeout: 30000,
+            headers
+        });
+        return response.data.output;
+    } catch (error) {
+        return handleApiError(error);
+    }
+}
+
+----------------------------------------
+FILE: ./client/src/api/authService.jsx
+----------------------------------------
+
+import axios from 'axios';
+
+const TOKEN_KEY = 'ccg_token';
+
+export const getStoredToken = () => {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem(TOKEN_KEY);
+};
+
+const storeToken = (token) => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(TOKEN_KEY, token);
+};
+
+export const logout = () => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(TOKEN_KEY);
+};
+
+export const register = async (email, password) => {
+  const response = await axios.post('/api/auth/register', { email, password });
+  const { token } = response.data;
+  if (token) storeToken(token);
+  return response.data;
+};
+
+export const login = async (email, password) => {
+  const response = await axios.post('/api/auth/login', { email, password });
+  const { token } = response.data;
+  if (token) storeToken(token);
+  return response.data;
+};
+
+----------------------------------------
+FILE: ./client/src/api/promptService.jsx
+----------------------------------------
+
+import { fetchCCGResponse } from './apiService'; // <-- FIXED: Imports the new function
+import { parseAndConstructData } from '../utils/responseParser';
+import toast from 'react-hot-toast';
+import { translations } from '../constants/translations';
+
+const sessionCache = new Map();
+
+// Helper function to show generic errors
+const handleError = (error, lang) => {
+    const t = translations[lang];
+    let message = t.errorDefault;
+
+    if (error.message.includes('Network')) {
+        message = t.errorNetwork;
+    }
+
+    toast.error(message, { duration: 5000 });
+};
+
+/**
+ * Acts as an adapter between the UI components (App.js, useCodeCompare)
+ * and the new `fetchCCGResponse` API service.
+ * -- UPDATED to pass all variables to the API --
+ */
+export const callApi = async ({
+    mode,
+    userInput,
+    os,
+    osVersion,
+    cli,
+    lang,
+    iteration = 0,
+    codeA = '',
+    codeB = '',
+    // --- NEWLY ADDED ---
+    knowledgeLevel,
+    deviceType,
+    existingCommands,
+    analysis,
+    ...otherProps
+}, onUpdate) => {
+
+    const t = translations[lang];
+    // Create a cache key from all unique request params
+    const cacheKey = `${lang}-${mode}-${os}-${osVersion}-${cli}-${userInput}-${iteration}-${codeA.length}-${codeB.length}-${knowledgeLevel}-${deviceType}-${existingCommands?.length}`;
+
+    if (sessionCache.has(cacheKey)) {
+        return sessionCache.get(cacheKey);
+    }
+
+    // This function is no longer streaming, so just signal we are fetching.
+    onUpdate?.('fetching');
+
+    // 1. Map UI-layer state to the new API 'variables'
+    // -- UPDATED to include all new fields --
+    const apiParams = {
+        mode,
+        os,
+        lang,
+        // Map userInput to the correct API variable based on mode
+        user_request: (mode !== 'error' && mode !== 'detect-lang') ? userInput : '',
+        input_a: codeA,
+        input_b: codeB,
+        error_message: (mode === 'error') ? userInput : '',
+        // --- NEWLY ADDED FIELDS ---
+        osVersion: osVersion || '',
+        cli: cli || '',
+        knowledgeLevel: knowledgeLevel || 'intermediate',
+        deviceType: deviceType || '',
+        existingCommands: existingCommands || [],
+        analysis: analysis || ''
+    };
+
+    try {
+        // 2. Call the new API service. It will *always* return a string.
+        const rawOutput = await fetchCCGResponse(apiParams);
+
+        // 3. Check if the string is an error message from the API service
+        if (rawOutput.startsWith('⚠️')) {
+            toast.error(rawOutput); // Display the specific error
+            return null;
+        }
+
+        // 4. Parse the successful string output into the data structure the UI expects
+        // The parser may still use the 'cli' hint, so we pass it along.
+        const finalData = parseAndConstructData(rawOutput, mode, cli);
+
+        if (!finalData) {
+            toast.error(t.errorParse);
+            return null;
+        }
+
+        // 5. Return data in the original format expected by App.js
+        const result = { type: mode, data: finalData };
+        sessionCache.set(cacheKey, result);
+        return result;
+
+    } catch (err) {
+        // Catch any unexpected critical errors (e.g., network failure)
+        handleError(err, lang);
+        return null;
+    }
+};
+----------------------------------------
+FILE: ./client/src/App.jsx
+----------------------------------------
+
+import React, { useState, useEffect, Suspense, lazy } from 'react';
+import { BrowserRouter } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import { translations } from './constants/translations';
+import { callApi } from './api/promptService';
+
+import Header from './components/Header';
+import Form from './components/Form';
+import { GeneratedCommandCard, ExplanationCard, ScriptCard } from './components/CommandCard';
+import { PlusCircle, Github, Wand2, GitCompare } from 'lucide-react';
+import LoadingSpinner from './components/common/LoadingSpinner';
+import Card from './components/common/Card';
+
+// Lazy load components that are not needed on initial render
+const ErrorAnalysis = lazy(() => import('./components/ErrorAnalysis'));
+const MobileDrawer = lazy(() => import('./components/MobileDrawer'));
+const FeedbackCard = lazy(() => import('./components/FeedbackCard'));
+const CodeComparePanel = lazy(() => import('./components/CodeComparePanel')); // New Compare Panel
+
+/**
+ * Helper function to determine the correct script file extension based on OS and CLI.
+ * @param {string} os - The selected operating system (e.g., 'python', 'windows', 'linux').
+ * @param {string} cli - The selected command-line interface (e.g., 'PowerShell 7', 'CMD').
+ * @returns {string} The file extension (e.g., '.py', '.ps1', '.sh').
+ */
+const getScriptExtension = (os, cli) => {
+  const lowerOs = (os || '').toLowerCase();
+  const lowerCli = (cli || '').toLowerCase();
+
+  if (lowerOs === 'python') return '.py';
+  if (lowerOs === 'windows') {
+    if (lowerCli.includes('powershell')) return '.ps1';
+    if (lowerCli.includes('cmd')) return '.bat';
+  }
+  // Default for linux, macos, cisco, mikrotik, bash, zsh, sh, etc.
+  return '.sh';
+};
+
+function AppContent() {
+  const [lang, setLang] = useState('en');
+  const [appMode, setAppMode] = useState('generate'); // 'generate' or 'compare'
+
+  const [commandList, setCommandList] = useState([]);
+  const [explanation, setExplanation] = useState(null);
+  const [script, setScript] = useState(null);
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
+  const [moreCommandsCount, setMoreCommandsCount] = useState(0);
+
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  const [formState, setFormState] = useState({});
+
+  const [showFeedback, setShowFeedback] = useState(false);
+
+  const t = translations[lang];
+
+  useEffect(() => {
+    // Permanently set theme to dark
+    document.documentElement.className = 'dark';
+
+    const savedLang = localStorage.getItem('lang') || 'en';
+    setLang(savedLang);
+    // --- FIXED: Set direction on <html> (documentElement) not <body> ---
+    document.documentElement.dir = savedLang === 'fa' ? 'rtl' : 'ltr';
+
+    const usageCount = parseInt(localStorage.getItem('usageCount') || '0', 10);
+    const feedbackRequested = localStorage.getItem('feedbackRequested') === 'true';
+
+    // --- MODIFICATION: Changed threshold to 20 ---
+    if (usageCount >= 20 && !feedbackRequested) {
+      // --- END MODIFICATION ---
+      setShowFeedback(true);
+    }
+  }, []); // Empty dependency array ensures this runs only once on mount
+
+  const handleLangChange = (newLang) => {
+    setLang(newLang);
+    localStorage.setItem('lang', newLang);
+    // --- FIXED: Set direction on <html> (documentElement) not <body> ---
+    document.documentElement.dir = newLang === 'fa' ? 'rtl' : 'ltr';
+    setIsDrawerOpen(false);
+  };
+
+  const resetStateForNewRequest = () => {
+    setCommandList([]);
+    setExplanation(null);
+    setScript(null);
+    setMoreCommandsCount(0);
+    setIsLoading(true);
+  };
+
+  const incrementUsageCount = () => {
+    const currentCount = parseInt(localStorage.getItem('usageCount') || '0', 10);
+    const newCount = currentCount + 1;
+    localStorage.setItem('usageCount', newCount);
+
+    // --- MODIFICATION: Changed threshold to 20 ---
+    if (newCount >= 20 && localStorage.getItem('feedbackRequested') !== 'true') {
+      // --- END MODIFICATION ---
+      setShowFeedback(true);
+    }
+  };
+
+  const handleGenerate = async (formData) => {
+    resetStateForNewRequest();
+    setFormState(formData);
+
+    const apiResult = await callApi(
+      { ...formData, lang, mode: 'generate' },
+      (stage) => setLoadingMessage(stage === 'fetching' ? t.fetching : t.connecting)
+    );
+
+    if (apiResult?.data?.commands) {
+      setCommandList(apiResult.data.commands);
+      incrementUsageCount();
+    }
+    setIsLoading(false);
+  };
+
+  const handleExplain = async (formData) => {
+    resetStateForNewRequest();
+    setFormState(formData);
+
+    const apiResult = await callApi(
+      { ...formData, lang, mode: 'explain' },
+      (stage) => setLoadingMessage(stage === 'fetching' ? t.fetching : t.connecting)
+    );
+
+    if (apiResult?.data?.explanation) {
+      setExplanation(apiResult.data.explanation);
+      incrementUsageCount();
+    }
+    setIsLoading(false);
+  };
+
+  const handleScript = async (formData) => {
+    resetStateForNewRequest();
+    setFormState(formData);
+
+    const apiResult = await callApi(
+      { ...formData, lang, mode: 'script' },
+      (stage) => setLoadingMessage(stage === 'fetching' ? t.fetching : t.connecting)
+    );
+
+    if (apiResult?.data?.explanation) {
+      const extension = getScriptExtension(formData.os, formData.cli);
+      const filename = `generated_script${extension}`;
+
+      setScript({
+        filename: filename,
+        script_lines: apiResult.data.explanation.split('\n')
+      });
+      incrementUsageCount();
+    }
+    setIsLoading(false);
+  };
+
+  const handleMoreCommands = async () => {
+    setIsLoadingMore(true);
+    const iteration = moreCommandsCount + 1;
+    const existing = commandList.map(c => c.command);
+
+    const apiResult = await callApi({ ...formState, lang, mode: 'generate', iteration, existingCommands: existing });
+
+    if (apiResult?.data?.commands) {
+      setCommandList(prev => [...prev, ...apiResult.data.commands]);
+      setMoreCommandsCount(iteration);
+    }
+    setIsLoadingMore(false);
+  };
+
+  const dismissFeedback = () => {
+    setShowFeedback(false);
+    localStorage.setItem('feedbackRequested', 'true');
+  };
+
+  const AppModeToggle = () => (
+    <div className="max-w-2xl mx-auto mb-6">
+      <Card lang={lang} className="p-2">
+        <div className="flex bg-gray-200/70 dark:bg-gray-700/70 rounded-lg p-1 space-x-1">
+          <button
+            onClick={() => setAppMode('generate')}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-semibold transition-colors ${appMode === 'generate'
+              ? 'bg-white dark:bg-gray-800 text-amber-600 dark:text-amber-400 shadow'
+              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100/50 dark:hover:bg-gray-600/50'
+              }`}
+          >
+            <Wand2 size={16} />
+            {t.appModeGenerator}
+          </button>
+          <button
+            onClick={() => setAppMode('compare')}
+            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-semibold transition-colors ${appMode === 'compare'
+              ? 'bg-white dark:bg-gray-800 text-amber-600 dark:text-amber-400 shadow'
+              : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100/50 dark:hover:bg-gray-600/AN'
+              }`}
+          >
+            <GitCompare size={16} />
+            {t.appModeCompare}
+          </button>
+        </div>
+      </Card>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-transparent text-gray-900 dark:text-gray-200" style={{ fontFamily: lang === 'fa' ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }}>
+      <Toaster
+        position="top-center"
+        reverseOrder={false}
+        toastOptions={{
+          className: 'dark:bg-gray-700 dark:text-white',
+        }}
+      />
+
+      <Suspense fallback={<div />}>
+        <MobileDrawer
+          isOpen={isDrawerOpen}
+          lang={lang}
+          onClose={() => setIsDrawerOpen(false)}
+          onLangChange={handleLangChange}
+        />
+      </Suspense>
+
+      <Header
+        lang={lang}
+        onMenuClick={() => setIsDrawerOpen(true)}
+        onLangChange={handleLangChange}
+      />
+
+      <main className="container mx-auto px-4 py-8 md:py-12 flex-grow">
+        <AppModeToggle />
+
+        {appMode === 'generate' ? (
+          <div className="max-w-2xl mx-auto">
+            <Form
+              onSubmit={handleGenerate}
+              onExplain={handleExplain}
+              onScript={handleScript}
+              isLoading={isLoading}
+              loadingMessage={loadingMessage}
+              lang={lang}
+            />
+
+            {showFeedback && (
+              <Suspense fallback={<div />}>
+                <FeedbackCard lang={lang} onDismiss={dismissFeedback} />
+              </Suspense>
+            )}
+
+            <div className="mt-8 space-y-4">
+              {commandList.map((cmd, index) => (
+                <GeneratedCommandCard key={index} {...cmd} lang={lang} />
+              ))}
+            </div>
+
+            {commandList.length > 0 && !isLoading && (
+              <div className="mt-6 text-center">
+                <button onClick={handleMoreCommands} disabled={isLoadingMore} className="w-full bg-gray-200/70 dark:bg-gray-700/70 backdrop-blur-lg text-gray-800 dark:text-gray-200 px-4 py-2.5 rounded-lg font-semibold hover:bg-gray-300/80 dark:hover:bg-gray-600/80 disabled:opacity-50 flex items-center justify-center gap-2 min-h-[48px] transition-colors">
+                  {isLoadingMore ? <><LoadingSpinner /> {t.loadingMore}</> : <><PlusCircle size={18} /> {t.moreCommands}</>}
+                </button>
+              </div>
+            )}
+
+            {explanation && <ExplanationCard explanation={explanation} lang={lang} />}
+            {script && <ScriptCard filename={script.filename} script_lines={script.script_lines} lang={lang} />}
+
+            {(commandList.length > 0 || explanation || script) && !isLoading && (
+              <Suspense fallback={<div className="text-center mt-10"><LoadingSpinner /></div>}>
+                <ErrorAnalysis {...formState} lang={lang} />
+              </Suspense>
+            )}
+          </div>
+        ) : (
+          <div className="max-w-5xl mx-auto">
+            <Suspense fallback={<div className="text-center mt-10"><LoadingSpinner /></div>}>
+              <CodeComparePanel lang={lang} t={t} />
+            </Suspense>
+          </div>
+        )}
+      </main>
+
+      <footer className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-lg py-3 text-center font-semibold text-gray-900 dark:text-gray-300 text-xs border-t border-gray-200/50 dark:border-gray-800/50">
+        <div className="flex justify-center items-center gap-4 mb-2">
+          <a href="httpsm://github.com/amirhosseinyavari021/CCG" target="_blank" rel="noopener noreferrer" className="text-gray-700 hover:text-black dark:text-gray-400 dark:hover:text-gray-300">
+            <Github size={20} />
+          </a>
+        </div>
+        <p>
+          This service belongs to <a href="https://cando.ac" target="_blank" rel="noopener noreferrer" className="font-bold text-amber-600 hover:underline">Cando Academy</a>.
+        </p>
+        <p className="mt-1">
+          Created and designed by <a href="mailto:amirhosseinyavari61@gmail.com" className="font-semibold text-amber-600 hover:underline">Amirhossein Yavari</a>.
+        </p>
+      </footer>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
+    </BrowserRouter>
+  );
+}
+----------------------------------------
+FILE: ./client/src/components/AboutModal.jsx
+----------------------------------------
+
+import React from 'react';
+import { X } from 'lucide-react';
+import { translations } from '../constants/translations';
+
+const AboutModal = ({ lang, onClose, onLangChange }) => {
+    const t = translations[lang];
+
+    // Prevent modal close when clicking inside the card
+    const handleModalContentClick = (e) => e.stopPropagation();
+
+    return (
+        <div
+            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+            onClick={onClose}
+        >
+            <div
+                className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-sm p-5 shadow-lg"
+                onClick={handleModalContentClick}
+            >
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-white">{t.aboutToolTitle}</h2>
+                    <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
+                        <X size={18} />
+                    </button>
+                </div>
+                <div className="space-y-4 text-gray-700 dark:text-gray-300">
+                    <div>
+                        <h3 className="font-medium text-amber-600 dark:text-amber-400">{t.aboutMeTitle}</h3>
+                        <p className="text-sm">{t.aboutMeText}</p>
+                    </div>
+                    <div>
+                        <h3 className="font-medium text-amber-600 dark:text-amber-400">{t.aboutToolTitle}</h3>
+                        <p className="text-sm">{t.aboutToolText}</p>
+                    </div>
+                    <div className="flex items-center justify-center pt-2">
+                        <div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5">
+                            <button onClick={() => onLangChange('en')} className={`px-3 py-1 rounded-full text-xs ${lang === 'en' ? 'bg-amber-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>EN</button>
+                            <button onClick={() => onLangChange('fa')} className={`px-3 py-1 rounded-full text-xs ${lang === 'fa' ? 'bg-amber-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>FA</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default AboutModal;
+----------------------------------------
+FILE: ./client/src/components/CodeComparePanel.jsx
+----------------------------------------
+
+import React, { useState } from 'react';
+import Card from './common/Card';
+import LoadingSpinner from './common/LoadingSpinner';
+import CommandDisplay from './common/CommandDisplay';
+import { useCodeCompare } from '../hooks/useCodeCompare';
+import { GitCompare, Terminal, AlertTriangle, Wand2, Star, Eye } from 'lucide-react';
+import { DiffEditor } from '@monaco-editor/react';
+import ReactMarkdown from 'react-markdown';
+
+const AnalysisSection = ({ title, icon, content }) => {
+    if (!content) return null;
+
+    return (
+        <div className="pt-4 mt-4 border-t border-gray-200/50 dark:border-gray-700/50 first:pt-0 first:mt-0 first:border-0">
+            <h4 className="flex items-center gap-2 text-md font-semibold text-amber-600 dark:text-amber-400 mb-2">
+                {icon} {title}
+            </h4>
+            <div className="prose prose-sm max-w-none dark:prose-invert prose-pre:bg-gray-900 prose-pre:text-gray-50 prose-code:text-amber-600">
+                <ReactMarkdown>{content}</ReactMarkdown>
+            </div>
+        </div>
+    );
+};
+
+const CodeComparePanel = ({ lang, t }) => {
+    const [codeA, setCodeA] = useState('');
+    const [codeB, setCodeB] = useState('');
+    const [activeTab, setActiveTab] = useState('visual');
+    const { state, runCompare } = useCodeCompare(lang, t);
+    const { isLoading, error, result } = state;
+
+    const handleCompare = () => {
+        if (!codeA.trim() || !codeB.trim()) {
+            return;
+        }
+        runCompare(codeA, codeB);
+        setActiveTab('visual');
+    };
+
+    const getMonacoLanguage = (detected) => {
+        const lower = (detected || '').toLowerCase();
+        if (lower.includes('python')) return 'python';
+        if (lower.includes('javascript') || lower === 'js') return 'javascript';
+        if (lower.includes('typescript') || lower === 'ts') return 'typescript';
+        if (lower.includes('c++')) return 'cpp';
+        if (lower === 'c') return 'c';
+        if (lower.includes('java')) return 'java';
+        if (lower.includes('bash') || lower.includes('shell')) return 'shell';
+        if (lower.includes('powershell')) return 'powershell';
+        return 'plaintext';
+    };
+
+    const langLabelA = result?.langA || 'N/A';
+    const langLabelB = result?.langB || 'N/A';
+    const editorLanguage = getMonacoLanguage(result?.langA || result?.langB);
+
+    return (
+        <div className="space-y-4">
+            <Card className="border border-gray-200/60 dark:border-gray-700/60 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                        <GitCompare className="w-5 h-5 text-amber-500" />
+                        <h3 className="text-lg font-semibold">
+                            {t.codeCompareTitle || 'Code comparison & merge'}
+                        </h3>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div className="flex flex-col">
+                        <label className="text-sm font-medium mb-1">
+                            {t.codeA || 'Code A'}
+                        </label>
+                        <textarea
+                            className="min-h-[160px] text-sm font-mono rounded-xl border border-gray-300/70 dark:border-gray-700/70 bg-white/80 dark:bg-gray-900/80 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500/70 resize-vertical"
+                            value={codeA}
+                            onChange={(e) => setCodeA(e.target.value)}
+                            placeholder={t.codeAPlaceholder || 'Paste the first version of your code here'}
+                        />
+                    </div>
+                    <div className="flex flex-col">
+                        <label className="text-sm font-medium mb-1">
+                            {t.codeB || 'Code B'}
+                        </label>
+                        <textarea
+                            className="min-h-[160px] text-sm font-mono rounded-xl border border-gray-300/70 dark:border-gray-700/70 bg-white/80 dark:bg-gray-900/80 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500/70 resize-vertical"
+                            value={codeB}
+                            onChange={(e) => setCodeB(e.target.value)}
+                            placeholder={t.codeBPlaceholder || 'Paste the second version of your code here'}
+                        />
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-3">
+                    <button
+                        onClick={handleCompare}
+                        disabled={isLoading || !codeA.trim() || !codeB.trim()}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {isLoading ? (
+                            <>
+                                <LoadingSpinner size="sm" />
+                                {t.analyzing || 'Analyzing...'}
+                            </>
+                        ) : (
+                            <>
+                                <Wand2 className="w-4 h-4" />
+                                {t.compareNow || 'Compare & analyze'}
+                            </>
+                        )}
+                    </button>
+
+                    <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                        <Terminal className="w-4 h-4" />
+                        <span>{t.codeCompareHint || 'Best results when both snippets are functionally related.'}</span>
+                    </div>
+                </div>
+            </Card>
+
+            {isLoading && (
+                <Card className="flex items-center justify-center py-10">
+                    <LoadingSpinner />
+                </Card>
+            )}
+
+            {error && !isLoading && (
+                <Card className="border border-red-300/60 dark:border-red-800/60 bg-red-50/60 dark:bg-red-900/20">
+                    <div className="flex items-center gap-2 text-red-700 dark:text-red-300">
+                        <AlertTriangle className="w-5 h-5" />
+                        <p className="text-sm">{error}</p>
+                    </div>
+                </Card>
+            )}
+
+            {result && !isLoading && (
+                <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+                    <div className="xl:col-span-3 space-y-3">
+                        <Card className="h-full flex flex-col">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <Eye className="w-4 h-4 text-amber-500" />
+                                    <span className="text-sm font-semibold">
+                                        {t.diffView || 'Visual diff'}
+                                    </span>
+                                </div>
+                                <div className="flex gap-2 text-xs">
+                                    <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200">
+                                        A: {langLabelA}
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200">
+                                        B: {langLabelB}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="flex border-b border-gray-200/60 dark:border-gray-700/60 mb-2">
+                                <button
+                                    onClick={() => setActiveTab('visual')}
+                                    className={`px-3 py-1.5 text-xs font-medium border-b-2 ${activeTab === 'visual'
+                                            ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+                                            : 'border-transparent text-gray-500 dark:text-gray-400'
+                                        }`}
+                                >
+                                    {t.visualTab || 'Visual'}
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('analysis')}
+                                    className={`px-3 py-1.5 text-xs font-medium border-b-2 ${activeTab === 'analysis'
+                                            ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+                                            : 'border-transparent text-gray-500 dark:text-gray-400'
+                                        }`}
+                                >
+                                    {t.analysisTab || 'AI analysis'}
+                                </button>
+                            </div>
+
+                            <div className="flex-1 min-h-[260px]">
+                                {activeTab === 'visual' ? (
+                                    <DiffEditor
+                                        original={codeA}
+                                        modified={codeB}
+                                        language={editorLanguage}
+                                        theme="vs-dark"
+                                        options={{
+                                            readOnly: true,
+                                            minimap: { enabled: false },
+                                            fontSize: 13,
+                                            renderSideBySide: true
+                                        }}
+                                    />
+                                ) : (
+                                    <div className="text-sm">
+                                        <AnalysisSection
+                                            title={t.diffAnalysisTitle || 'Differences & structure'}
+                                            icon={<GitCompare className="w-4 h-4" />}
+                                            content={result.diffAnalysis}
+                                        />
+                                        <AnalysisSection
+                                            title={t.qualityAnalysisTitle || 'Code quality review'}
+                                            icon={<Star className="w-4 h-4" />}
+                                            content={result.qualityAnalysis}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        </Card>
+                    </div>
+
+                    <div className="xl:col-span-2 space-y-3">
+                        <Card className="h-full flex flex-col">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Terminal className="w-4 h-4 text-amber-500" />
+                                <span className="text-sm font-semibold">
+                                    {t.mergeTitle || 'Merged / improved version'}
+                                </span>
+                            </div>
+                            {result.merge ? (
+                                <CommandDisplay command={result.merge} lang={lang} />
+                            ) : (
+                                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                                    <AlertTriangle className="w-4 h-4" />
+                                    <span>{t.noMergeResult || 'AI did not provide a merged version.'}</span>
+                                </div>
+                            )}
+                        </Card>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default CodeComparePanel;
+
+----------------------------------------
+FILE: ./client/src/components/CommandCard.jsx
+----------------------------------------
+
+import React from 'react';
+import { Bot, FileCode2, Terminal } from 'lucide-react';
+import Card from './common/Card';
+import CommandDisplay from './common/CommandDisplay';
+import { translations } from '../constants/translations';
+
+// For "Generate" mode
+export const GeneratedCommandCard = ({ command, explanation, warning, lang }) => {
+    return (
+        <Card lang={lang}>
+            <div className="flex justify-between items-center mb-3">
+                <h4 className="flex items-center gap-2 text-lg font-semibold text-amber-600 dark:text-amber-400">
+                    <Terminal size={18} /> Command
+                </h4>
+            </div>
+            <CommandDisplay command={command} lang={lang} />
+            {explanation && <p className="mt-3 text-gray-600 dark:text-gray-300 text-sm">{explanation}</p>}
+            {warning && warning.trim() !== '' && <p className="mt-2 text-xs text-amber-600 dark:text-amber-400 italic">{warning}</p>}
+        </Card>
+    );
+};
+
+// For "Explain" mode
+export const ExplanationCard = ({ explanation, lang }) => {
+    const t = translations[lang];
+    return (
+        <div className="mt-6 max-w-2xl mx-auto">
+            <Card lang={lang}>
+                <h3 className="text-lg font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2 mb-4">
+                    <Bot size={18} /> {t.detailedExplanation}
+                </h3>
+                <div 
+                    className="prose prose-sm dark:prose-invert text-gray-700 dark:text-gray-300 max-w-none" 
+                    dangerouslySetInnerHTML={{ __html: explanation.replace(/\n/g, '<br />').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} 
+                />
+            </Card>
+        </div>
+    );
+};
+
+// For "Script" mode
+export const ScriptCard = ({ filename, script_lines = [], lang }) => {
+    const t = translations[lang];
+    const fullScript = script_lines.join('\n');
+  
+    const downloadScript = () => {
+        const blob = new Blob([fullScript], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    return (
+        <div className="mt-6 max-w-2xl mx-auto">
+            <Card lang={lang}>
+                <div className="flex justify-between items-center mb-3">
+                    <h4 className="flex items-center gap-2 text-lg font-semibold text-amber-600 dark:text-amber-400">
+                        <FileCode2 size={18} /> {filename}
+                    </h4>
+                    <button onClick={downloadScript} className="flex items-center gap-1 text-sm text-amber-600 dark:text-amber-400 hover:text-amber-700 transition-colors">
+                        {t.downloadScript || 'Download Script'}
+                    </button>
+                </div>
+                <CommandDisplay command={fullScript} lang={lang} />
+            </Card>
+        </div>
+    );
+};
+
+----------------------------------------
+FILE: ./client/src/components/common/Card.jsx
+----------------------------------------
+
+import React from 'react';
+
+const Card = ({ children, lang, className = '' }) => {
+    return (
+        <div
+            className={`bg-white/70 dark:bg-gray-800/70 border border-gray-200/50 dark:border-gray-700/50 rounded-xl p-5 shadow-lg backdrop-blur-lg ${className}`}
+            style={{ fontFamily: lang === 'fa' ? 'Vazirmatn, sans-serif' : 'Inter, sans-serif' }}
+        >
+            {children}
+        </div>
+    );
+};
+
+export default Card;
+
+----------------------------------------
+FILE: ./client/src/components/common/CommandDisplay.jsx
+----------------------------------------
+
+import React, { useState } from 'react';
+import { Copy, Check } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { translations } from '../../constants/translations';
+
+const CommandDisplay = ({ command, lang }) => {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(command);
+        setCopied(true);
+        toast.success(translations[lang].copied);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+        <div className="relative bg-gray-50 dark:bg-gray-900 rounded-lg overflow-hidden">
+            <pre className="p-4 pr-12 font-mono text-sm text-gray-800 dark:text-gray-200 break-words whitespace-pre-wrap">
+                {command}
+            </pre>
+            <button
+                onClick={handleCopy}
+                className="absolute top-2 right-2 p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-white bg-gray-100 dark:bg-gray-700 rounded-full transition-colors"
+                aria-label="Copy command"
+            >
+                {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5" />}
+            </button>
+        </div>
+    );
+};
+
+export default CommandDisplay;
+
+----------------------------------------
+FILE: ./client/src/components/common/CustomSelect.jsx
+----------------------------------------
+
+import React from 'react';
+import { ChevronDown } from 'lucide-react';
+
+const CustomSelect = ({ label, value, onChange, options, placeholder, lang, error, isObjectOptions = false }) => (
+    <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
+            {label}&nbsp;<span className="text-red-500">*</span>
+        </label>
+        <div className="relative">
+            <select
+                value={value}
+                onChange={e => onChange(e.target.value)}
+                className="w-full appearance-none bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-amber-500"
+            >
+                <option value="" disabled>{placeholder}</option>
+                {isObjectOptions
+                    ? options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)
+                    : options.map(opt => <option key={opt} value={opt}>{opt}</option>)
+                }
+            </select>
+            <ChevronDown className={`w-5 h-5 absolute text-gray-500 dark:text-gray-400 pointer-events-none ${lang === 'fa' ? 'left-2' : 'right-2'} top-1/2 -translate-y-1/2`} />
+        </div>
+        {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+    </div>
+);
+
+export default CustomSelect;
+----------------------------------------
+FILE: ./client/src/components/common/LoadingSpinner.jsx
+----------------------------------------
+
+import React from 'react';
+import { LoaderCircle } from 'lucide-react';
+
+const LoadingSpinner = ({ className = "" }) => {
+    return <LoaderCircle className={`animate-spin ${className}`} />;
+};
+
+export default LoadingSpinner;
+
+----------------------------------------
+FILE: ./client/src/components/ErrorAnalysis.jsx
+----------------------------------------
+
+import React, { useState } from 'react';
+import { ShieldAlert } from 'lucide-react';
+import { translations } from '../constants/translations';
+import { callApi } from '../api/promptService'; 
+import Card from './common/Card';
+import LoadingSpinner from './common/LoadingSpinner';
+import CommandDisplay from './common/CommandDisplay';
+import toast from 'react-hot-toast';
+
+const SolutionStep = ({ step, t, lang }) => {
+    if (step.startsWith('CMD:')) {
+        const command = step.substring(4).trim();
+        return <CommandDisplay command={command} lang={lang} />;
+    }
+    return <p className="text-gray-600 dark:text-gray-300 text-sm">{step}</p>;
+};
+
+const ErrorAnalysisCard = ({ analysis, lang }) => {
+    const t = translations[lang];
+    return (
+        <div className="mt-6 max-w-2xl mx-auto">
+            <Card lang={lang}>
+                <h3 className="text-lg font-bold text-amber-600 dark:text-amber-400 flex items-center gap-2 mb-4">
+                    <ShieldAlert size={18} /> {t.errorAnalysis}
+                </h3>
+                <div className="space-y-5">
+                    {analysis.cause && <div><h4 className="font-semibold text-red-500 dark:text-red-400 mb-2">{t.cause}</h4><p className="text-gray-600 dark:text-gray-300 text-sm">{analysis.cause}</p></div>}
+                    {analysis.explanation && <div><h4 className="font-semibold text-amber-500 dark:text-amber-400 mb-2">{t.explanation}</h4><p className="text-gray-600 dark:text-gray-300 text-sm">{analysis.explanation}</p></div>}
+                    {analysis.solution && <div><h4 className="font-semibold text-green-600 dark:text-green-400 mb-2">{t.solution}</h4><div className="space-y-2">{analysis.solution.map((step, index) => <SolutionStep key={index} step={step} t={t} lang={lang} />)}</div></div>}
+                </div>
+            </Card>
+        </div>
+    );
+};
+
+const ErrorAnalysis = ({ lang, os, osVersion, cli }) => {
+    const t = translations[lang];
+    const [errorInput, setErrorInput] = useState('');
+    const [errorContext, setErrorContext] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [analysisResult, setAnalysisResult] = useState(null);
+
+    const handleAnalyze = async () => {
+        if (!errorInput.trim()) {
+            toast.error(t.fieldRequired);
+            return;
+        }
+        setIsLoading(true);
+        setAnalysisResult(null);
+
+        const combinedInput = `Error Message:\n${errorInput}\n\nContext:\n${errorContext || 'No context provided.'}`;
+        
+        const result = await callApi({ 
+            mode: 'error', 
+            userInput: combinedInput, 
+            os, 
+            osVersion, 
+            cli, 
+            lang 
+        });
+
+        if (result) {
+            setAnalysisResult(result.data);
+        }
+        setIsLoading(false);
+    };
+
+    return (
+        <div className="mt-10">
+            <Card lang={lang}>
+                <div className="text-center">
+                    <ShieldAlert className="mx-auto h-10 w-10 text-amber-500" />
+                    <h3 className="mt-2 text-lg font-semibold text-gray-900 dark:text-white">{t.errorPromptTitle}</h3>
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">{t.errorPromptSubheader}</p>
+                </div>
+                <div className="mt-4 flex flex-col gap-4">
+                    <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.errorLabel} <span className="text-red-500">*</span></label>
+                        <textarea value={errorInput} onChange={(e) => setErrorInput(e.target.value)} placeholder={t.errorPlaceholder} className="mt-1 w-full h-24 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-amber-500 resize-none" />
+                    </div>
+                     <div>
+                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.errorContextLabel}</label>
+                        <textarea value={errorContext} onChange={(e) => setErrorContext(e.target.value)} placeholder={t.errorContextPlaceholder} className="mt-1 w-full h-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-amber-500 resize-none" />
+                    </div>
+                </div>
+                <button onClick={handleAnalyze} disabled={isLoading} className="mt-4 w-full bg-amber-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-amber-700 disabled:bg-gray-400 flex items-center justify-center min-h-[44px]">
+                    {isLoading ? <LoadingSpinner /> : t.analyzeError}
+                </button>
+            </Card>
+            {analysisResult && <ErrorAnalysisCard analysis={analysisResult} lang={lang} />}
+        </div>
+    );
+};
+
+export default ErrorAnalysis;
+
+----------------------------------------
+FILE: ./client/src/components/FeedbackCard.jsx
+----------------------------------------
+
+import React from 'react';
+import Card from './common/Card';
+import { translations } from '../constants/translations';
+
+const FeedbackCard = ({ lang, onDismiss }) => {
+    const t = translations[lang];
+    // --- MODIFICATION: Updated Feedback URL ---
+    const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfkigw8FoqPI2KpIg7Xhy_3CqXAovCVwuPXQGCeKnVaV1PLAg/viewform?usp=dialog';
+    // --- END MODIFICATION ---
+
+    const handleProvideFeedback = () => {
+        window.open(FEEDBACK_URL, '_blank');
+        onDismiss(); // Hide the card after opening the link
+    };
+
+    return (
+        <div className="mt-8">
+            <Card lang={lang}>
+                <div className="text-center">
+                    <h3 className="text-lg font-semibold text-amber-600 dark:text-amber-400">{t.feedbackTitle}</h3>
+                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{t.feedbackSubheader}</p>
+                    <div className="mt-4 flex gap-4 justify-center">
+                        <button onClick={handleProvideFeedback} className="bg-amber-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-amber-700">
+                            {t.feedbackAction}
+                        </button>
+                        <button onClick={onDismiss} className="bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600">
+                            {t.feedbackDismiss}
+                        </button>
+                    </div>
+                </div>
+            </Card>
+        </div>
+    );
+};
+
+export default FeedbackCard;
+----------------------------------------
+FILE: ./client/src/components/Form.jsx
+----------------------------------------
+
+import React, { useState, useEffect } from 'react';
+import { Wand2, Search, FileCode2 } from 'lucide-react';
+import { translations } from '../constants/translations';
+import { osDetails } from '../constants/osDetails';
+import Card from './common/Card';
+import CustomSelect from './common/CustomSelect';
+import LoadingSpinner from './common/LoadingSpinner';
+
+const CustomInput = ({ label, value, onChange, placeholder, error, isRequired = true }) => (
+    <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
+            {label}&nbsp;{isRequired && <span className="text-red-500">*</span>}
+        </label>
+        <input
+            type="text"
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            placeholder={placeholder}
+            className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-amber-500"
+        />
+        {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+    </div>
+);
+
+const Form = ({ onSubmit, onExplain, onScript, isLoading, loadingMessage, lang }) => {
+    const t = translations[lang];
+
+    const [os, setOs] = useState('ubuntu'); // Default to new OS list
+    const [osVersion, setOsVersion] = useState(''); // This will only be used for 'other'
+    const [cli, setCli] = useState('');
+    const [userInput, setUserInput] = useState('');
+    const [formErrors, setFormErrors] = useState({});
+
+    const [customOsName, setCustomOsName] = useState('');
+    const [customOsVersion, setCustomOsVersion] = useState(''); // Renamed for clarity
+    const [customCli, setCustomCli] = useState('');
+
+    const [deviceType, setDeviceType] = useState('router');
+    const [knowledgeLevel, setKnowledgeLevel] = useState('intermediate');
+
+    useEffect(() => {
+        if (os in osDetails && os !== 'other') {
+            setCli(osDetails[os].clis[0] || '');
+            setOsVersion(''); // Clear osVersion for standard OSs
+        } else {
+            setCli('');
+            setOsVersion(''); // Clear for 'other' initially
+        }
+    }, [os]);
+
+    const validateAndSubmit = (handler) => {
+        const newErrors = {};
+        if (!userInput.trim()) newErrors.userInput = t.fieldRequired;
+
+        let finalOs = os;
+        let finalOsVersion = ''; // Changed: OS version is now optional
+        let finalCli = cli;
+
+        if (os === 'other') {
+            if (!customOsName.trim()) newErrors.customOsName = t.fieldRequired;
+            // osVersion (customOsVersion) is now optional, no validation needed
+            if (!customCli.trim()) newErrors.customCli = t.fieldRequired;
+            finalOs = customOsName.trim();
+            finalOsVersion = customOsVersion.trim(); // Pass it if user provided it
+            finalCli = customCli.trim();
+        } else {
+            if (!os) newErrors.os = t.fieldRequired;
+            // osVersion field is removed, so no validation
+            if (!cli) newErrors.cli = t.fieldRequired;
+        }
+
+        if (os === 'cisco' && !deviceType) {
+            newErrors.deviceType = t.fieldRequired;
+        }
+
+        setFormErrors(newErrors);
+
+        if (Object.keys(newErrors).length === 0) {
+            const formData = {
+                os: finalOs,
+                osVersion: finalOsVersion, // Pass the optional version
+                cli: finalCli,
+                userInput,
+                knowledgeLevel,
+                deviceType: os === 'cisco' ? deviceType : undefined,
+            };
+            handler(formData);
+        }
+    };
+
+    // Updated OS options from osDetails keys
+    const osOptions = [...Object.keys(osDetails).filter(k => k !== 'other'), 'other'];
+    const deviceOptions = ['router', 'switch', 'firewall'];
+    const knowledgeLevelOptions = ['beginner', 'intermediate', 'expert'];
+
+    return (
+        <div>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2 text-center">CCG - Cando Command Generator</h2>
+            <p className="text-gray-600 mb-8 text-center text-md">{t.generateSubheader}</p>
+
+            <Card lang={lang}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                    <CustomSelect
+                        label={t.os}
+                        value={os}
+                        onChange={setOs}
+                        options={osOptions.map(opt => ({
+                            value: opt,
+                            label: t[`os_${opt}`] || (opt.charAt(0).toUpperCase() + opt.slice(1))
+                        }))}
+                        placeholder={t.os}
+                        lang={lang}
+                        error={formErrors.os}
+                        isObjectOptions={true}
+                    />
+
+                    {os !== 'other' ? (
+                        <>
+                            {/* OS Version Select is REMOVED for standard OSs */}
+                            <div className="lg:col-span-1">
+                                <CustomSelect label={t.cli} value={cli} onChange={setCli} options={osDetails[os]?.clis || []} placeholder={t.selectCli} lang={lang} error={formErrors.cli} />
+                            </div>
+                            {/* This div is to fill the grid cell */}
+                            <div className="hidden lg:block lg:col-span-1"></div>
+                        </>
+                    ) : (
+                        <>
+                            <CustomInput label={t.customOsLabel} value={customOsName} onChange={setCustomOsName} placeholder={t.customOsPlaceholder} error={formErrors.customOsName} />
+                            <CustomInput
+                                label={t.customOsVersionLabel}
+                                value={customOsVersion}
+                                onChange={setCustomOsVersion}
+                                placeholder={t.customOsVersionPlaceholder}
+                                error={formErrors.customOsVersion}
+                                isRequired={false} // Field is now optional
+                            />
+                            <CustomInput label={t.cli} value={customCli} onChange={setCustomCli} placeholder={t.customCliPlaceholder || 'e.g., sh'} error={formErrors.customCli} />
+                        </>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <CustomSelect
+                        label={t.knowledgeLevel}
+                        value={knowledgeLevel}
+                        onChange={setKnowledgeLevel}
+                        options={knowledgeLevelOptions.map(opt => ({ value: opt, label: t[`level_${opt}`] }))}
+                        placeholder={t.selectLevel}
+                        lang={lang}
+                        isObjectOptions={true}
+                    />
+                    {os === 'cisco' && (
+                        <CustomSelect
+                            label={t.deviceType}
+                            value={deviceType}
+                            onChange={setDeviceType}
+                            options={deviceOptions.map(opt => ({ value: opt, label: t[`device_${opt}`] }))}
+                            placeholder={t.selectDevice}
+                            lang={lang}
+                            isObjectOptions={true}
+                            error={formErrors.deviceType}
+                        />
+                    )}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.questionLabel}</label>
+                    <textarea value={userInput} onChange={(e) => setUserInput(e.target.value)} placeholder={t.questionPlaceholder} className="w-full h-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-amber-500 resize-none" />
+                    {formErrors.userInput && <p className="text-red-500 text-xs mt-1">{formErrors.userInput}</p>}
+                </div>
+
+                <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <button onClick={() => validateAndSubmit(onSubmit)} disabled={isLoading} className="w-full bg-amber-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-amber-700 disabled:bg-gray-400 flex items-center justify-center min-h-[48px] transition-colors">
+                        {isLoading ? <LoadingSpinner /> : <><Wand2 size={18} /><span className="ml-2">{t.generate}</span></>}
+                    </button>
+                    <button onClick={() => validateAndSubmit(onScript)} disabled={isLoading} className="w-full bg-emerald-700 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-emerald-800 disabled:bg-gray-400 flex items-center justify-center min-h-[48px] transition-colors">
+                        {isLoading ? <LoadingSpinner /> : <><FileCode2 size={18} /><span className="ml-2">{t.generateScript}</span></>}
+                    </button>
+                    <button onClick={() => validateAndSubmit(onExplain)} disabled={isLoading} className="w-full bg-sky-700 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-sky-800 disabled:bg-gray-400 flex items-center justify-center min-h-[48px] transition-colors">
+                        {isLoading ? <LoadingSpinner /> : <><Search size={18} /><span className="ml-2">{t.explain}</span></>}
+                    </button>
+                </div>
+                {isLoading && <p className="text-center text-sm text-gray-500 mt-2">{loadingMessage}</p>}
+            </Card>
+        </div>
+    );
+};
+
+export default Form;
+----------------------------------------
+FILE: ./client/src/components/Header.jsx
+----------------------------------------
+
+import React from 'react';
+import { Menu, MessageSquare } from 'lucide-react'; // <-- Added MessageSquare
+import { translations } from '../constants/translations'; // <-- Added translations
+
+const Header = ({ lang, onMenuClick, onLangChange }) => {
+
+    const appVersion = process.env.REACT_APP_VERSION || '3.0.9';
+    const t = translations[lang]; // <-- Get translation object
+    const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfkigw8FoqPI2KpIg7Xhy_3CqXAovCVwuPXQGCeKnVaV1PLAg/viewform?usp=dialog'; // <-- Feedback URL
+
+    return (
+        <header className="bg-white/70 dark:bg-gray-900/70 shadow-sm sticky top-0 z-40 backdrop-blur-lg">
+            <div className="container mx-auto px-4 py-2 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                    {/* Menu button for mobile */}
+                    <button onClick={onMenuClick} className="md:hidden p-1.5 text-gray-700 dark:text-gray-300 rounded-full hover:bg-gray-200/70 dark:hover:bg-gray-700/70">
+                        <Menu size={20} />
+                    </button>
+                    <div className="flex items-center gap-3">
+                        <img src="/logo (2).png" alt="Cando Logo" className="h-8 w-auto" />
+                        <div className="flex items-baseline gap-2">
+                            <h1 className="text-xl font-bold text-amber-500 dark:text-amber-400">CCG</h1>
+                            <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400">v{appVersion}</span>
+                        </div>
+                    </div>
+                </div>
+                <div className="flex items-center gap-4"> {/* <-- Increased gap */}
+                    {/* Desktop buttons */}
+                    <div className="hidden md:flex items-center gap-4"> {/* <-- Increased gap */}
+
+                        {/* --- NEW FEEDBACK BUTTON --- */}
+                        <a
+                            href={FEEDBACK_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 text-gray-600 dark:text-gray-300 hover:text-amber-600 dark:hover:text-amber-400 text-xs font-semibold"
+                        >
+                            <MessageSquare size={14} />
+                            {t.feedbackButton}
+                        </a>
+                        {/* --- END NEW BUTTON --- */}
+
+                        <div className="flex items-center bg-gray-200/70 dark:bg-gray-700/70 rounded-full p-0.5">
+                            <button onClick={() => onLangChange('en')} className={`px-2.5 py-1 rounded-full text-xs ${lang === 'en' ? 'bg-amber-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>EN</button>
+                            <button onClick={() => onLangChange('fa')} className={`px-2.5 py-1 rounded-full text-xs ${lang === 'fa' ? 'bg-amber-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>FA</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+    );
+};
+
+export default Header;
+
+----------------------------------------
+FILE: ./client/src/components/MobileDrawer.jsx
+----------------------------------------
+
+import React from 'react';
+import { X, MessageSquare } from 'lucide-react'; // <-- Added MessageSquare
+import { translations } from '../constants/translations';
+
+const MobileDrawer = ({ isOpen, onClose, lang, onLangChange }) => {
+    const t = translations[lang];
+    const FEEDBACK_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfkigw8FoqPI2KpIg7Xhy_3CqXAovCVwuPXQGCeKnVaV1PLAg/viewform?usp=dialog'; // <-- Feedback URL
+
+    const handleContentClick = (e) => e.stopPropagation();
+
+    return (
+        <>
+            {/* Overlay */}
+            <div
+                onClick={onClose}
+                className={`fixed inset-0 bg-black/50 z-50 transition-opacity duration-300 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+            />
+            {/* Drawer */}
+            <div
+                className={`fixed top-0 bottom-0 ${lang === 'fa' ? 'right-0' : 'left-0'} w-64 bg-white dark:bg-gray-800 shadow-lg z-50 transform transition-transform duration-300 ${isOpen ? 'translate-x-0' : (lang === 'fa' ? 'translate-x-full' : '-translate-x-full')}`}
+                onClick={handleContentClick}
+            >
+                <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+                    <h2 className="text-lg font-bold text-amber-600 dark:text-amber-400">Menu</h2>
+                    <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
+                        <X size={20} />
+                    </button>
+                </div>
+                <div className="p-4 space-y-4">
+                    <div className="pt-2">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 px-2 mb-2">Language</p>
+                        <div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-0.5">
+                            <button onClick={() => onLangChange('en')} className={`flex-1 text-center px-3 py-1 rounded-full text-xs ${lang === 'en' ? 'bg-amber-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>EN</button>
+                            <button onClick={() => onLangChange('fa')} className={`flex-1 text-center px-3 py-1 rounded-full text-xs ${lang === 'fa' ? 'bg-amber-600 text-white' : 'text-gray-600 dark:text-gray-300'}`}>FA</button>
+                        </div>
+                    </div>
+
+                    {/* --- NEW FEEDBACK BUTTON --- */}
+                    <div className="pt-2">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 px-2 mb-2">{t.feedbackButton}</p>
+                        <a
+                            href={FEEDBACK_URL}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                        >
+                            <MessageSquare size={16} />
+                            {t.feedbackButton}
+                        </a>
+                    </div>
+                    {/* --- END NEW BUTTON --- */}
+
+                </div>
+            </div>
+        </>
+    );
+};
+
+export default MobileDrawer;
+----------------------------------------
+FILE: ./client/src/constants/osDetails.jsx
+----------------------------------------
+
+export const osDetails = {
+  ubuntu: {
+    clis: ['Bash', 'Zsh']
+  },
+  debian: {
+    clis: ['Bash', 'Zsh']
+  },
+  fedora: {
+    clis: ['Bash', 'Zsh']
+  },
+  // 'centos-stream': { // REMOVED
+  //   clis: ['Bash', 'Zsh']
+  // },
+  centos: {
+    clis: ['Bash', 'Zsh']
+  },
+  arch: { // Assuming Arch Linux is meant, kept as 'arch' for consistency
+    clis: ['Bash', 'Zsh']
+  },
+  windows: {
+    clis: ['PowerShell 7', 'CMD']
+  },
+  macos: {
+    clis: ['Zsh', 'Bash']
+  },
+  cisco: {
+    clis: ['CLI'] // Cisco IOS CLI
+  },
+  mikrotik: { // ADDED
+    clis: ['MikroTik CLI'] // RouterOS CLI
+  },
+  fortigate: { // ADDED
+    clis: ['FortiOS CLI'] // FortiOS CLI
+  },
+  python: {
+    clis: ['Python 3']
+  },
+  other: {
+    clis: ['Bash', 'Zsh', 'PowerShell', 'CMD', 'Sh'] // Common shells
+  }
+};
+----------------------------------------
+FILE: ./client/src/constants/translations.jsx
+----------------------------------------
+
+export const translations = {
+  en: {
+    about: "About",
+    modeGenerate: "Generate",
+    modeExplain: "Explain",
+    // New App Modes
+    appModeGenerator: "Command Generator",
+    appModeCompare: "Smart Code Compare",
+    // Generator
+    generateSubheader: "Ask a question to get practical, real-world commands.",
+    explainSubheader: "Enter a command for a clear, simple explanation.",
+    questionLabel: "Your Request",
+    commandLabel: "Command to Explain",
+    questionPlaceholder: "e.g., how to find and delete all temp files older than 30 days?",
+    commandPlaceholder: "e.g., tar -czvf archive.tar.gz /path/to/dir",
+    os: "Platform / OS",
+    os_ubuntu: "Ubuntu",
+    os_debian: "Debian",
+    os_fedora: "Fedora",
+    // 'os_centos-stream': "CentOS Stream", // REMOVED as requested
+    os_centos: "CentOS",
+    os_arch: "Arch Linux",
+    os_windows: "Windows",
+    os_macos: "macOS",
+    os_cisco: "Cisco",
+    os_mikrotik: "MikroTik",
+    os_fortigate: "FortiGate", // ADDED as requested
+    os_python: "Python",
+    os_other: "Other...",
+    osVersion: "Version (Optional)",
+    cli: "CLI / Shell",
+    deviceType: "Device Type",
+    device_router: "Router",
+    device_switch: "Switch",
+    device_firewall: "Firewall",
+    knowledgeLevel: "Knowledge Level",
+    level_beginner: "Beginner",
+    level_intermediate: "Intermediate",
+    level_expert: "Expert",
+    selectVersion: "Specify Version (Optional)",
+    selectCli: "Select Shell",
+    selectDevice: "Select Device",
+    selectLevel: "Select Level",
+    generate: "Generate Commands",
+    generateScript: "Generate Script",
+    explain: "Explain Command",
+    generating: "Generating...",
+    explaining: "Explaining...",
+    scripting: "Scripting...",
+    moreCommands: "More Suggestions",
+    loadingMore: "Loading More...",
+    copied: "Copied to clipboard!",
+    fieldRequired: "This field is required",
+    detailedExplanation: "Command Explanation",
+    errorAnalysis: "Error Analysis",
+    cause: "Probable Cause",
+    solution: "Proposed Solution",
+    explanation: "Error Meaning",
+    errorPromptTitle: "Did a command fail?",
+    errorPromptSubheader: "Paste the error message and context to get a step-by-step solution.",
+    errorLabel: "Paste Your Error Message",
+    errorPlaceholder: "e.g., bash: command not found: git",
+    errorContextLabel: "Describe the context (optional but recommended)",
+    errorContextPlaceholder: "e.g., I was trying to clone a git repository...",
+    analyzeError: "Analyze Error",
+    analyzing: "Analyzing...",
+    aboutMeTitle: "About Me",
+    aboutToolTitle: "About CCG",
+    aboutMeText: "I'm Amirhossein Yavari, an IT enthusiast passionate about building helpful tools. CCG is one of my projects to simplify command-line tasks, now part of Cando Academy.",
+    aboutToolText: "CCG (Cando Command Generator) is an intelligent assistant that leverages a powerful AI to help you generate, understand, and debug command-line instructions.",
+    footerLine1: "All rights reserved.",
+    footerLine2: "Created by Amirhossein Yavari",
+    connecting: "Connecting to server...",
+    fetching: "Generating response...",
+    customOsLabel: "Custom OS Name",
+    customOsVersionLabel: "Custom OS Version (Optional)",
+    customCliPlaceholder: "e.g., sh",
+    customOsPlaceholder: "e.g., FreeBSD",
+    customOsVersionPlaceholder: "e.g., 14.0-RELEASE",
+    errorNetwork: "Connection failed. Please check your internet and try again.",
+    errorProvider: "The AI service is temporarily unavailable. Please try again in a few moments.",
+    errorAccessConfig: "There's a configuration issue on our server. The administrator has been notified.",
+    errorInput: "Your request could not be processed. Please check your input.",
+    errorParse: "We received an unexpected response from the AI. Please try rephrasing your request.",
+    errorTooManyRequests: "You've sent too many requests. Please wait a moment before trying again.",
+    errorDefault: "An unexpected error occurred. We're looking into it. Please try again later.",
+    feedbackTitle: "We Value Your Feedback!",
+    feedbackSubheader: "You've used CCG several times. Would you mind sharing your thoughts to help us improve?",
+    feedbackAction: "Provide Feedback",
+    feedbackDismiss: "Maybe Later",
+    feedbackButton: "Feedback", // <-- NEW
+    // Smart Code Compare Translations
+    compareSubheader: "Compare two code snippets with AI to understand logical differences, review quality, and merge changes.",
+    pasteCodeA: "Paste Code A (Original)",
+    pasteCodeB: "Paste Code B (Modified)",
+    compareWithAI: "Compare with AI",
+    comparing: "Analyzing...",
+    tabSideBySide: "Side-by-Side View", // <-- NEW
+    tabDifferences: "Differences",
+    tabAIAnalysis: "AI Analysis",
+    tabSuggestedMerge: "Suggested Merge",
+    analysisTitle: "AI Analysis Report",
+    logicalDifferences: "Logical Differences",
+    qualityReview: "Code Quality & Security Review",
+    mergeSuggestion: "AI-Generated Merge",
+    langDetected: "Detected Languages",
+    langMismatchWarning: "Language mismatch detected. Analysis may be less accurate.",
+  },
+  fa: {
+    about: "درباره",
+    modeGenerate: "تولید دستور",
+    modeExplain: "تحلیل دستور",
+    // New App Modes
+    appModeGenerator: "مولد دستورات",
+    appModeCompare: "مقایسه هوشمند کد",
+    // Generator
+    generateSubheader: "برای دریافت دستورات کاربردی، درخواست خود را بنویسید.",
+    explainSubheader: "برای دریافت توضیحات روان، دستور مورد نظر را وارد کنید.",
+    questionLabel: "درخواست شما",
+    commandLabel: "دستور جهت تحلیل",
+    questionPlaceholder: "مثال: چطور فایل‌های حجیم‌تر از ۵۰۰ مگابایت را پیدا و حذف کنم؟",
+    commandPlaceholder: "مثال: tar -czvf archive.tar.gz /path/to/dir",
+    os: "پلتفرم / سیستم‌عامل",
+    os_ubuntu: "اوبونتو",
+    os_debian: "دبیان",
+    os_fedora: "فدورا",
+    // 'os_centos-stream': "CentOS Stream", // REMOVED as requested
+    os_centos: "CentOS",
+    os_arch: "آرچ لینوکس",
+    os_windows: "ویندوز",
+    os_macos: "مک",
+    os_cisco: "سیسکو",
+    os_mikrotik: "میکروتیک",
+    os_fortigate: "FortiGate", // ADDED as requested
+    os_python: "پایتون",
+    os_other: "سایر...",
+    osVersion: "نسخه (اختیاری)",
+    cli: "خط فرمان / شل",
+    deviceType: "نوع دستگاه",
+    device_router: "روتر",
+    device_switch: "سوئیچ",
+    device_firewall: "فایروال",
+    knowledgeLevel: "سطح دانش",
+    level_beginner: "مبتدی",
+    level_intermediate: "متوسط",
+    level_expert: "حرفه‌ای",
+    selectVersion: "نسخه را مشخص کنید (اختیاری)",
+    selectCli: "انتخاب شل",
+    selectDevice: "انتخاب دستگاه",
+    selectLevel: "انتخاب سطح",
+    generate: "تولید دستورات",
+    generateScript: "تولید اسکریپت",
+    explain: "توضیح دستور",
+    generating: "در حال تولید...",
+    explaining: "در حال توضیح...",
+    scripting: "در حال ساخت اسکریپت...",
+    moreCommands: "پیشنهادهای بیشتر",
+    loadingMore: "بارگذاری موارد بیشتر...",
+    copied: "در کلیپ‌بورد کپی شد!",
+    fieldRequired: "این فیلد الزامی است",
+    detailedExplanation: "توضیحات دستور",
+    errorAnalysis: "تحلیل خطا",
+    cause: "علت احتمالی",
+    solution: "راه‌حل پیشنهادی",
+    explanation: "توضیح خطا",
+    errorPromptTitle: "دستوری با خطا مواجه شد؟",
+    errorPromptSubheader: "پیام خطا و زمینه آن را وارد کنید تا راه‌حل قدم‌به‌قدم دریافت کنید.",
+    errorLabel: "پیام خطا را اینجا وارد کنید",
+    errorPlaceholder: "مثال: bash: command not found: git",
+    errorContextLabel: "زمینه را شرح دهید (اختیاری اما توصیه می‌شود)",
+    errorContextPlaceholder: "مثال: در حال کلون کردن یک ریپازیتوری گیت بودم که این خطا رخ داد...",
+    analyzeError: "تحلیل خطا",
+    analyzing: "در حال تحلیل...",
+    aboutMeTitle: "درباره من",
+    aboutToolTitle: "درباره CCG",
+    aboutMeText: "من امیرحسین یاوری هستم، علاقه‌مند به دنیای IT و ساخت ابزارهای مفید. CCG یکی از پروژه‌های من برای ساده‌سازی کار با خط فرمان است که اکنون بخشی از Cando Academy است.",
+    aboutToolText: "CCG (Cando Command Generator) یک دستیار هوشمند است که با استفاده از هوش مصنوعی قدرتمند به شما کمک می‌کند تا دستورات خط فرمان را تولید، درک و اشکال‌زدایی کنید.",
+    footerLine1: "تمامی حقوق محفوظ است.",
+    footerLine2: "ساخته شده توسط امیرحسین یاوری",
+    connecting: "در حال اتصال به سرور...",
+    fetching: "در حال تولید پاسخ...",
+    customOsLabel: "نام سیستم‌عامل سفارشی",
+    customOsVersionLabel: "نسخه سیستم‌عامل سفارشی (اختیاری)",
+    customCliPlaceholder: "مثال: sh",
+    customOsPlaceholder: "مثال: FreeBSD",
+    customOsVersionPlaceholder: "مثال: 14.0-RELEASE",
+    errorNetwork: "اتصال ناموفق بود. لطفاً اینترنت خود را بررسی و دوباره تلاش کنید.",
+    errorProvider: "سرویس هوش مصنوعی موقتاً در دسترس نیست. لطفاً چند لحظه دیگر دوباره تلاش کنید.",
+    errorAccessConfig: "مشکلی در تنظیمات سرور وجود دارد. مدیران سیستم در حال بررسی آن هستند.",
+    errorInput: "درخواست شما قابل پردازش نبود. لطفاً ورودی خود را بررسی کنید.",
+    errorParse: "پاسخ غیرمنتظره‌ای از هوش مصنوعی دریافت شد. لطفاً درخواست خود را با بیانی دیگر مطرح کنید.",
+    errorTooManyRequests: "تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید.",
+    errorDefault: "یک خطای غیر منتظره رخ داد. در حال بررسی آن هستیم. لطفاً بعداً تلاش کنید.",
+    feedbackTitle: "نظر شما برای ما ارزشمند است!",
+    feedbackSubheader: "شما چندین بار از CCG استفاده کرده‌اید. برای کمک به بهبود ابزار، نظر خود را با ما در میان می‌گذارید؟",
+    feedbackAction: "ثبت بازخورد",
+    feedbackDismiss: "بعداً",
+    feedbackButton: "بازخورد", // <-- NEW
+    // Smart Code Compare Translations (Persian)
+    compareSubheader: "دو قطعه کد را با هوش مصنوعی مقایسه کنید تا تفاوت‌های منطقی، کیفیت و تغییرات را درک کنید.",
+    pasteCodeA: "کد A (نسخه اصلی)",
+    pasteCodeB: "کد B (نسخه تغییریافته)",
+    compareWithAI: "مقایسه با AI",
+    comparing: "در حال تحلیل...",
+    tabSideBySide: "نمای کنار هم", // <-- NEW
+    tabDifferences: "تفاوت‌ها",
+    tabAIAnalysis: "تحلیل AI",
+    tabSuggestedMerge: "ادغام پیشنهادی",
+    analysisTitle: "گزارش تحلیل هوش مصنوعی",
+    logicalDifferences: "تفاوت‌های منطقی",
+    qualityReview: "بررسی کیفیت و امنیت کد",
+    mergeSuggestion: "کد ادغام‌شده توسط AI",
+    langDetected: "زبان‌های شناسایی‌شده",
+    langMismatchWarning: "زبان‌های کد یکسان نیستند. تحلیل ممکن است دقیق نباشد.",
+  }
+};
+----------------------------------------
+FILE: ./client/src/hooks/useCodeCompare.jsx
+----------------------------------------
+
+import { useReducer } from 'react';
+import { callApi } from '../api/promptService'; // For AI analysis
+import toast from 'react-hot-toast';
+
+// Reducer for complex state management
+const initialState = {
+    isLoading: false,
+    error: null,
+    result: null,
+};
+
+function compareReducer(state, action) {
+    switch (action.type) {
+        case 'START_COMPARE':
+            return { ...initialState, isLoading: true };
+        case 'SET_RESULTS':
+            return { ...initialState, isLoading: false, result: action.payload };
+        case 'SET_ERROR':
+            return { ...initialState, error: action.payload };
+        default:
+            return state;
+    }
+}
+
+export const useCodeCompare = (lang, t) => {
+    const [state, dispatch] = useReducer(compareReducer, initialState);
+
+    // Helper for AI calls
+    const runAiTask = async (mode, options = {}) => {
+        // --- FIXED: Added userInput: 'analyze' ---
+        // This ensures the payload to /api/proxy is valid, as userInput is required by callApi
+        // -- UPDATED to pass all options --
+        const result = await callApi({ mode, lang, userInput: 'analyze', ...options });
+        return result?.data?.explanation || result?.data?.cause || null;
+    };
+
+    // Main comparison function
+    // --- UPDATED to run sequentially for better quality merge ---
+    const runCompare = async (codeA, codeB) => {
+        dispatch({ type: 'START_COMPARE' });
+
+        try {
+            // 1. Detect Languages in parallel
+            const [langA, langB] = await Promise.all([
+                runAiTask('detect-lang', { codeA }),
+                runAiTask('detect-lang', { codeA: codeB }) // Use codeA as the generic param
+            ]);
+
+            // 2. Run analysis (diff and quality) in parallel
+            const [diffAnalysis, qualityAnalysis] = await Promise.all([
+                runAiTask('compare-diff', { codeA, codeB, langA, langB }),
+                runAiTask('compare-quality', { codeA, codeB, langA, langB })
+            ]);
+
+            // 3. Create a combined analysis report for the merge task
+            const analysisReport = `
+--- Logical Differences ---
+${diffAnalysis || 'N/A'}
+
+--- Code Quality Review ---
+${qualityAnalysis || 'N/A'}
+`;
+
+            // 4. Run merge task *using* the analysis from step 2
+            const merge = await runAiTask('compare-merge', {
+                codeA,
+                codeB,
+                langA,
+                langB,
+                analysis: analysisReport
+            });
+
+
+            // 5. Set results
+            dispatch({
+                type: 'SET_RESULTS',
+                payload: {
+                    langA,
+                    langB,
+                    diffAnalysis,
+                    qualityAnalysis,
+                    merge
+                }
+            });
+
+        } catch (err) {
+            const errorMessage = err.message || t.errorDefault;
+            dispatch({ type: 'SET_ERROR', payload: errorMessage });
+            toast.error(errorMessage);
+        }
+    };
+
+    return { state, runCompare };
+};
+----------------------------------------
+FILE: ./client/src/index.css
+----------------------------------------
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Inter', sans-serif;
+}
+
+/* Add some global smoothness and better font rendering */
+body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  
+  /* --- ADDED FOR EMBEDDED SVG BACKGROUND --- */
+  background-image: url("data:image/svg+xml,<?xml version='1.0' encoding='utf-8'?><svg xmlns='http://www.w3.org/2000/svg' xmlns:xlink='http://www.w3.org/1999/xlink' enable-background='new 0 0 207.4 105.3' version='1.1' viewBox='0 0 207.4 105.3'><defs><rect id='f' width='207.8' height='105.3'/></defs><clipPath id='g'><use overflow='visible' xlink:href='%23f'/></clipPath><g clip-path='url(%23g)'><g fill='%23F9AA0B' opacity='.51'><polygon points='45.5 90.1 37.6 77 45.5 63.8 61.5 63.8 69.4 77 61.5 90.1'/><polygon points='22.4 74.8 15.7 63.7 22.4 52.6 35.9 52.6 42.6 63.7 35.9 74.8'/><polygon points='5 83.9 -0.3 75.3 5 66.6 15.4 66.6 20.7 75.3 15.4 83.9'/></g><polygon points='104.7 98.9 94.9 82.8 104.7 66.6 124.3 66.6 134.1 82.8 124.3 98.9' fill='%23F9B000'/><polygon points='173.5 24.3 167.1 13.9 173.5 3.5 186.1 3.5 192.4 13.9 186.1 24.3' fill='%23F9AA0B' opacity='.5'/><polygon points='13.2 46.4 3.4 30.2 13.2 14.1 32.8 14.1 42.6 30.2 32.8 46.4' fill='%23F9B000'/><path d='m130.7 65.1h-23.8l-12-19.7 12-19.7h23.8l12 19.7-12 19.7zm-22.4-2.7h20.9l10.4-17.1-10.4-17.1h-20.9l-10.4 17.1 10.4 17.1z' fill='%23F9B000'/><path d='m163.3 44.1h-20l-10-16.5 10-16.5h20l10 16.5-10 16.5zm-19.2-1.3h18.5l9.2-15.2-9.2-15.2h-18.5l-9.2 15.2 9.2 15.2z' fill='%23F9B000'/><path d='m172 75.7h-18.2l-9.1-15 9.1-15h18.2l9.1 15-9.1 15zm-17.5-1.1h16.8l8.4-13.8-8.4-13.8h-16.8l-8.4 13.8 8.4 13.8z' fill='%23F9B000'/><path d='m191.4 65.3h-15.5l-7.8-12.8 7.8-12.8h15.5l7.8 12.8-7.8 12.8zm-14.6-1.8h13.6l6.7-11.1-6.7-11.1h-13.6l-6.7 11.1 6.7 11.1z' fill='%23F9B000'/><path d='m93.1 79.7h-20.3l-10.2-16.8 10.2-16.8h20.3l10.2 16.8-10.2 16.8zm-19.6-1.4h18.8l9.4-15.5-9.4-15.5h-18.8l-9.4 15.5 9.4 15.5z' fill='%23F9B000'/><path d='m61.6 60.8h-17.2l-8.6-14.2 8.6-14.2h17.2l8.6 14.2-8.6 14.2zm-16.5-1.2h15.9l7.9-13.1-7.9-13h-15.9l-7.9 13.1 7.9 13z' fill='%23F9B000'/><path d='m36.3 71.6h-13.2l-6.6-10.8 0.1-0.1 6.5-10.7h13.1l6.6 10.8-0.1 0.1-6.4 10.7zm-12.9-0.4h12.6l6.3-10.4-6.3-10.4h-12.6l-6.3 10.4 6.3 10.4z' fill='%23F4F2ED'/><polygon points='181 86.1 175.4 77 181 67.8 192.1 67.8 197.6 77 192.1 86.1' fill='%23F9B000'/><path d='m201.7 39.6h-15.5l-7.8-12.8 7.8-12.8h15.5l7.8 12.8-7.8 12.8zm-14.6-1.7h13.6l6.7-11.1-6.7-11.1h-13.6l-6.7 11.1 6.7 11.1z' fill='%23F7F6F5'/><polygon points='74.8 42.8 65.6 27.6 74.8 12.4 93.3 12.4 102.5 27.6 93.3 42.8' fill='%23F9AA0B' opacity='.5'/><path d='m62.7 30.4h-17.2l-8.6-14.2 8.6-14.2h17.2l8.6 14.2-8.6 14.2zm-16.5-1.1h15.9l7.9-13.1-7.9-13.1h-15.9l-7.9 13.1 7.9 13.1z' fill='%23F9B000'/><path d='m150.8 90.4h-25.7l-0.1-0.1-12.8-21.1 0.1-0.1 12.8-21.1h25.7l0.1 0.1 12.8 21.1-0.1 0.1-12.8 21.1zm-25.4-0.4h25.2l12.6-20.7-12.6-20.7h-25.2l-12.6 20.7 12.6 20.7z' fill='%23F9F8F7'/><polygon points='75.7 106.7 68.4 94.7 75.7 82.8 90.2 82.8 97.5 94.7 90.2 106.7' fill='%23F9B000'/><polygon points='160.9 100.4 154.6 90.1 160.9 79.8 173.4 79.8 179.7 90.1 173.4 100.4' fill='%23F9B000' opacity='.5'/><polygon points='22.3 99.5 15.5 88.2 22.3 77 36 77 42.9 88.2 36 99.5' fill='%23F9B000'/><path d='m112.8 37.7h-14.8l-7.4-12.2 0.1-0.1 7.3-12.1h14.8l7.4 12.2-0.1 0.1-7.3 12.1zm-14.6-0.5h14.3l7.1-11.8-7.1-11.8h-14.3l-7.1 11.8 7.1 11.8z' fill='%23F7F6F5'/><polygon points='119.2 19.7 111.2 6.6 119.2 -6.5 135.1 -6.5 143.1 6.6 135.1 19.7' fill='%23F9AA0B' opacity='.51'/><path d='m83.8 11.6h-14l-7-11.6 7-11.6h14l7 11.6-7 11.6zm-13.4-1h12.9l6.4-10.6-6.4-10.6h-12.9l-6.5 10.6 6.5 10.6z' fill='%23F9AA0B'/><polygon points='96.1 11.2 90.8 2.6 96.1 -6.1 106.6 -6.1 111.8 2.6 106.6 11.2' fill='%23F9AA0B'/><polygon points='132.2 126.2 122 109.9 132.2 93.6 152.5 93.6 162.7 109.9 152.5 126.2' fill='%23F9AA0B' opacity='.51'/><path d='m205.1 121.9h-20.1l-10.1-16.6 10.1-16.7h20.2l10.1 16.6-10.2 16.7zm-19.6-1h19l9.5-15.6-9.5-15.6h-19l-9.5 15.6 9.5 15.6z' fill='%23F9B000'/><path d='m63.1 124.8h-20.1l-10.1-16.6 10.1-16.6h20.2l10.1 16.6-10.2 16.6zm-19.6-1h19l9.5-15.6-9.5-15.6h-19l-9.5 15.6 9.5 15.6z' fill='%23F9B000'/><polygon points='-8.8 118.4 -18.6 102.2 -8.8 86.1 10.8 86.1 20.6 102.2 10.8 118.4' fill='%23F9B000'/><polygon points='203 79.7 195 66.6 203 53.5 218.9 53.5 226.9 66.6 218.9 79.7' fill='%23F9AA0B' opacity='.51'/><polygon points='8.3 10.3 1 -1.7 8.3 -13.8 22.9 -13.8 30.2 -1.7 22.9 10.3' fill='%23F9AA0B' opacity='.51'/><path d='m15.3 54.2h-26.6l-13.3-22 13.3-22h26.6l13.3 22-13.3 22zm-25.5-2h24.3l12.1-20-12.1-20h-24.3l-12.1 20 12.1 20z' fill='%23F9F8F7'/><path d='m159.3 21.2h-26.6l-13.3-22 13.3-22h26.6l13.3 22-13.3 22zm-25.5-2h24.3l12.1-20-12.1-20h-24.3l-12.1 20 12.1 20z' fill='%23F9F8F7'/><path d='m115.7 113.8h-18.1l-9.1-15 9.1-15h18.2l9.1 15-9.2 15zm-17.6-1h17l8.5-14-8.5-14h-17l-8.5 14 8.5 14z' fill='%23F9F8F7'/></g></svg>");
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  /* ------------------------------------- */
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* RTL Styles */
+[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+[dir="rtl"] .flex-row {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .text-left {
+  text-align: right;
+}
+
+/* Custom styles for better UI */
+@layer components {
+  .btn-primary {
+    @apply w-full bg-amber-600 text-white px-4 py-2.5 rounded-lg font-semibold hover:bg-amber-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-200;
+  }
+}
+
+/* Persian Font */
+[lang="fa"] {
+  font-family: 'Vazirmatn', sans-serif;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  body {
+    font-size: 14px;
+  }
+
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .card {
+    padding: 1rem;
+  }
+
+  h2 {
+    font-size: 1.75rem;
+    /* Larger title on mobile */
+  }
+}
+
+/* Code block styling */
+pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+----------------------------------------
+FILE: ./client/src/index.jsx
+----------------------------------------
+
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import './index.css'; // Import the CSS file
+import App from './App';
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
+----------------------------------------
+FILE: ./client/src/utils/responseParser.jsx
+----------------------------------------
+
+/**
+ * Parses the raw text response from the AI for the web client.
+ * This version is robust and handles multi-line '|||' formats and fallbacks.
+ */
+export const parseAndConstructData = (textResponse, mode) => {
+    try {
+        const trimmedResponse = textResponse.trim().replace(/^```(?:\w+)?\n|```$/g, '');
+        if (!trimmedResponse) return null;
+
+        if (mode === 'generate') {
+            const lines = trimmedResponse.split('\n').filter(line => line.trim() && line.includes('|||'));
+            if (lines.length === 0) {
+                // Fallback: If no '|||' is found, try to find a command.
+                const codeBlockMatch = trimmedResponse.match(/```(?:\w+)?\n([\s\S]*?)\n```/);
+                let command = '';
+                let explanation = trimmedResponse;
+
+                if (codeBlockMatch && codeBlockMatch[1]) {
+                    command = codeBlockMatch[1].trim();
+                    explanation = trimmedResponse.replace(codeBlockMatch[0], '').trim();
+                } else {
+                    const firstLine = trimmedResponse.split('\n')[0];
+                    if (firstLine.length < 150 && !firstLine.includes(' ')) { // Simple command check
+                        command = firstLine;
+                        explanation = trimmedResponse.substring(firstLine.length).trim();
+                    }
+                }
+
+                if (command) {
+                    return { commands: [{ command, explanation, warning: "" }] };
+                }
+
+                return null;
+            }
+
+            const commands = lines.map(line => {
+                const parts = line.split('|||');
+                if (parts.length < 2) return null;
+
+                const rawCommand = parts[0]?.trim().replace(/^`|`$/g, '').trim() || '';
+                const cleanedCommand = rawCommand.replace(/^\s*\d+[\.\s]*\s*/, '');
+
+                if (!cleanedCommand) return null;
+
+                return {
+                    command: cleanedCommand,
+                    explanation: parts[1]?.trim() || 'No explanation provided.',
+                    warning: parts[2]?.trim() || ''
+                };
+            }).filter(Boolean);
+
+            return { commands };
+        }
+
+        // --- FIXED: Added all new compare modes to this condition ---
+        if (
+            mode === 'explain' ||
+            mode === 'script' ||
+            mode === 'detect-lang' ||
+            mode === 'compare-diff' ||
+            mode === 'compare-quality' ||
+            mode === 'compare-merge'
+        ) {
+            return { explanation: trimmedResponse };
+        }
+
+        if (mode === 'error') {
+            const parts = trimmedResponse.split('|||');
+            if (parts.length < 2) {
+                return {
+                    cause: 'Analysis Result',
+                    explanation: trimmedResponse,
+                    solution: []
+                };
+            }
+            return {
+                cause: parts[0]?.trim() || '',
+                explanation: parts[1]?.trim() || '',
+                solution: parts.slice(2).map(s => s.trim()).filter(s => s)
+            };
+        }
+
+        // If mode is unknown (which it was), it will return null
+        return null;
+
+    } catch (error) {
+        console.error("Critical error in responseParser:", error);
+        return { error: "Failed to parse the response from the server." };
+    }
+};
+
+----------------------------------------
+FILE: ./cli/responseParser-cli.js
+----------------------------------------
+
+/**
+ * Enhanced CCG response parser.
+ * Handles the '|||' format robustly and gracefully degrades for malformed responses.
+ */
+const parseAndConstructData = (textResponse, mode) => {
+    try {
+        const trimmedResponse = textResponse.trim().replace(/^```(?:\w+)?\n|```$/g, '');
+        if (!trimmedResponse) return null;
+
+        if (mode === 'generate') {
+            const lines = trimmedResponse.split('\n').filter(line => line.trim() && line.includes('|||'));
+            if (lines.length === 0) {
+                // Fallback: If no '|||' is found, try to find a command.
+                const codeBlockMatch = trimmedResponse.match(/```(?:\w+)?\n([\s\S]*?)\n```/);
+                let command = '';
+                let explanation = trimmedResponse;
+
+                if (codeBlockMatch && codeBlockMatch[1]) {
+                    command = codeBlockMatch[1].trim();
+                    explanation = trimmedResponse.replace(codeBlockMatch[0], '').trim();
+                } else {
+                    const firstLine = trimmedResponse.split('\n')[0];
+                    if (firstLine.length < 150 && !firstLine.includes(' ')) { // Simple command check
+                        command = firstLine;
+                        explanation = trimmedResponse.substring(firstLine.length).trim();
+                    }
+                }
+
+                if (command) {
+                    return { commands: [{ command, explanation, warning: "" }] };
+                }
+
+                return null;
+            }
+
+            const commands = lines.map(line => {
+                const parts = line.split('|||');
+                if (parts.length < 2) return null;
+
+                // Clean command: remove markdown, leading list markers, and ensure it's a single line.
+                const cleanedCommand = (parts[0]?.trim() || '').replace(/[*`]/g, '').replace(/^\s*[\d\-\*]+[\.\:\)]\s*/, '').trim();
+                if (!cleanedCommand) return null;
+
+                return {
+                    command: cleanedCommand,
+                    explanation: parts[1]?.trim() || 'No explanation provided.',
+                    warning: parts[2]?.trim() || ''
+                };
+            }).filter(Boolean); // Filter out any null entries
+
+            return commands.length > 0 ? { commands } : null;
+        }
+
+        if (mode === 'script' || mode === 'explain') {
+            return { explanation: trimmedResponse };
+        }
+
+        if (mode === 'error') {
+            const parts = trimmedResponse.split('|||');
+            if (parts.length < 2) {
+                // Fallback for malformed error responses
+                return { cause: 'Analysis Result', explanation: trimmedResponse, solution: [] };
+            }
+            return {
+                cause: parts[0]?.trim() || 'Analysis',
+                explanation: parts[1]?.trim() || 'No detailed explanation.',
+                solution: parts.slice(2).map(s => s.trim()).filter(s => s) // Handles multiple solution steps
+            };
+        }
+
+        return null;
+
+    } catch (error) {
+        // Optional: Add more verbose logging if a debug flag is present
+        if (process.argv.includes('--debug')) {
+            console.error("Critical error in responseParser:", error);
+        }
+        return null; // Ensure function returns null on error
+    }
+};
+
+module.exports = { parseAndConstructData };
+----------------------------------------
+FILE: ./.env
+----------------------------------------
+
+###################################
+# CCG ENV CONFIG (v3.2.0)
+###################################
+
+# -------- General --------
+PORT=50000
+NODE_ENV=production
+LICENSE=Cando
+VERSION=3.2.0
+
+# -------- AI Config --------
+AI_PROVIDER=openai
+AI_PRIMARY_MODEL=gpt-4o
+
+# Local model (Ollama / LM Studio) - optional
+AI_LOCAL_MODEL_NAME=qwen2:7b-instruct
+AI_LOCAL_MODEL_URL=http://localhost:11434/v1
+
+# ⚠️ کلید واقعی OpenAI – چون سرورت خصوصی است okay
+OPENAI_API_KEY=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
+
+OPENAI_API_URL=https://api.openai.com/v1
+AI_COMPLEXITY_THRESHOLD=medium
+
+# -------- Localization --------
+LANG=en
+
+# -------- Domain --------
+BASE_URL=https://ccg.cando.ac
+
+# -------- Database --------
+MONGO_URI=mongodb://ccgadmin:CCG2025devopsDb_9xL7QfM3z@127.0.0.1:27017/ccg?authSource=ccg
+
+
+# JWT Secret for login system
+JWT_SECRET=AyCcg_Jwt_2025_SuperSecret_9x
+
+
+
+----------------------------------------
+FILE: ./.github/workflows/release.yml
+----------------------------------------
+
+name: Build Secure Binaries
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+      run: |
+          npm install
+          npm install --save-dev pkg javascript-obfuscator
+
+      - name: Obfuscate Source
+        run: |
+          npx javascript-obfuscator cli/ --output cli-obf/ --compact true --control-flow-flattening true
+
+      - name: Build binaries using pkg
+        run: |
+          mkdir -p dist
+
+          # WINDOWS
+          npx pkg cli-obf/cmdgen-cli.js \
+            --targets node18-win-x64 \
+            --output dist/ccg-win.exe
+
+          # LINUX
+          npx pkg cli-obf/cmdgen-cli.js \
+            --targets node18-linux-x64 \
+            --output dist/ccg-linux
+
+          # MACOS
+          npx pkg cli-obf/cmdgen-cli.js \
+            --targets node18-macos-x64 \
+            --output dist/ccg-macos
+
+      - name: Upload Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/ccg-win.exe
+            dist/ccg-linux
+            dist/ccg-macos
+
+----------------------------------------
+FILE: ./install.sh
+----------------------------------------
+
+#!/bin/sh
+
+# Exit immediately if a command exits with a non-zero status.
+set -e
+
+# --- Configuration ---
+GITHUB_REPO="amirhosseinyavari021/CCG"
+INSTALL_DIR="/usr/local/bin"
+CMD_NAME="ccg" # <--- Changed
+
+# --- Helper Functions ---
+echo_color() {
+  printf '\033[%sm%s\033[0m\n' "$1" "$2"
+}
+
+# --- Main Logic ---
+echo_color "36" "Installing/Updating CCG (Cando Command Generator)..."
+
+# --- Stop running instances if any ---
+echo_color "33" "Checking for running instances of ccg..."
+if pgrep -x "ccg" > /dev/null; then
+    echo_color "33" "Stopping running ccg process to allow update..."
+    if command -v killall >/dev/null 2>&1; then
+        killall ccg || true
+    else
+        pkill -f ccg || true
+    fi
+    sleep 1
+fi
+
+# 1. Determine OS and Architecture
+OS="$(uname -s)"
+ARCH="$(uname -m)"
+TARGET=""
+
+case "$OS" in
+  Linux)
+    case "$ARCH" in
+      x86_64) TARGET="ccg-linux" ;; # <--- Changed
+      *) echo_color "31" "Error: Architecture $ARCH for Linux is not supported."; exit 1 ;;
+    esac
+    ;;
+  Darwin)
+    case "$ARCH" in
+      x86_64 | arm64) TARGET="ccg-macos" ;; # <--- Changed
+      *) echo_color "31" "Error: Architecture $ARCH for macOS is not supported."; exit 1 ;;
+    esac
+    ;;
+  *)
+    echo_color "31" "Error: Operating System $OS is not supported. Please install manually from the Releases page."
+    exit 1
+    ;;
+esac
+
+# 2. Fetch latest release tag from GitHub API
+echo_color "36" "Fetching latest release info from GitHub API..."
+LATEST_TAG=$(curl -s https://api.github.com/repos/$GITHUB_REPO/releases/latest | grep '"tag_name":' | cut -d '"' -f 4)
+
+if [ -z "$LATEST_TAG" ]; then
+    echo_color "33" "⚠ Failed to fetch release tag from API. Falling back to /latest/ endpoint."
+    PRIMARY_RELEASE_URL="https://github.com/$GITHUB_REPO/releases/latest/download/$TARGET"
+else
+    PRIMARY_RELEASE_URL="https://github.com/$GITHUB_REPO/releases/download/$LATEST_TAG/$TARGET"
+fi
+
+FALLBACK_RELEASE_URL="https://github.com/$GITHUB_REPO/releases/latest/download/$TARGET"
+DOWNLOAD_PATH="/tmp/$TARGET"
+
+# 3. Attempt download
+echo "Attempting to download from: $PRIMARY_RELEASE_URL"
+if command -v curl >/dev/null 2>&1; then
+  curl -fsSL "$PRIMARY_RELEASE_URL" -o "$DOWNLOAD_PATH" || true
+else
+  wget -q "$PRIMARY_RELEASE_URL" -O "$DOWNLOAD_PATH" || true
+fi
+
+if [ ! -s "$DOWNLOAD_PATH" ]; then
+    echo_color "33" "Primary download failed. Trying fallback source..."
+    echo "Attempting to download from: $FALLBACK_RELEASE_URL"
+    if command -v curl >/dev/null 2>&1; then
+      curl -fsSL "$FALLBACK_RELEASE_URL" -o "$DOWNLOAD_PATH" || true
+    else
+      wget -q "$FALLBACK_RELEASE_URL" -O "$DOWNLOAD_PATH" || true
+    fi
+fi
+
+if [ ! -s "$DOWNLOAD_PATH" ]; then
+    echo_color "31" "❌ Error: Download failed from all available sources. Please check your internet connection or the GitHub releases page."
+    exit 1
+fi
+
+# 4. Install the binary
+echo "Installing to: $INSTALL_DIR/$CMD_NAME"
+chmod +x "$DOWNLOAD_PATH"
+if [ "$(id -u)" -ne 0 ]; then
+  echo "Sudo privileges are required to move the file to $INSTALL_DIR."
+  sudo mv "$DOWNLOAD_PATH" "$INSTALL_DIR/$CMD_NAME"
+else
+  mv "$DOWNLOAD_PATH" "$INSTALL_DIR/$CMD_NAME"
+fi
+
+# 5. Success message
+if [ -n "$LATEST_TAG" ]; then
+  echo_color "32" "✅ CCG $LATEST_TAG was installed successfully!"
+else
+  echo_color "32" "✅ CCG was installed successfully!"
+fi
+
+echo "You can now use the 'ccg' command in a new terminal window."
+echo "To get started, try running: ccg --help"
+----------------------------------------
+FILE: ./README.md
+----------------------------------------
+
+# CCG (Cando Command Generator) - Your Intelligent Command-Line Assistant
+
+[![Hosted by Cando Academy](https://img.shields.io/badge/Hosted%20by-Cando%20Academy-yellow)](https://cando.ac)
+[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red)](LICENSE)
+[![Version](https://img.shields.io/badge/Release-v3.0.9-8a2be2)](https://github.com/amirhosseinyavari021/CCG/releases)
+[![Website](https://img.shields.io/badge/Web_app-HERE-FFD700)](https://ccg.cando.ac)
+[![npm](https://img.shields.io/badge/Published_on-npm-dd1100)](https://www.npmjs.com/package/@amirhosseinyavari/ccg)
+
+
+🎉 **What's New in Version 3.0.9 – Smart Code Compare & AI Fallback!**
+
+This major release introduces the **Smart Code Compare** feature for both the Web and CLI, adds new platforms (**FortiGate**, **MikroTik**), and implements a resilient AI backend with fallback support for local models.
+
+  - **✨ NEW: Smart Code Compare (Web & CLI)**: Compare two code snippets or files. The AI provides a logical difference analysis, a code quality & security review, and a suggested smart merge.
+  - **✨ NEW: CLI `compare` Command**: Use `ccg compare <fileA> <fileB>` for a full AI-powered comparison directly in your terminal.
+  - **✨ NEW: Platform Support**: Added full support for **FortiGate (FortiOS)** and **MikroTik (RouterOS)**.
+  - **✨ NEW: Resilient AI Backend**: The server now automatically falls back to a local model (like Ollama) if the primary AI service (OpenAI) fails, ensuring higher availability.
+  - **✨ NEW: CLI `update` Command**: Keep your tool up-to-date with a simple `ccg update` command.
+  - **✨ NEW: CLI `feedback` Command**: Open the feedback form directly using `ccg feedback`.
+
+✨ **Key Features**
+
+  - **AI-Powered Generation**: Describe what you want to do and get the exact command you need, tailored to your **OS**, **Device Type** (Cisco, FortiGate), and **Knowledge Level**.
+  - **Intelligent Scripting**: Turn multi-step tasks into ready-to-run scripts for PowerShell, Bash, and network devices.
+  - **In-depth Analysis**: Paste any command to get a detailed explanation customized to your level of expertise.
+  - **Error Debugging**: Got an error? CCG analyzes it and gives you a step-by-step solution.
+  - **NEW: Smart Code Compare**: Analyze the logical differences, review quality, and get merge suggestions for any two code snippets.
+  - **Cross-Platform Support**: Natively works on Windows, macOS, Linux, **Cisco**, **MikroTik**, and **FortiGate**.
+  - **Multi-Language Support**: Available in both **English** and **Persian (فارسی)**.
+  - **Interactive Mode (CLI)**: Directly execute generated commands, request more suggestions, or exit effortlessly.
+  - **Configuration Management**: Easily manage your default settings (OS, shell, language, knowledge level) with the `config` command.
+  - **Self-Update Mechanism**: Keep your tool up-to-date with a simple `ccg update` command.
+
+🚀 **Quick Install (Recommended)**
+
+**Administrator Privileges are typically required for global installation.**
+
+### **For macOS / Linux**
+
+The recommended way to install and update is with NPM:
+
+```bash
+sudo npm install -g @amirhosseinyavari/ccg
+````
+
+*To update, run `ccg update` or re-run the install command.*
+
+### **For Windows**
+
+Open PowerShell as **Administrator** and run:
+
+```powershell
+npm install -g @amirhosseinyavari/ccg
+```
+
+*To update, run `ccg update` or re-run the install command.*
+
+✅ **Tip for Users Without Admin Rights**
+You can use `npx` to run CCG without a global installation:
+
+```bash
+npx @amirhosseinyavari/ccg generate "list all files"
+```
+
+After installation, open a **new terminal window** and verify by running: `ccg --help`
+
+-----
+
+**⚠️ Important Note on Running Downloaded Files (Manual Install)**
+
+If you download the executable files (`ccg-win.exe`, `ccg-macos`, `ccg-linux`) directly from the **GitHub Releases** page, your operating system might show a security warning. This happens because the application is not "Code Signed" by Apple or Microsoft.
+
+**We assure you that this project is 100% safe.** This tool is endorsed, featured, and used by **Cando Academy (Cando.ac)**, one of the top IT training centers in the country. The full source code is also available in this repository for complete transparency.
+
+### **How to Bypass the Security Warning?**
+
+  * **On Windows (Windows Defender SmartScreen):**
+
+    1.  When the blue "Windows protected your PC" dialog appears, click on **'More info'**.
+    2.  A new button, **'Run anyway'**, will appear at the bottom. Click it to run the application.
+
+  * **On macOS (Gatekeeper):**
+
+    1.  If you get a warning that "ccg-macos cannot be opened because it is from an unidentified developer," go to **System Settings \> Privacy & Security**.
+    2.  Scroll down, and you will see a message about "ccg-macos". Click the **'Open Anyway'** button.
+    3.  *Alternatively:* **Right-click** the `ccg-macos` file, select **'Open'** from the context menu, and then click **'Open'** in the confirmation dialog.
+
+  * **On Linux:**
+
+    1.  You usually won't get a security warning, but you must make the file executable.
+    2.  Run the following command in your terminal: `chmod +x ./ccg-linux`
+
+-----
+
+⚙️ **How to Use**
+
+**Command Summary**
+
+| Command | Alias | Description |
+|---|---|---|
+| `generate <request>` | `g` | Generate command suggestions |
+| `script <request>` | `s` | Generate a full script |
+| `analyze <command>` | `a` | Understand what a command does |
+| `error <message>` | `e` | Help with an error message |
+| `compare <fileA> <fileB>` | `c` | Smart AI code compare |
+| `history` | `h` | Show recently generated items |
+| `feedback` | `f` | Provide feedback on the tool |
+| `config [action]` | | Manage settings (show, set, wizard) |
+| `update` | | Update CCG to the latest version |
+
+**1. Generate Commands (g)**
+Stuck? Just ask.
+
+```bash
+# Get a simple FortiGate command for a beginner
+ccg g "show system interface" --os fortigate --level beginner
+
+# Get an advanced command to find large files on Linux for an expert
+ccg g "find all files larger than 1GB" --os ubuntu --level expert
+```
+
+**2. Create Scripts (s)**
+Automate complex tasks instantly.
+
+```bash
+# Create a robust Cisco script to configure OSPF on a router
+ccg s "configure ospf with process id 1 and advertise 192.168.1.0/24 for area 0" --os cisco --device router
+
+# Create a Bash script to back up a directory
+ccg s "create a backup of /etc/nginx"
+```
+
+**3. Compare Code (c)**
+Understand changes between two files with AI.
+
+```bash
+# Compare two versions of a script
+ccg compare ./old_script.py ./new_script.py
+```
+
+💻 **Web Version**
+Prefer a graphical interface? Use the web version instantly without any installation.
+→ [https://ccg.cando.ac/](https://ccg.cando.ac/)
+
+The web version includes all features, including **Command Generation** and the new **Smart Code Compare** interface.
+
+-----
+
+## 🧑‍💻 About the Creator
+
+I'm **Amirhossein Yavari**, an IT enthusiast passionate about building helpful tools that simplify complex tasks. CCG is one of my personal projects designed to bridge the gap between natural language and the command line — making terminal usage faster, safer, and more accessible for everyone. This project is now proudly part of the Cando Academy toolkit.
+
+-----
+
+## ❓ Frequently Asked Questions (FAQ)
+
+**Q1: Is CCG safe and private?**
+Yes. Both the web app and CLI send your prompts to the Cando server (`ccg.cando.ac`), which securely proxies the request to an upstream AI provider (like OpenAI) or a local model. **Your prompts are not stored.**
+
+**Q2: Can I use CCG without installing it?**
+Absolutely\! Visit the **web version** at [https://ccg.cando.ac/](https://ccg.cando.ac/) to use all core features instantly—no installation required.
+
+**Q3: How do I use the new network device support?**
+In the CLI, use `--os cisco`, `--os mikrotik`, or `--os fortigate`. In the web app, select them from the "Platform / OS" dropdown menu. For Cisco, you can also specify `--device <type>` (router, switch, or firewall).
+
+**Q4: How does the Knowledge Level feature work?**
+Specify your expertise (`beginner`, `intermediate`, or `expert`) using the `--level` flag in the CLI or the dropdown in the web app. The AI will adjust the complexity, explanation, and style of its response accordingly.
+
+**Q5: What platforms does CCG support?**
+CCG supports Windows (PowerShell, CMD), macOS (Bash, Zsh), Linux (Bash, Zsh), **Cisco** (CLI), **MikroTik** (CLI), and **FortiGate** (CLI).
+
+-----
+
+📜 **License**
+This project is protected by an exclusive **Proprietary License Agreement**.
+Copyright (c) 2024 Amirhossein Yavari & Cando Academy. All Rights Reserved.
+
+Use is granted free of charge for personal, educational, research, and internal non-commercial operations. Commercial use, modification, and redistribution are strictly prohibited without a separate written agreement.
+
+See the `LICENSE` file for full terms and contact details for commercial licensing.
+
+```
+```
+
+----------------------------------------
+FILE: ./responseParser-cli.js
+----------------------------------------
+
+const parseAndConstructData = (textResponse, mode) => {
+    try {
+        const trimmedResponse = textResponse.trim();
+        if (!trimmedResponse) return null;
+
+        if (mode === 'generate') {
+            const lines = trimmedResponse.split('\n').filter(line => line.trim());
+            const commands = lines.map(line => {
+                const parts = line.split('|||');
+                if (parts.length < 2) return null;
+                return {
+                    command: parts[0]?.trim() || '',
+                    explanation: parts[1]?.trim() || '',
+                    warning: parts[2]?.trim() || ''
+                };
+            }).filter(Boolean);
+            return { commands };
+        }
+
+        if (mode === 'explain') {
+            return { explanation: trimmedResponse };
+        }
+        
+        if (mode === 'error') {
+            const parts = trimmedResponse.split('|||');
+            if (parts.length < 3) return null;
+            return {
+                cause: parts[0]?.trim() || '',
+                explanation: parts[1]?.trim() || '',
+                solution: parts.slice(2).map(s => s.trim()).filter(s => s)
+            };
+        }
+        
+        return null;
+
+    } catch (error) {
+        console.error("Critical error in responseParser:", error);
+        return null;
+    }
+};
+
+module.exports = { parseAndConstructData };
+
+----------------------------------------
+FILE: ./server.js
+----------------------------------------
+
+import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import rateLimit from 'express-rate-limit';
+import crypto from 'crypto';
+import dotenv from 'dotenv';
+import mongoose from 'mongoose';
+
+import { routeRequest } from './server/aiRouter.js';
+import authRoutes from './server/routes/authRoutes.js';
+import { requireAuth } from './server/middleware/auth.js';
+import { usageLimit } from './server/middleware/usageLimit.js';
+import { domainGuard } from './server/middleware/domainGuard.js';
+
+dotenv.config();
+
+// --- ES Module dirname shim ---
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const {
+  MONGO_URI,
+  PORT: ENV_PORT
+} = process.env;
+
+// --- MongoDB connection ---
+if (!MONGO_URI) {
+  console.warn('⚠️ MONGO_URI is not set. MongoDB will not be connected and auth will fail.');
+} else {
+  mongoose.connect(MONGO_URI)
+    .then(() => console.log('✅ MongoDB connected'))
+    .catch(err => {
+      console.error('❌ MongoDB connection error:', err.message);
+    });
+}
+
+const app = express();
+
+// --- Basic middleware ---
+app.use(express.json({ limit: '1mb' }));
+
+// Simple request context logging
+app.use((req, res, next) => {
+  req.startTime = Date.now();
+  req.requestId = crypto.randomUUID();
+  req.logContext = {
+    requestId: req.requestId,
+    path: req.path,
+    method: req.method,
+    ip: req.ip
+  };
+  next();
+});
+
+// --- Rate limiting for all API routes ---
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/', apiLimiter);
+
+// --- Healthcheck ---
+app.post('/api/ping', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// --- Simple analytics sink ---
+app.post('/api/analytics', (req, res) => {
+  try {
+    const { event, source, payload } = req.body || {};
+    console.log(JSON.stringify({
+      event: event || 'analytics_event',
+      source: source || 'web',
+      payload: payload || {},
+      timestamp: new Date().toISOString()
+    }));
+  } catch (e) {
+    console.error('analytics parse error', e.message);
+  }
+  res.status(200).json({ status: 'ok' });
+});
+
+// --- Auth routes ---
+app.use('/api/auth', authRoutes);
+
+// --- Main CCG AI endpoint ---
+app.post('/api/ccg', requireAuth, usageLimit({ maxFreeDaily: 30 }), domainGuard, async (req, res) => {
+  try {
+    const { prompt } = req.body || {};
+
+    if (!prompt || !prompt.id || !prompt.variables) {
+      console.error(JSON.stringify({
+        ...req.logContext,
+        event: 'api_error',
+        code: 'INVALID_PAYLOAD',
+        message: 'Missing or invalid prompt object'
+      }));
+      return res.status(400).json({
+        error: {
+          code: 'INVALID_PAYLOAD',
+          message: 'Request payload must include a valid "prompt" object.'
+        }
+      });
+    }
+
+    console.log(JSON.stringify({
+      ...req.logContext,
+      event: 'ccg_request_start',
+      mode: prompt.variables?.mode || 'unknown'
+    }));
+
+    const aiContent = await routeRequest(prompt);
+
+    if (req.incrementUsage) {
+      await req.incrementUsage();
+    }
+
+    console.log(JSON.stringify({
+      ...req.logContext,
+      event: 'ccg_request_success',
+      mode: prompt.variables?.mode || 'unknown',
+      responseTimeMs: Date.now() - req.startTime
+    }));
+
+    res.json({ output: aiContent });
+  } catch (error) {
+    console.error(JSON.stringify({
+      ...req.logContext,
+      event: 'ccg_request_error',
+      error: error.message,
+      stack: error.stack,
+      responseTimeMs: Date.now() - req.startTime
+    }));
+
+    res.status(500).json({
+      error: {
+        code: 'AI_PROXY_ERROR',
+        message: 'خطا در پردازش درخواست توسط CCG.'
+      }
+    });
+  }
+});
+
+// --- Static hosting for Vite client (production) ---
+const clientBuildPath = path.join(__dirname, 'client', 'dist');
+
+app.use(express.static(clientBuildPath));
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(clientBuildPath, 'index.html'), (err) => {
+    if (err) {
+      console.error('Error sending index.html:', err.message);
+      res.status(404).send('Web interface not found. API is running.');
+    }
+  });
+});
+
+// --- Server Start ---
+const PORT = ENV_PORT || 50000;
+app.listen(PORT, () => {
+  console.log(`🚀 Server listening on port ${PORT}`);
+  console.log(JSON.stringify({
+    event: 'server_start',
+    port: PORT,
+    timestamp: new Date().toISOString(),
+    version: process.env.VERSION || '3.0.9'
+  }));
+});
+
+----------------------------------------
+FILE: ./static.json
+----------------------------------------
+
+{
+  "root": "client/build/",
+  "routes": {
+    "/**": "index.html"
+  }
+}
+

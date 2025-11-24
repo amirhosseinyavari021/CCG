@@ -66,7 +66,7 @@ app.post('/api/ping', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// --- Simple analytics sink (optional) ---
+// --- Simple analytics sink ---
 app.post('/api/analytics', (req, res) => {
   try {
     const { event, source, payload } = req.body || {};
@@ -85,7 +85,7 @@ app.post('/api/analytics', (req, res) => {
 // --- Auth routes ---
 app.use('/api/auth', authRoutes);
 
-// --- Main CCG AI endpoint (protected + freemium + domain guard) ---
+// --- Main CCG AI endpoint ---
 app.post('/api/ccg', requireAuth, usageLimit({ maxFreeDaily: 30 }), domainGuard, async (req, res) => {
   try {
     const { prompt } = req.body || {};
@@ -143,8 +143,9 @@ app.post('/api/ccg', requireAuth, usageLimit({ maxFreeDaily: 30 }), domainGuard,
   }
 });
 
-// --- Static hosting for React client (production) ---
-const clientBuildPath = path.join(__dirname, 'client', 'build');
+// --- Static hosting for Vite client (production) ---
+const clientBuildPath = path.join(__dirname, 'client', 'dist');
+
 app.use(express.static(clientBuildPath));
 
 app.get('*', (req, res) => {
@@ -159,7 +160,7 @@ app.get('*', (req, res) => {
 // --- Server Start ---
 const PORT = ENV_PORT || 50000;
 app.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+  console.log(`🚀 Server listening on port ${PORT}`);
   console.log(JSON.stringify({
     event: 'server_start',
     port: PORT,
