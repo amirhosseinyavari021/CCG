@@ -1,99 +1,86 @@
-import express from 'express';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { User } from '../models/User.js';
+import express from "express";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import User from "../models/User.js";
 
 const router = express.Router();
-const { JWT_SECRET } = process.env;
 
-if (!JWT_SECRET) {
-  console.warn('⚠️ JWT_SECRET is not set. Authentication routes will not work correctly.');
-}
-
-const createToken = (user) => {
-  return jwt.sign(
-    {
-      userId: user._id.toString(),
-      plan: user.plan
-    },
-    JWT_SECRET,
-    { expiresIn: '30d' }
-  );
-};
-
-// POST /api/auth/register
-router.post('/register', async (req, res) => {
+// ---------------------------
+// Signup
+// ---------------------------
+router.post("/signup", async (req, res) => {
   try {
-    const { email, password } = req.body || {};
-    if (!email || !password) {
-      return res.status(400).json({ error: 'ایمیل و رمز عبور الزامی است.' });
-    }
+    const { email, password, name } = req.body;
 
-    const existing = await User.findOne({ email });
-    if (existing) {
-      return res.status(409).json({ error: 'برای این ایمیل قبلاً حساب ساخته شده است.' });
-    }
+    const exists = await User.findOne({ email });
+    if (exists)
+      return res.status(400).json({ error: "Email already registered" });
 
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    const trialEnds = new Date();
-    trialEnds.setDate(trialEnds.getDate() + 3); // 3 روز تریال
+    const hashed = await bcrypt.hash(password, 10);
 
     const user = await User.create({
       email,
-      passwordHash,
-      plan: 'free',
-      trialEnds
+      password: hashed,
+      name,
+      plan: "free",
+      usage: {
+        dailyUsed: 0,
+        lastReset: new Date()
+      }
     });
 
-    const token = createToken(user);
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "7d"
+    });
 
     res.json({
       token,
       user: {
+        id: user._id,
         email: user.email,
-        plan: user.plan,
-        trialEnds: user.trialEnds
+        name: user.name,
+        plan: user.plan
       }
     });
   } catch (err) {
-    console.error('Register error:', err.message);
-    res.status(500).json({ error: 'خطای داخلی سرور هنگام ثبت‌نام.' });
+    console.error("Signup error:", err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
-// POST /api/auth/login
-router.post('/login', async (req, res) => {
+// ---------------------------
+// Login
+// ---------------------------
+router.post("/login", async (req, res) => {
   try {
-    const { email, password } = req.body || {};
-    if (!email || !password) {
-      return res.status(400).json({ error: 'ایمیل و رمز عبور الزامی است.' });
-    }
+    const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(401).json({ error: 'ایمیل یا رمز عبور اشتباه است.' });
-    }
+    if (!user)
+      return res.status(400).json({ error: "Invalid email or password" });
 
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) {
-      return res.status(401).json({ error: 'ایمیل یا رمز عبور اشتباه است.' });
-    }
+    const ok = await bcrypt.compare(password, user.password);
+    if (!ok)
+      return res.status(400).json({ error: "Invalid email or password" });
 
-    const token = createToken(user);
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "7d"
+    });
 
     res.json({
       token,
       user: {
+        id: user._id,
         email: user.email,
-        plan: user.plan,
-        trialEnds: user.trialEnds
+        name: user.name,
+        plan: user.plan
       }
     });
   } catch (err) {
-    console.error('Login error:', err.message);
-    res.status(500).json({ error: 'خطای داخلی سرور هنگام ورود.' });
+    console.error("Login error:", err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
 export default router;
+

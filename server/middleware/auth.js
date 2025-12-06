@@ -1,32 +1,20 @@
-import jwt from 'jsonwebtoken';
-import { User } from '../models/User.js';
+import jwt from "jsonwebtoken";
 
-const { JWT_SECRET } = process.env;
-
-if (!JWT_SECRET) {
-  console.warn('⚠️ JWT_SECRET is not set. Authentication will not work correctly.');
-}
-
-export const requireAuth = async (req, res, next) => {
+export function requireAuth(req, res, next) {
   try {
-    const authHeader = req.headers.authorization || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    const header = req.headers.authorization;
 
-    if (!token) {
-      return res.status(401).json({ error: 'برای استفاده از CCG باید وارد حساب کاربری شوید.' });
+    if (!header) {
+      return res.status(401).json({ error: "Authorization header missing" });
     }
 
-    const payload = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(payload.userId);
+    const token = header.replace("Bearer ", "");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    if (!user) {
-      return res.status(401).json({ error: 'کاربر یافت نشد یا دسترسی نامعتبر است.' });
-    }
-
-    req.user = user;
+    req.userId = decoded.id;
     next();
   } catch (err) {
-    console.error('Auth error:', err.message);
-    return res.status(401).json({ error: 'نشست کاربری شما معتبر نیست. دوباره وارد شوید.' });
+    console.error("Auth middleware error:", err);
+    res.status(401).json({ error: "Invalid or expired token" });
   }
-};
+}

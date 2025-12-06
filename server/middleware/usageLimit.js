@@ -1,41 +1,40 @@
-export const usageLimit = (options = {}) => {
-  const { maxFreeDaily = 30 } = options;
+import User from "../models/User.js";
 
-  return async (req, res, next) => {
-    const user = req.user;
-    if (!user) return res.status(500).json({ error: 'مشکل داخلی احراز هویت.' });
+export function usageLimit() {
+  return async function (req, res, next) {
+    try {
+      const user = await User.findById(req.userId);
+      if (!user) {
+        return res.status(401).json({ error: "User not found" });
+      }
 
-    const now = new Date();
-    const lastReset = user.usage?.lastReset || new Date(0);
-    const diff = now.getTime() - lastReset.getTime();
+      const now = new Date();
+      const last = new Date(user.usage.lastReset);
 
-    // reset every 24h
-    if (diff > 24 * 60 * 60 * 1000) {
-      user.usage.dailyUsed = 0;
-      user.usage.lastReset = now;
-    }
+      const isNewDay =
+        now.getUTCDate() !== last.getUTCDate() ||
+        now.getUTCMonth() !== last.getUTCMonth() ||
+        now.getUTCFullYear() !== last.getUTCFullYear();
 
-    // active trial → no limit
-    if (user.trialEnds && user.trialEnds > now) {
-      req.incrementUsage = async () => {
-        user.usage.dailyUsed += 1;
+      if (isNewDay) {
+        user.usage.dailyUsed = 0;
+        user.usage.lastReset = now;
         await user.save();
-      };
-      return next();
-    }
+      }
 
-    if (user.plan === 'free' && user.usage.dailyUsed >= maxFreeDaily) {
-      return res.status(429).json({
-        error: 'سقف استفاده امروز پلن رایگان شما تمام شده است.',
-        code: 'FREE_LIMIT_REACHED'
-      });
-    }
+      if (user.plan === "free" && user.usage.dailyUsed >= 20) {
+        return res
+          .status(429)
+          .json({ error: "Daily limit reached. Upgrade to continue." });
+      }
 
-    req.incrementUsage = async () => {
       user.usage.dailyUsed += 1;
       await user.save();
-    };
 
-    next();
+      next();
+    } catch (err) {
+      console.error("UsageLimit middleware error:", err);
+      res.status(500).json({ error: "Internal middleware error" });
+    }
   };
-};
+}

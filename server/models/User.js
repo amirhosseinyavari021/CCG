@@ -1,20 +1,60 @@
-import mongoose from 'mongoose';
+// server/models/User.js
+import mongoose from "mongoose";
 
-const usageSchema = new mongoose.Schema({
-  dailyUsed: { type: Number, default: 0 },
-  lastReset: { type: Date, default: Date.now }
-}, { _id: false });
+const userSchema = new mongoose.Schema(
+  {
+    email: { 
+      type: String, 
+      required: true, 
+      unique: true 
+    },
 
-const userSchema = new mongoose.Schema({
-  email: { type: String, required: true, unique: true, index: true },
-  passwordHash: { type: String, required: true },
-  plan: {
-    type: String,
-    enum: ['free', 'monthly', 'three_month'],
-    default: 'free'
+    // برای یوزرهای معمولی (local)
+    password: { 
+      type: String, 
+      default: null   // نباید required باشد
+    },
+
+    name: { 
+      type: String, 
+      default: ""     // گوگل همیشه name را می‌دهد
+    },
+
+    // -----------------------------
+    //   GOOGLE OAUTH FIELDS
+    // -----------------------------
+    googleId: { 
+      type: String, 
+      sparse: true 
+    },
+
+    avatar: { 
+      type: String, 
+      default: null 
+    },
+
+    provider: { 
+      type: String, 
+      enum: ["local", "google"], 
+      default: "local" 
+    },
+
+    // -----------------------------
+    //   PLAN + USAGE
+    // -----------------------------
+    plan: { 
+      type: String, 
+      default: "free" 
+    },
+
+    usage: {
+      used:  { type: Number, default: 0 },
+      limit: { type: Number, default: 50 }
+    }
   },
-  trialEnds: { type: Date, default: null },
-  usage: { type: usageSchema, default: () => ({}) }
-}, { timestamps: true });
 
-export const User = mongoose.model('User', userSchema);
+  { timestamps: true }
+);
+
+const User = mongoose.model("User", userSchema);
+export default User;

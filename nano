@@ -1,0 +1,24 @@
+import express from "express";
+import cors from "cors";
+import mongoose from "mongoose";
+import ccgRoutes from "./server/routes/ccgRoutes.js";
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+// مسیر رسمی AI
+app.use("/api/ai/ccg", ccgRoutes);
+
+// اتصال به Mongo و شروع سرور
+const PORT = process.env.PORT || 50000;
+
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => {
+    console.log("✅ MongoDB connected");
+    app.listen(PORT, () => {
+      console.log(`🚀 Server listening on port ${PORT} — Version 3.2.0`);
+    });
+  })
+  .catch((err) => console.error("❌ MongoDB connection error:", err));

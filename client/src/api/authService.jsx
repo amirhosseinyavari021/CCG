@@ -1,32 +1,69 @@
-import axios from 'axios';
+// src/api/authService.jsx
+import axios from "axios";
 
-const TOKEN_KEY = 'ccg_token';
+const TOKEN_KEY = "ccg_token";
+const USER_KEY = "ccg_user";
 
+const api = axios.create({
+  baseURL: "/api/auth",
+  withCredentials: true,
+});
+
+// ----------------------
+// Local storage helpers
+// ----------------------
 export const getStoredToken = () => {
-  if (typeof window === 'undefined') return null;
-  return window.localStorage.getItem(TOKEN_KEY);
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(TOKEN_KEY);
 };
 
-const storeToken = (token) => {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(TOKEN_KEY, token);
+export const getStoredUser = () => {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem(USER_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 };
 
-export const logout = () => {
-  if (typeof window === 'undefined') return;
-  window.localStorage.removeItem(TOKEN_KEY);
+export const storeToken = (token) => {
+  if (typeof window === "undefined") return;
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
 };
 
-export const register = async (email, password) => {
-  const response = await axios.post('/api/auth/register', { email, password });
-  const { token } = response.data;
-  if (token) storeToken(token);
-  return response.data;
+export const storeUser = (user) => {
+  if (typeof window === "undefined") return;
+  if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
+  else localStorage.removeItem(USER_KEY);
 };
 
-export const login = async (email, password) => {
-  const response = await axios.post('/api/auth/login', { email, password });
-  const { token } = response.data;
-  if (token) storeToken(token);
-  return response.data;
+// ----------------------
+// API calls
+// ----------------------
+export const registerRequest = async ({ name, email, password }) => {
+  const res = await api.post("/register", { name, email, password });
+  return res.data; // { user, token }
+};
+
+export const loginRequest = async ({ email, password }) => {
+  const res = await api.post("/login", { email, password });
+  return res.data; // { user, token }
+};
+
+export const getMe = async () => {
+  const res = await api.get("/me");
+  return res.data; // { user }
+};
+
+export const logoutRequest = async () => {
+  try {
+    await api.post("/logout");
+  } catch {
+    // ignore
+  }
+  storeToken(null);
+  storeUser(null);
 };
