@@ -1,7 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
-import "./index.css"; // فقط این خط اضافه می‌شود یا جایگزین می‌شود
+import "./index.css";         // اضافه شده
+import "./styles/global.css"; // اگر وجود داشته باشد
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

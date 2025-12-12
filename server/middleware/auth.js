@@ -1,20 +1,31 @@
+// server/middleware/auth.js
 import jwt from "jsonwebtoken";
+import User from "../models/User.js";
 
-export function requireAuth(req, res, next) {
+export const requireAuth = async (req, res, next) => {
   try {
-    const header = req.headers.authorization;
+    const header = req.headers.authorization || "";
+    const token = header.startsWith("Bearer ")
+      ? header.slice(7)
+      : null;
 
-    if (!header) {
-      return res.status(401).json({ error: "Authorization header missing" });
+    if (!token) {
+      return res.status(401).json({ message: "توکن یافت نشد." });
     }
 
-    const token = header.replace("Bearer ", "");
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded?.id) {
+      return res.status(401).json({ message: "توکن نامعتبر است." });
+    }
 
-    req.userId = decoded.id;
+    const user = await User.findById(decoded.id);
+    if (!user) {
+      return res.status(401).json({ message: "کاربر یافت نشد." });
+    }
+
+    req.user = { id: user._id, email: user.email, name: user.name };
     next();
   } catch (err) {
-    console.error("Auth middleware error:", err);
-    res.status(401).json({ error: "Invalid or expired token" });
+    return res.status(401).json({ message: "احراز هویت ناموفق بود." });
   }
-}
+};

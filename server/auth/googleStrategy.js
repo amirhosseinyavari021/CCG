@@ -14,15 +14,14 @@ const {
 passport.use(
   new GoogleStrategy(
     {
-      clientID:     GOOGLE_CLIENT_ID,
+      clientID: GOOGLE_CLIENT_ID,
       clientSecret: GOOGLE_CLIENT_SECRET,
-      callbackURL:  GOOGLE_CALLBACK_URL,
+      callbackURL: GOOGLE_CALLBACK_URL,
     },
-
     async (accessToken, refreshToken, profile, done) => {
       try {
-        const email  = profile.emails?.[0]?.value;
-        const name   = profile.displayName;
+        const email = profile.emails?.[0]?.value;
+        const name = profile.displayName;
         const avatar = profile.photos?.[0]?.value;
         const googleId = profile.id;
 
@@ -32,44 +31,33 @@ passport.use(
 
         let user = await User.findOne({ email });
 
-        // IF USER DOESN'T EXIST
         if (!user) {
           user = await User.create({
             email,
             name,
             avatar,
-            provider: "google",
             googleId,
-
-            // default plan for new accounts
+            provider: "google",
             plan: "free",
-            usage: {
-              used: 0,
-              limit: 50,
-            },
           });
         } else {
-          // IF USER EXISTS BUT HAS NO GOOGLE DATA
           user.googleId = googleId;
           user.avatar = avatar || user.avatar;
           user.provider = "google";
           await user.save();
         }
 
-        // BUILD JWT
         const token = jwt.sign(
           {
-            id:    user._id,
+            id: user._id,
             email: user.email,
-            name:  user.name,
+            name: user.name,
           },
           JWT_SECRET,
           { expiresIn: "7d" }
         );
 
-        // PASS TOKEN TO CALLBACK ROUTE
         return done(null, { token });
-
       } catch (err) {
         console.error("Google Strategy Error:", err);
         return done(err, null);

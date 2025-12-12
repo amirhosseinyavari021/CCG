@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 
 // Middlewares
+import { optionalAuth } from "./server/middleware/optionalAuth.js";
 import { requireAuth } from "./server/middleware/auth.js";
 import { usageLimit } from "./server/middleware/usageLimit.js";
 
@@ -26,68 +27,19 @@ app.use(express.json({ limit: "4mb" }));
 // Initialize passport (NO session)
 app.use(passport.initialize());
 
-// AUTH (Email + Password)
+// ======================
+// AUTH ROUTES (email, phone, google)
+// ======================
 app.use("/api/auth", authRoutes);
 
-// -------------------------------
-// GOOGLE OAUTH ROUTES
-// -------------------------------
-app.get(
-  "/api/auth/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
-);
+// ======================
+// MAIN CCG AI ROUTE (Auth + Guest Limit)
+// ======================
+app.use("/api/ccg", optionalAuth, usageLimit(), ccgRoutes);
 
-app.get(
-  "/api/auth/google/callback",
-  passport.authenticate("google", {
-    failureRedirect: "https://ccg.cando.ac/login?error=oauth_failed",
-    session: false,
-  }),
-  (req, res) => {
-    const { token } = req.user;
-
-    if (!token) {
-      return res.redirect("https://ccg.cando.ac/login?error=token_missing");
-    }
-
-    // فرانت این صفحه را دارد: /auth/callback
-    return res.redirect(`https://ccg.cando.ac/auth/callback?token=${token}`);
-  }
-);
-
-// -------------------------------
-// AI / CCG ROUTES (Protected)
-// -------------------------------
-app.use(
-  "/api/ai/ccg",
-  requireAuth,
-  usageLimit(),
-  ccgRoutes
-);
-
-// -------------------------------
-// DATABASE + SERVER START
-// -------------------------------
-const MONGO_URI = process.env.MONGO_URI;
-
-mongoose
-  .connect(MONGO_URI)
-  .then(() => {
-    console.log("✅ MongoDB connected");
-
-    const PORT = process.env.PORT || 50000;
-    app.listen(PORT, () =>
-      console.log(`🚀 CCG Backend running on ${PORT} — v3.2.0`)
-    );
-  })
-  .catch((err) => {
-    console.error("❌ MongoDB error:", err);
-    process.exit(1);
-  });
-
-// -------------------------------
+// ======================
 // HEALTH CHECK
-// -------------------------------
+// ======================
 app.get("/", (_, res) =>
   res.json({
     status: "online",
@@ -95,3 +47,18 @@ app.get("/", (_, res) =>
     oauth: true,
   })
 );
+
+// ======================
+// DB CONNECTION & SERVER START
+// ======================
+const MONGO_URI = process.env.MONGO_URI;
+mongoose.connect(MONGO_URI).then(() => {
+  console.log("✅ MongoDB connected");
+  const PORT = process.env.PORT || 50000;
+  app.listen(PORT, () =>
+    console.log(`🚀 CCG Backend running on ${PORT} — v3.2.0`)
+  );
+}).catch((err) => {
+  console.error("❌ MongoDB error:", err);
+  process.exit(1);
+});

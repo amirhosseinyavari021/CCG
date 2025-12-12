@@ -1,40 +1,93 @@
+// server/middleware/usageLimit.js
 import User from "../models/User.js";
+
+const guestBuckets = new Map(); // key: IP → { count, lastReset }
+
+function isSameDay(a, b) {
+  return (
+    a.getUTCFullYear() === b.getUTCFullYear() &&
+    a.getUTCMonth() === b.getUTCMonth() &&
+    a.getUTCDate() === b.getUTCDate()
+  );
+}
 
 export function usageLimit() {
   return async function (req, res, next) {
     try {
-      const user = await User.findById(req.userId);
-      if (!user) {
-        return res.status(401).json({ error: "User not found" });
-      }
-
       const now = new Date();
-      const last = new Date(user.usage.lastReset);
 
-      const isNewDay =
-        now.getUTCDate() !== last.getUTCDate() ||
-        now.getUTCMonth() !== last.getUTCMonth() ||
-        now.getUTCFullYear() !== last.getUTCFullYear();
+      // ==========================
+      // ۱) کاربر لاگین‌شده
+      // ==========================
+      if (req.user?.id) {
+        const user = await User.findById(req.user.id);
+        if (!user) {
+          return res.status(401).json({ error: "کاربر یافت نشد." });
+        }
 
-      if (isNewDay) {
-        user.usage.dailyUsed = 0;
-        user.usage.lastReset = now;
+        if (!user.usage) {
+          user.usage = {
+            dailyUsed: 0,
+            lastReset: now,
+          };
+        }
+
+        if (!user.usage.lastReset || !isSameDay(now, user.usage.lastReset)) {
+          user.usage.dailyUsed = 0;
+          user.usage.lastReset = now;
+        }
+
+        const planLimit =
+          user.plan === "free"
+            ? 20   // لیمیت کاربر پلن رایگان
+            : 200; // پلن‌های بالاتر (بعداً تنظیم می‌کنی)
+
+        if (user.usage.dailyUsed >= planLimit) {
+          return res
+            .status(429)
+            .json({ error: "محدودیت استفاده روزانه شما به پایان رسیده است." });
+        }
+
+        user.usage.dailyUsed += 1;
         await user.save();
+
+        return next();
       }
 
-      if (user.plan === "free" && user.usage.dailyUsed >= 20) {
-        return res
-          .status(429)
-          .json({ error: "Daily limit reached. Upgrade to continue." });
+      // ==========================
+      // ۲) مهمان (بدون توکن)
+      // ==========================
+      const ipHeader = req.headers["x-forwarded-for"];
+      const ip =
+        (Array.isArray(ipHeader)
+          ? ipHeader[0]
+          : (ipHeader || "").split(",")[0].trim()) ||
+        req.ip ||
+        "unknown";
+
+      let bucket = guestBuckets.get(ip);
+      if (!bucket || !isSameDay(now, bucket.lastReset)) {
+        bucket = { count: 0, lastReset: now };
       }
 
-      user.usage.dailyUsed += 1;
-      await user.save();
+      const guestLimit = 5; // ✅ لیمیت مهمان: ۵ درخواست در روز
 
-      next();
+      if (bucket.count >= guestLimit) {
+        guestBuckets.set(ip, bucket);
+        return res.status(429).json({
+          error:
+            "محدودیت استفاده مهمان به پایان رسیده است. لطفاً ثبت‌نام کنید تا ادامه دهید.",
+        });
+      }
+
+      bucket.count += 1;
+      bucket.lastReset = now;
+      guestBuckets.set(ip, bucket);
+
+      return next();
     } catch (err) {
       console.error("UsageLimit middleware error:", err);
-      res.status(500).json({ error: "Internal middleware error" });
+      return res.status(500).json({ error: "Internal middleware error" });
     }
   };
 }

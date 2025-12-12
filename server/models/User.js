@@ -3,58 +3,46 @@ import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
-    email: { 
-      type: String, 
-      required: true, 
-      unique: true 
+    // هویت اصلی
+    name: { type: String },
+    family: { type: String },
+
+    // ایمیل
+    email: { type: String, unique: true, sparse: true },
+
+    // پسورد (فقط برای provider=email)
+    password: { type: String },
+
+    // لاگین با شماره
+    phone: { type: String, unique: true, sparse: true },
+
+    // نوع ورود
+    provider: {
+      type: String,
+      enum: ["email", "google", "phone"],
+      default: "email",
     },
 
-    // برای یوزرهای معمولی (local)
-    password: { 
-      type: String, 
-      default: null   // نباید required باشد
-    },
+    // گوگل
+    googleId: { type: String },
+    avatar: { type: String },
 
-    name: { 
-      type: String, 
-      default: ""     // گوگل همیشه name را می‌دهد
-    },
+    // OTP
+    otpCode: { type: String },
+    otpExpires: { type: Date },
 
-    // -----------------------------
-    //   GOOGLE OAUTH FIELDS
-    // -----------------------------
-    googleId: { 
-      type: String, 
-      sparse: true 
-    },
+    // پلن
+    plan: { type: String, default: "free" },
 
-    avatar: { 
-      type: String, 
-      default: null 
-    },
-
-    provider: { 
-      type: String, 
-      enum: ["local", "google"], 
-      default: "local" 
-    },
-
-    // -----------------------------
-    //   PLAN + USAGE
-    // -----------------------------
-    plan: { 
-      type: String, 
-      default: "free" 
-    },
-
+    // محدودیت استفاده (همون ساختار قبلی رو نگه می‌داریم)
     usage: {
-      used:  { type: Number, default: 0 },
-      limit: { type: Number, default: 50 }
-    }
+      dailyUsed: { type: Number, default: 0 },
+      lastReset: { type: Date, default: new Date() },
+    },
   },
-
   { timestamps: true }
 );
 
 const User = mongoose.model("User", userSchema);
+
 export default User;

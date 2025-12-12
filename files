@@ -1,0 +1,88 @@
+#!/bin/bash
+
+echo "=== CCG Backend Structure ==="
+echo "-------------------------------"
+find server -type f -name "*.js" -o -name "*.ts" -o -name "*.json" | sort
+
+echo -e "\n\n=== Environment Variables (.env) ==="
+cat .env 2>/dev/null || echo "# .env file not found"
+
+echo -e "\n\n=== Package.json (Backend Dependencies) ==="
+cat package.json
+
+echo -e "\n\n=== Main Server Entry (server.js) ==="
+cat server.js
+
+echo -e "\n\n=== Routes ==="
+echo "-------------------"
+for route_file in server/routes/*.js; do
+  echo -e "\n--- $route_file ---"
+  cat "$route_file"
+done
+
+echo -e "\n\n=== Middleware ==="
+echo "-------------------"
+for middleware_file in server/middleware/*.js; do
+  echo -e "\n--- $middleware_file ---"
+  cat "$middleware_file"
+done
+
+echo -e "\n\n=== Models ==="
+echo "-------------------"
+for model_file in server/models/*.js; do
+  echo -e "\n--- $model_file ---"
+  cat "$model_file"
+done
+
+echo -e "\n\n=== Configs ==="
+echo "-------------------"
+for config_file in server/config/*.js; do
+  echo -e "\n--- $config_file ---"
+  cat "$config_file"
+done
+
+echo -e "\n\n=== Utils ==="
+echo "-------------------"
+for util_file in server/utils/*.js; do
+  echo -e "\n--- $util_file ---"
+  cat "$util_file"
+done
+
+echo -e "\n\n=== Auth Strategies ==="
+echo "-------------------"
+for auth_file in server/auth/*.js; do
+  echo -e "\n--- $auth_file ---"
+  cat "$auth_file"
+done
+
+echo -e "\n\n=== AI Router (Main AI Logic) ==="
+echo "-------------------"
+cat server/aiRouter_DISABLED.js 2>/dev/null || echo "# aiRouter_DISABLED.js not found"
+
+echo -e "\n\n=== Prompt Transformers & Builders ==="
+echo "-------------------"
+cat server/utils/promptTransformer.js 2>/dev/null || echo "# promptTransformer.js not found"
+cat server/utils/promptBuilder.js 2>/dev/null || echo "# promptBuilder.js not found"
+
+echo -e "\n\n=== Plan & Usage Logic ==="
+echo "-------------------"
+cat server/config/planConfig.js 2>/dev/null || echo "# planConfig.js not found"
+cat server/middleware/usageLimit.js 2>/dev/null || echo "# usageLimit.js not found"
+
+echo -e "\n\n=== CLI Integration ==="
+echo "-------------------"
+cat cli/responseParser-cli.js 2>/dev/null || echo "# responseParser-cli.js not found"
+cat cli/apiService-cli.js 2>/dev/null || echo "# apiService-cli.js not found"
+
+echo -e "\n\n=== Core Logic (if exists) ==="
+echo "-------------------"
+for core_file in server/core/*.js; do
+  echo -e "\n--- $core_file ---"
+  cat "$core_file"
+done
+
+echo -e "\n\n=== GitHub Workflow (for release) ==="
+echo "-------------------"
+cat .github/workflows/release.yml 2>/dev/null || echo "# release.yml not found"
+
+echo -e "\n\n=== End of Backend Dump ==="
