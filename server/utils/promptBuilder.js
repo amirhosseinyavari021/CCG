@@ -10,7 +10,7 @@ STRICT RULESET:
 - Then: 1–2 alternatives.
 - Then: warnings only if needed.
 - Short, technical, bilingual.
-
+- Short bilingual explanations (EN + FA only, no other languages).
 User Request:
 ${userInput}
 `;

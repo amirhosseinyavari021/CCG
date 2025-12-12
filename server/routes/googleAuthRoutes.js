@@ -1,27 +1,24 @@
 import express from "express";
 import passport from "../auth/googleStrategy.js";
-import jwt from "jsonwebtoken";
 
 const router = express.Router();
 
-router.get("/google",
+router.get(
+  "/google",
   passport.authenticate("google", { scope: ["profile", "email"] })
 );
 
 router.get(
   "/google/callback",
-  passport.authenticate("google", { failureRedirect: "/auth?google=failure" }),
+  passport.authenticate("google", {
+    failureRedirect: `${process.env.CLIENT_URL}/?google=failure`,
+    session: false,
+  }),
   async (req, res) => {
-    const user = req.user;
+    const { token } = req.user;
 
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    // برگشت به فرانت
-    res.redirect(`${process.env.CLIENT_URL}/auth?token=${token}`);
+    // redirect to frontend callback page
+    return res.redirect(`${process.env.CLIENT_URL}/auth/callback?token=${token}`);
   }
 );
 

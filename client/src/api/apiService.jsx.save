@@ -1,5 +1,0 @@
-        return response.data.output;
-    } catch (error) {
-        return handleApiError(error);
-    }
-}
