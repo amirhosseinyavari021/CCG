@@ -1,66 +1,54 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+// src/context/LanguageContext.jsx
+import { createContext, useContext, useEffect, useState } from "react";
 
 const LanguageContext = createContext();
 
+const translations = {
+  en: {
+    inputs: "Inputs",
+    output: "Output",
+    platform: "Platform",
+    cli: "CLI / Shell",
+    deviceType: "Device Type",
+    request: "Request",
+    generate: "Generate Output",
+  },
+  fa: {
+    inputs: "ورودی‌ها",
+    output: "خروجی",
+    platform: "پلتفرم",
+    cli: "CLI / شل",
+    deviceType: "نوع دیوایس",
+    request: "درخواست",
+    generate: "تولید خروجی",
+  },
+};
+
 export function LanguageProvider({ children }) {
-  // استفاده از localStorage برای ذخیره زبان انتخاب‌شده
-  const [lang, setLang] = useState(() => {
-    return localStorage.getItem('ccg_lang') || 'fa'; // پیش‌فرض فارسی
-  });
+  const [lang, setLang] = useState("en");
 
-  // ذخیره در localStorage هر وقت زبان تغییر کرد
   useEffect(() => {
-    localStorage.setItem('ccg_lang', lang);
-  }, [lang]);
+    const saved = localStorage.getItem("ccg_lang");
+    if (saved) setLang(saved);
+  }, []);
 
-  // تابع تغییر زبان
-  const changeLanguage = (newLang) => {
-    setLang(newLang);
-  };
-
-  // توابع ترجمه برای زبان فعلی
-  const translations = {
-    fa: {
-      welcome: 'خوش‌آمدید!',
-      selectLanguage: 'زبان پیش‌فرض را انتخاب کنید',
-      continue: 'ادامه',
-      persian: 'فارسی',
-      english: 'English',
-      tryWithoutSignup: 'امتحان بدون ثبت‌نام',
-      loginOrRegister: 'ثبت‌نام یا ورود',
-      guestMode: 'حالت مهمان',
-      guestDescription: 'شما می‌توانید 5 درخواست رایگان انجام دهید.',
-      registerNow: 'همین حالا ثبت‌نام کنید',
-    },
-    en: {
-      welcome: 'Welcome!',
-      selectLanguage: 'Select your default language',
-      continue: 'Continue',
-      persian: 'فارسی',
-      english: 'English',
-      tryWithoutSignup: 'Try without signup',
-      loginOrRegister: 'Login or Register',
-      guestMode: 'Guest Mode',
-      guestDescription: 'You can make 5 free requests.',
-      registerNow: 'Register Now',
-    }
-  };
-
-  const t = (key) => translations[lang][key] || key;
-
-  const value = {
-    lang,
-    changeLanguage,
-    t
+  const changeLanguage = (l) => {
+    setLang(l);
+    localStorage.setItem("ccg_lang", l);
   };
 
   return (
-    <LanguageContext.Provider value={value}>
+    <LanguageContext.Provider
+      value={{
+        lang,
+        isRTL: lang === "fa",
+        t: translations[lang],
+        changeLanguage,
+      }}
+    >
       {children}
     </LanguageContext.Provider>
   );
 }
 
-export function useLanguage() {
-  return useContext(LanguageContext);
-}
+export const useLanguage = () => useContext(LanguageContext);
