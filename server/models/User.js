@@ -1,48 +1,52 @@
-// server/models/User.js
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
   {
-    // هویت اصلی
-    name: { type: String },
-    family: { type: String },
+    name: String,
+    family: String,
 
-    // ایمیل
     email: { type: String, unique: true, sparse: true },
+    password: String,
 
-    // پسورد (فقط برای provider=email)
-    password: { type: String },
-
-    // لاگین با شماره
     phone: { type: String, unique: true, sparse: true },
 
-    // نوع ورود
     provider: {
       type: String,
       enum: ["email", "google", "phone"],
       default: "email",
     },
 
-    // گوگل
-    googleId: { type: String },
-    avatar: { type: String },
+    googleId: String,
+    avatar: String,
 
-    // OTP
-    otpCode: { type: String },
-    otpExpires: { type: Date },
+    // 🔐 Product Controls
+    role: {
+      type: String,
+      enum: ["expert", "learner"],
+      default: "learner",
+    },
 
-    // پلن
-    plan: { type: String, default: "free" },
+    lang: {
+      type: String,
+      enum: ["en", "fa"],
+      default: "en",
+    },
 
-    // محدودیت استفاده (همون ساختار قبلی رو نگه می‌داریم)
+    plan: {
+      type: String,
+      enum: ["free", "pro"],
+      default: "free",
+    },
+
     usage: {
       dailyUsed: { type: Number, default: 0 },
       lastReset: { type: Date, default: new Date() },
     },
+
+    otpCode: String,
+    otpExpires: Date,
   },
   { timestamps: true }
 );
 
-const User = mongoose.model("User", userSchema);
-
-export default User;
+export default mongoose.model("User", userSchema);

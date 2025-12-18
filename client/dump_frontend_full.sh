@@ -1,4 +1,3 @@
-cat > ~/CCG/client/dump_frontend_full.sh <<'SH'
 #!/bin/bash
 set -e
 cd "$(dirname "$0")"
@@ -25,6 +24,3 @@ do
   echo "===== FILE: $f ====="
   [ -f "$f" ] && sed -n '1,220p' "$f" || echo "NOT FOUND"
 done
-SH
-chmod +x ~/CCG/client/dump_frontend_full.sh
-bash ~/CCG/client/dump_frontend_full.sh

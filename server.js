@@ -1,64 +1,79 @@
 // server.js
 import express from "express";
 import cors from "cors";
-import mongoose from "mongoose";
 import dotenv from "dotenv";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import mongoose from "mongoose";
 
-// Middlewares
 import { optionalAuth } from "./server/middleware/optionalAuth.js";
-import { requireAuth } from "./server/middleware/auth.js";
 import { usageLimit } from "./server/middleware/usageLimit.js";
 
-// Routes
 import ccgRoutes from "./server/routes/ccgRoutes.js";
 import authRoutes from "./server/routes/authRoutes.js";
-
-// Google OAuth (passport)
-import passport from "passport";
-import "./server/auth/googleStrategy.js";
+import profileRoutes from "./server/routes/profileRoutes.js";
 
 dotenv.config();
 
 const app = express();
 
-app.use(cors());
-app.use(express.json({ limit: "4mb" }));
+/* ======================
+   IMPORTANT FOR NGINX
+====================== */
+app.set("trust proxy", 1);
 
-// Initialize passport (NO session)
-app.use(passport.initialize());
-
-// ======================
-// AUTH ROUTES (email, phone, google)
-// ======================
-app.use("/api/auth", authRoutes);
-
-// ======================
-// MAIN CCG AI ROUTE (Auth + Guest Limit)
-// ======================
-app.use("/api/ccg", optionalAuth, usageLimit(), ccgRoutes);
-
-// ======================
-// HEALTH CHECK
-// ======================
-app.get("/", (_, res) =>
-  res.json({
-    status: "online",
-    version: "3.2.0",
-    oauth: true,
+/* ======================
+   BASIC SECURITY
+====================== */
+app.use(helmet());
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
   })
 );
 
-// ======================
-// DB CONNECTION & SERVER START
-// ======================
-const MONGO_URI = process.env.MONGO_URI;
-mongoose.connect(MONGO_URI).then(() => {
-  console.log("✅ MongoDB connected");
-  const PORT = process.env.PORT || 50000;
-  app.listen(PORT, () =>
-    console.log(`🚀 CCG Backend running on ${PORT} — v3.2.0`)
-  );
-}).catch((err) => {
-  console.error("❌ MongoDB error:", err);
-  process.exit(1);
+app.use(express.json({ limit: "1mb" }));
+
+/* ======================
+   RATE LIMIT (AUTH ONLY)
+====================== */
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
 });
+
+app.use("/api/auth", authLimiter, authRoutes);
+
+/* ======================
+   MAIN API (NO HTTP RATE LIMIT)
+====================== */
+app.use("/api/ccg", optionalAuth, usageLimit(), ccgRoutes);
+app.use("/api/profile", optionalAuth, profileRoutes);
+
+/* ======================
+   HEALTH CHECK
+====================== */
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+/* ======================
+   DB + START
+====================== */
+const PORT = process.env.PORT || 50000;
+
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => {
+    console.log("✅ MongoDB connected");
+    app.listen(PORT, () =>
+      console.log(`🚀 CCG backend running on port ${PORT}`)
+    );
+  })
+  .catch((err) => {
+    console.error("❌ MongoDB error:", err);
+    process.exit(1);
+  });
