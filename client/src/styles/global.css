@@ -1,11 +1,102 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App.jsx";
-import "./index.css";         // اضافه شده
-import "./styles/global.css"; // اگر وجود داشته باشد
+/* ===== Fonts ===== */
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/vazirmatn/400.css";
+@import "@fontsource/vazirmatn/600.css";
 
-ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+/* ===== Base ===== */
+:root {
+  --bg-main: #020617;
+  --bg-panel: #020617;
+  --bg-soft: #020617;
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+  --border: rgba(255,255,255,0.14);
+}
+
+[data-theme="light"] {
+  --bg-main: #f8fafc;
+  --bg-panel: #ffffff;
+  --bg-soft: #f1f5f9;
+  --text: #0f172a;
+  --muted: #475569;
+  --border: #e2e8f0;
+}
+
+html {
+  background: var(--bg-main);
+}
+
+html[dir="rtl"] {
+  font-family: "Vazirmatn", system-ui, sans-serif;
+}
+
+html[dir="ltr"] {
+  font-family: "Inter", system-ui, sans-serif;
+}
+
+/* ===== Panels ===== */
+.panel,
+.card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+}
+
+/* ===== Shadows (modern, soft) ===== */
+.panel,
+.card {
+  box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+}
+
+[data-theme="light"] .panel,
+[data-theme="light"] .card {
+  box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+}
+
+/* ===== Inputs ===== */
+input,
+select,
+textarea {
+  background: var(--bg-soft);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+select option {
+  background: var(--bg-panel);
+  color: var(--text);
+}
+
+/* ===== Errors ===== */
+.error-box {
+  background: rgba(220,38,38,0.12);
+  border: 1px solid rgba(220,38,38,0.35);
+  color: #fecaca;
+}
+
+[data-theme="light"] .error-box {
+  background: #fff1f2;
+  border-color: #fecdd3;
+  color: #9f1239;
+}
+
+/* ===== Markdown ===== */
+.prose {
+  color: var(--text);
+}
+
+.prose code {
+  background: rgba(148,163,184,0.15);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.prose pre {
+  background: #020617;
+  border: 1px solid var(--border);
+}
+
+[data-theme="light"] .prose pre {
+  background: #0f172a;
+}

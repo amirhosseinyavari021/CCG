@@ -1,25 +1,15 @@
+// server/routes/googleAuthRoutes.js
 import express from "express";
-import passport from "../auth/googleStrategy.js";
 
 const router = express.Router();
 
-router.get(
-  "/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
-);
-
-router.get(
-  "/google/callback",
-  passport.authenticate("google", {
-    failureRedirect: `${process.env.CLIENT_URL}/?google=failure`,
-    session: false,
-  }),
-  async (req, res) => {
-    const { token } = req.user;
-
-    // redirect to frontend callback page
-    return res.redirect(`${process.env.CLIENT_URL}/auth/callback?token=${token}`);
-  }
-);
+// Disabled for v3.2.0 stability (googleStrategy missing)
+router.all("*", (req, res) => {
+  return res.status(503).json({
+    ok: false,
+    error: "Google OAuth is temporarily disabled.",
+    code: "GOOGLE_AUTH_DISABLED",
+  });
+});
 
 export default router;

@@ -1,54 +1,32 @@
-// src/context/LanguageContext.jsx
-import { createContext, useContext, useEffect, useState } from "react";
+// client/src/context/LanguageContext.jsx
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
-const LanguageContext = createContext();
-
-const translations = {
-  en: {
-    inputs: "Inputs",
-    output: "Output",
-    platform: "Platform",
-    cli: "CLI / Shell",
-    deviceType: "Device Type",
-    request: "Request",
-    generate: "Generate Output",
-  },
-  fa: {
-    inputs: "ورودی‌ها",
-    output: "خروجی",
-    platform: "پلتفرم",
-    cli: "CLI / شل",
-    deviceType: "نوع دیوایس",
-    request: "درخواست",
-    generate: "تولید خروجی",
-  },
-};
+const LanguageCtx = createContext(null);
 
 export function LanguageProvider({ children }) {
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState(() => localStorage.getItem("ccg_lang") || "fa");
 
   useEffect(() => {
-    const saved = localStorage.getItem("ccg_lang");
-    if (saved) setLang(saved);
-  }, []);
+    localStorage.setItem("ccg_lang", lang);
+    document.documentElement.setAttribute("lang", lang);
+    document.documentElement.setAttribute("dir", lang === "fa" ? "rtl" : "ltr");
+  }, [lang]);
 
-  const changeLanguage = (l) => {
-    setLang(l);
-    localStorage.setItem("ccg_lang", l);
-  };
-
-  return (
-    <LanguageContext.Provider
-      value={{
-        lang,
-        isRTL: lang === "fa",
-        t: translations[lang],
-        changeLanguage,
-      }}
-    >
-      {children}
-    </LanguageContext.Provider>
+  const value = useMemo(
+    () => ({
+      lang,
+      isRTL: lang === "fa",
+      setLang,
+      toggleLanguage: () => setLang((p) => (p === "fa" ? "en" : "fa")),
+    }),
+    [lang]
   );
+
+  return <LanguageCtx.Provider value={value}>{children}</LanguageCtx.Provider>;
 }
 
-export const useLanguage = () => useContext(LanguageContext);
+export function useLanguage() {
+  const ctx = useContext(LanguageCtx);
+  if (!ctx) throw new Error("useLanguage must be used within LanguageProvider");
+  return ctx;
+}

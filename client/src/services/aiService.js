@@ -1,33 +1,69 @@
-// src/services/aiService.js
-import { API_BASE_URL } from "../config/api";
+// client/src/services/aiService.js
+import { API_TIMEOUT_MS, withBase } from "../config/api";
 
-export async function generateCommand(payload) {
-  const token = localStorage.getItem("ccg_token");
+async function postJSON(path, body) {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
 
-  const res = await fetch(`${API_BASE_URL}/api/ccg`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token && { Authorization: `Bearer ${token}` }),
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const text = await res.text();
-
-  let data;
   try {
-    data = JSON.parse(text);
+    const res = await fetch(withBase(path), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        // بعضی بک‌اندها lang رو از header هم می‌گیرن
+        "Accept-Language": body?.lang === "fa" ? "fa" : "en",
+      },
+      body: JSON.stringify(body || {}),
+      signal: controller.signal,
+    });
+
+    const contentType = res.headers.get("content-type") || "";
+    const isJSON = contentType.includes("application/json");
+
+    const data = isJSON ? await res.json().catch(() => null) : await res.text().catch(() => "");
+    if (!res.ok) {
+      const msg =
+        (typeof data === "object" && data && (data.error || data.message)) ||
+        (typeof data === "string" && data) ||
+        `HTTP ${res.status}`;
+      const err = new Error(msg);
+      err.status = res.status;
+      err.payload = data;
+      throw err;
+    }
+    return data;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+// ✅ Generate
+export async function generateCommand(payload) {
+  // Primary endpoint
+  try {
+    return await postJSON("/ai/generate", payload);
+  } catch (e) {
+    // Fallback (older backend pattern)
+    return await postJSON("/ai", { ...payload, mode: payload?.mode || "generate" });
+  }
+}
+
+// ✅ Compare
+export async function compareCode(payload) {
+  try {
+    return await postJSON("/ai/compare", payload);
   } catch {
-    throw new Error("Invalid server response");
+    // fallback: same /ai/generate with mode compare
+    return await postJSON("/ai/generate", { ...payload, mode: "compare" });
   }
+}
 
-  if (data.error) {
-    return { error: data.error };
+// ✅ Error Analyze
+export async function analyzeError(payload) {
+  try {
+    return await postJSON("/ai/error-analyze", payload);
+  } catch {
+    // fallback: same /ai/generate with mode error_analyze
+    return await postJSON("/ai/generate", { ...payload, mode: "error_analyze" });
   }
-
-  return {
-    markdown: data.output || "",
-    limitReached: data.limitReached || false,
-  };
 }
