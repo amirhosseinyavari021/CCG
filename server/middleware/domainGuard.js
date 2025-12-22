@@ -1,36 +1,40 @@
-export const domainGuard = (req, res, next) => {
-  const prompt = req.body?.prompt;
-  const userRequest = prompt?.variables?.user_request || '';
+// server/middleware/domainGuard.js
 
-  if (!userRequest || !userRequest.trim()) {
-    return next();
-  }
+export function domainGuard() {
+  return function (req, res, next) {
+    try {
+      // بعضی درخواست‌ها (GET /health) اصلاً body ندارن
+      const origin = req.headers?.origin || "";
+      const host = req.headers?.host || "";
 
-  const faText = userRequest;
+      // اگر whitelist داری (اختیاری)
+      const allowedDomains = [
+        "ccg.cando.ac",
+        "cando.ac",
+        "localhost",
+        "127.0.0.1",
+      ];
 
-  // موضوعاتی که به CCG ربطی ندارن و باید کلاً رد بشن
-  const blockedKeywords = [
-    'عشق',
-    'رابطه',
-    'روانشناسی',
-    'سلامتی',
-    'سلامت',
-    'رژیم',
-    'تعبیر خواب',
-    'خوابم',
-    'انگیزه',
-    'افسردگی',
-    'دوست دختر',
-    'دوست پسر',
-    'رابطه عاطفی'
-  ];
+      const isAllowed =
+        allowedDomains.some((d) => host.includes(d)) ||
+        allowedDomains.some((d) => origin.includes(d));
 
-  if (blockedKeywords.some(k => faText.includes(k))) {
-    return res.status(400).json({
-      error: '❌ این سؤال خارج از حوزه‌ی CCG است. لطفاً فقط درباره‌ی IT، DevOps، CLI، شبکه و اسکریپت‌ها سؤال بپرسید.'
-    });
-  }
+      if (!isAllowed && process.env.NODE_ENV === "production") {
+        return res.status(403).json({
+          ok: false,
+          error: "Forbidden domain",
+          code: "DOMAIN_GUARD",
+        });
+      }
 
-  // بقیه رو می‌ذاریم بره جلو، خود پرامپت اصلی هم محدودیت داره
-  return next();
-};
+      return next();
+    } catch (err) {
+      console.error("DomainGuard error:", err);
+      return res.status(500).json({
+        ok: false,
+        error: "Security middleware failure",
+        code: "DOMAIN_GUARD_ERROR",
+      });
+    }
+  };
+}

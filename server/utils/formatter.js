@@ -1,32 +1,59 @@
 // server/utils/formatter.js
+
+function pickSection(markdown, title) {
+  // title like "Explanation", "Alternatives", "Warnings"
+  const re = new RegExp(`^##\\s+${title}\\s*\\n([\\s\\S]*?)(?=^##\\s+|\\Z)`, "m");
+  const m = markdown.match(re);
+  return m ? m[1].trim() : "";
+}
+
+function extractFirstCodeBlock(markdown) {
+  const re = /```(\w+)?\n([\s\S]*?)```/m;
+  const m = markdown.match(re);
+  if (!m) return { lang: "", code: "" };
+  return { lang: (m[1] || "").trim(), code: (m[2] || "").trim() };
+}
+
+function linesToList(text) {
+  if (!text) return [];
+  // accept "- item" or "1. item"
+  return text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((l) => l.replace(/^[-*]\s+/, "").replace(/^\d+\.\s+/, "").trim())
+    .filter(Boolean);
+}
+
 export function formatAIResponse(output, error) {
-  if (error) return { error };
-
-  if (!output || typeof output !== "string") {
-    return { error: "Empty AI output" };
+  if (error) {
+    return {
+      ok: false,
+      error,
+      outputMarkdown: "",
+      command: "",
+      commandLang: "",
+      explanation: "",
+      alternatives: [],
+      warnings: [],
+    };
   }
 
-  const commandMatch = output.match(/```bash([\s\S]*?)```/i);
-  const command = commandMatch ? commandMatch[1].trim() : null;
+  const outputMarkdown = String(output || "").trim();
+  const { lang, code } = extractFirstCodeBlock(outputMarkdown);
 
-  let rest = output.replace(/```bash[\s\S]*?```/i, "").trim();
-
-  let warnings = [];
-  const warningMatch = rest.match(/Warning[s]?:([\s\S]*)/i);
-  if (warningMatch) {
-    warnings = warningMatch[1]
-      .split("\n")
-      .map(l => l.replace(/^[-•]/, "").trim())
-      .filter(Boolean);
-
-    rest = rest.replace(warningMatch[0], "").trim();
-  }
-
-  const explanation = rest || null;
+  const explanation = pickSection(outputMarkdown, "Explanation") || "";
+  const alternativesRaw = pickSection(outputMarkdown, "Alternatives") || "";
+  const warningsRaw = pickSection(outputMarkdown, "Warnings") || "";
 
   return {
-    command,
+    ok: true,
+    error: null,
+    outputMarkdown,
+    command: code,
+    commandLang: lang,
     explanation,
-    warnings,
+    alternatives: linesToList(alternativesRaw),
+    warnings: linesToList(warningsRaw),
   };
 }

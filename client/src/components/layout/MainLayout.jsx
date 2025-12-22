@@ -1,17 +1,21 @@
-// src/components/layout/MainLayout.jsx
-import Header from "./Header";
-import Footer from "./Footer";
+// client/src/components/layout/MainLayout.jsx
+import { useLanguage } from "../../context/LanguageContext";
+import Header from "../shared/Header";
+import Footer from "../shared/Footer";
 
 export default function MainLayout({ children }) {
+  const { isRTL } = useLanguage();
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <div
+      className="min-h-screen bg-[var(--bg-main)] text-[var(--text)]"
+      dir={isRTL ? "rtl" : "ltr"}
+    >
       <Header />
 
-      {/* ⬇️ FIX: container + horizontal padding */}
-      <main className="flex-1">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-          {children}
-        </div>
+      {/* ✅ فاصله درست زیر هدر */}
+      <main className="mx-auto w-full max-w-6xl px-4 pt-24 pb-20">
+        {children}
       </main>
 
       <Footer />

@@ -1,18 +1,29 @@
-export default function CodeBlock({ title, code }) {
-  if (!code) return null;
+// client/src/components/ui/CodeBlock.jsx
+import { useState } from "react";
+
+export default function CodeBlock({ title = "Command", code = "" }) {
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 900);
+    } catch {}
+  };
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-950">
-      <div className="flex items-center justify-between border-b border-slate-800 px-4 py-2 text-xs text-slate-400">
-        <span>{title}</span>
+    <div className="rounded-2xl border border-slate-800 bg-slate-950">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800">
+        <div className="text-xs font-semibold text-slate-300">{title}</div>
         <button
-          onClick={() => navigator.clipboard.writeText(code)}
-          className="hover:text-blue-400"
+          onClick={copy}
+          className="text-xs rounded-lg border border-slate-700 px-2 py-1 text-slate-200 hover:bg-slate-800"
         >
-          Copy
+          {copied ? "Copied" : "Copy"}
         </button>
       </div>
-      <pre className="overflow-x-auto p-4 text-sm text-slate-100">
+      <pre className="overflow-auto p-4 text-sm text-slate-100">
         <code>{code}</code>
       </pre>
     </div>

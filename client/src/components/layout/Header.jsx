@@ -1,67 +1,39 @@
+// src/components/layout/Header.jsx
 import { useLanguage } from "../../context/LanguageContext";
-import { useAuth } from "../../context/AuthContext";
-import { appConfig } from "../../config/app";
-import { Sun, Moon, User } from "lucide-react";
-import { useState } from "react";
+import { useTheme } from "../../context/ThemeContext";
 
 export default function Header() {
-  const { lang, toggleLanguage, isRTL } = useLanguage();
-  const { user } = useAuth(); // null => guest
-  const [dark, setDark] = useState(true);
-
-  const toggleTheme = () => {
-    setDark(!dark);
-    document.documentElement.classList.toggle("dark");
-  };
+  const { lang, toggleLang } = useLanguage();
+  const { toggleTheme } = useTheme();
 
   return (
-    <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        
-        {/* Left: Brand */}
-        <div className="flex items-center gap-3">
-          <span className="text-lg font-semibold text-slate-100">
-            {appConfig.appName}
-          </span>
-        </div>
+    <header className="flex items-center justify-between px-6 py-4 border-b border-slate-300 dark:border-slate-800">
+      <div className="text-lg font-semibold">
+        CCG – Cando Command Generator
+      </div>
 
-        {/* Right: Actions */}
-        <div className="flex items-center gap-3">
-          
-          {/* Language */}
-          <button
-            onClick={toggleLanguage}
-            className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-800"
-          >
-            {lang === "fa" ? "EN" : "FA"}
-          </button>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={toggleTheme}
+          className="rounded-lg border px-3 py-1 text-sm
+          border-slate-300 hover:bg-slate-200
+          dark:border-slate-700 dark:hover:bg-slate-800"
+        >
+          🌗
+        </button>
 
-          {/* Theme */}
-          <button
-            onClick={toggleTheme}
-            className="rounded-lg border border-slate-700 p-2 text-slate-300 hover:bg-slate-800"
-          >
-            {dark ? <Sun size={16} /> : <Moon size={16} />}
-          </button>
+        <button
+          onClick={toggleLang}
+          className="rounded-lg border px-3 py-1 text-sm
+          border-slate-300 hover:bg-slate-200
+          dark:border-slate-700 dark:hover:bg-slate-800"
+        >
+          {lang.toUpperCase()}
+        </button>
 
-          {/* Auth */}
-          {!user ? (
-            <a
-              href="/login"
-              className="rounded-xl bg-blue-500 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-blue-400"
-            >
-              {isRTL ? "ورود / ثبت‌نام" : "Login / Sign up"}
-            </a>
-          ) : (
-            <a
-              href="/dashboard"
-              className="flex items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800"
-            >
-              <User size={16} />
-              {isRTL ? "پروفایل" : "Profile"}
-            </a>
-          )}
-        </div>
+        <button className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-blue-500">
+          ورود / ثبت‌نام
+        </button>
       </div>
     </header>
   );
