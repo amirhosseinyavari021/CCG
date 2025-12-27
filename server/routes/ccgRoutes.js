@@ -1,59 +1,83 @@
-// server/routes/ccgRoutes.js
 import express from "express";
-import { runAI } from "../utils/aiClient.js";
-import { formatAIResponse } from "../utils/formatter.js";
-import { toPromptVariables, buildFallbackPrompt } from "../utils/promptTransformer.js";
+import ccgNormalize from "../middleware/ccgNormalize.js";
 
-import { optionalAuth } from "../middleware/optionalAuth.js";
-import { usageLimit } from "../middleware/usageLimit.js";
+// Try to import existing AI client in a compatible way.
+import * as aiClient from "../utils/aiClient.js";
 
 const router = express.Router();
 
-router.post("/", optionalAuth, usageLimit(), async (req, res) => {
-  try {
-    const body = req.body || {};
+function extractText(ai) {
+  if (!ai) return "";
+  if (typeof ai === "string") return ai;
+  if (typeof ai.output_text === "string") return ai.output_text;
+  if (typeof ai.text === "string") return ai.text;
 
-    const user_request = String(body.user_request || "").trim();
-    if (!user_request || user_request.length > 1200) {
+  // OpenAI Responses-like format: ai.output -> [{type:"message", content:[...]}]
+  try {
+    if (Array.isArray(ai.output)) {
+      const msg = ai.output.find(x => x && x.type === "message" && Array.isArray(x.content));
+      if (msg) {
+        const texts = msg.content
+          .map(c => (c && (c.text || c.output_text)) ? (c.text || c.output_text) : "")
+          .filter(Boolean);
+        return texts.join("\n").trim();
+      }
+    }
+  } catch {}
+
+  // Fallback: try common shapes
+  try {
+    if (ai.data && typeof ai.data === "string") return ai.data;
+    if (ai.result && typeof ai.result === "string") return ai.result;
+    if (ai.result && typeof ai.result.text === "string") return ai.result.text;
+  } catch {}
+
+  return "";
+}
+
+router.post("/", ccgNormalize, ccgNormalize, ccgNormalize, async (req, res) => {
+  const body = (req.ccg ?? req.body ?? {});
+  try {
+    const { mode, lang, os, outputStyle, userRequest } = req.body || {};
+
+    if (!userRequest || String(userRequest).trim().length === 0) {
       return res.status(400).json({
         ok: false,
-        error: "Invalid or too long user request",
-        code: "BAD_REQUEST",
+        error: "userRequest is required",
+        hint: "Send { mode: 'generate'|'learn', lang: 'fa', os: 'windows|linux|macos', userRequest: '...' }"
       });
     }
 
-    // Guest can send lang/mode; logged-in user can override defaults from profile
-    const vars = toPromptVariables({
-      mode: body.mode || "learn",
-      os: body.os,
-      cli: body.cli,
-      lang: body.lang || req.user?.lang || "en",
-      deviceType: body.deviceType,
-      knowledgeLevel: body.knowledgeLevel || "beginner",
-      user_request,
-      error_message: body.error_message,
-      input_a: body.input_a,
-      input_b: body.input_b,
-    });
+    const runAI = aiClient.runAI || aiClient.default || aiClient.callOpenAI;
+    if (!runAI) {
+      return res.status(500).json({ ok: false, error: "AI client not available (runAI not found)" });
+    }
 
-    const fallbackPrompt = buildFallbackPrompt(vars);
+    // Pass a superset for maximum backward-compatibility
+    const payload = {
+      mode,
+      lang,
+      os,
+      outputStyle,
+      userRequest,
+      user_request: userRequest
+    };
 
-    const ai = await runAI({ variables: vars, fallbackPrompt });
+    const ai = await runAI(payload);
+    const text = extractText(ai);
 
-    const formatted = formatAIResponse(ai.output, ai.error);
-
-    // keep compatibility: also return raw output if frontend wants markdown renderer
     return res.json({
-      ...formatted,
-      output: ai.output || "",
+      ok: true,
+      mode,
+      lang,
+      os,
+      outputStyle,
+      text: text || "",
+      raw: (!text ? ai : undefined) // only include raw if extraction failed
     });
-  } catch (err) {
-    console.error("CCG route error:", err);
-    return res.status(500).json({
-      ok: false,
-      error: "Unexpected server error",
-      code: "SERVER_ERROR",
-    });
+  } catch (e) {
+    console.error("CCG route error:", e);
+    return res.status(500).json({ ok: false, error: "Internal error", details: String(e?.message || e) });
   }
 });
 

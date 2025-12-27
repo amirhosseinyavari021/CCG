@@ -1,69 +1,44 @@
 // client/src/services/aiService.js
-import { API_TIMEOUT_MS, withBase } from "../config/api";
+import { withBase } from "../config/api";
 
-async function postJSON(path, body) {
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
-
+async function safeJson(res) {
   try {
-    const res = await fetch(withBase(path), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // بعضی بک‌اندها lang رو از header هم می‌گیرن
-        "Accept-Language": body?.lang === "fa" ? "fa" : "en",
-      },
-      body: JSON.stringify(body || {}),
-      signal: controller.signal,
-    });
-
-    const contentType = res.headers.get("content-type") || "";
-    const isJSON = contentType.includes("application/json");
-
-    const data = isJSON ? await res.json().catch(() => null) : await res.text().catch(() => "");
-    if (!res.ok) {
-      const msg =
-        (typeof data === "object" && data && (data.error || data.message)) ||
-        (typeof data === "string" && data) ||
-        `HTTP ${res.status}`;
-      const err = new Error(msg);
-      err.status = res.status;
-      err.payload = data;
-      throw err;
-    }
-    return data;
-  } finally {
-    clearTimeout(t);
-  }
-}
-
-// ✅ Generate
-export async function generateCommand(payload) {
-  // Primary endpoint
-  try {
-    return await postJSON("/ai/generate", payload);
-  } catch (e) {
-    // Fallback (older backend pattern)
-    return await postJSON("/ai", { ...payload, mode: payload?.mode || "generate" });
-  }
-}
-
-// ✅ Compare
-export async function compareCode(payload) {
-  try {
-    return await postJSON("/ai/compare", payload);
+    return await res.json();
   } catch {
-    // fallback: same /ai/generate with mode compare
-    return await postJSON("/ai/generate", { ...payload, mode: "compare" });
+    return null;
   }
 }
 
-// ✅ Error Analyze
-export async function analyzeError(payload) {
-  try {
-    return await postJSON("/ai/error-analyze", payload);
-  } catch {
-    // fallback: same /ai/generate with mode error_analyze
-    return await postJSON("/ai/generate", { ...payload, mode: "error_analyze" });
+export async function callCCG(payload) {
+  const url = withBase("/api/ccg");
+  // Debug log (خاموش/روشن با نیاز خودت)
+  console.log("[CCG] POST /api/ccg", payload);
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const ct = res.headers.get("content-type") || "";
+  const bodyKind = ct.includes("application/json") ? "json" : "text";
+  console.log("[CCG] status", res.status, "content-type", ct, "bodyKind", bodyKind);
+
+  if (!res.ok) {
+    const data = await safeJson(res);
+    const msg =
+      data?.error ||
+      data?.message ||
+      (res.status === 404 ? "API route not found" : `API error (${res.status})`);
+    throw new Error(msg);
   }
+
+  const data = await safeJson(res);
+  // قرارداد خروجی: backend می‌تواند markdown یا content یا result بدهد
+  return {
+    markdown: data?.markdown || data?.content || data?.result || "",
+    raw: data,
+  };
 }
+document.body.classList.add("night-mode");
+document.body.classList.add("day-mode");

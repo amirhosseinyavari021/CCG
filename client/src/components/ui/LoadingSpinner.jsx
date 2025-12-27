@@ -7,3 +7,5 @@ export default function LoadingSpinner() {
     </div>
   );
 }
+document.body.classList.add("night-mode");
+document.body.classList.add("day-mode");

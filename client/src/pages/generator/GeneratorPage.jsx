@@ -1,1080 +1,357 @@
-// client/src/pages/generator/GeneratorPage.jsx
-// NOTE: This file intentionally contains all UI parts in one place (Generator + Comparator + Error Analyzer Modal)
-// to keep structure stable and avoid missing imports while you finalize "Home" before Auth/Dashboard.
-
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import MainLayout from "../../components/layout/MainLayout";
+import { useEffect, useMemo, useState } from "react";
 import { useLanguage } from "../../context/LanguageContext";
-import { generateCommand, compareCode, analyzeError } from "../../services/aiService";
-import MarkdownBox from "../../components/ui/MarkdownBox";
+import { callCCG } from "../../services/aiService";
+import SectionedMarkdown from "../../components/ui/SectionedMarkdown";
 
-/* =======================================================================================
-  UI Helpers (Button / Badge / Tooltip / Modal / Cards)
-======================================================================================= */
+const PLATFORM_OPTIONS = [
+  { value: "linux", label: "Linux" },
+  { value: "windows", label: "Windows" },
+  { value: "mac", label: "macOS" },
+  { value: "network", label: "Network Device" },
+];
 
-function cx(...arr) {
-  return arr.filter(Boolean).join(" ");
-}
+const SHELL_BY_PLATFORM = {
+  linux: [
+    { value: "bash", label: "bash" },
+    { value: "zsh", label: "zsh" },
+    { value: "sh", label: "sh" },
+  ],
+  mac: [
+    { value: "zsh", label: "zsh (default)" },
+    { value: "bash", label: "bash" },
+  ],
+  windows: [
+    { value: "powershell", label: "PowerShell" },
+    { value: "cmd", label: "CMD" },
+  ],
+};
 
-/** ✅ Tooltip that stays readable + doesn't get clipped */
-function HelpTip({ text }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+const NETWORK_VENDORS = [
+  { value: "cisco", label: "Cisco" },
+  { value: "fortinet_fortigate", label: "Fortinet FortiGate" },
+  { value: "mikrotik", label: "MikroTik" },
+];
+
+const DEVICE_TYPES_BY_VENDOR = {
+  cisco: [
+    { value: "router", label: "Router" },
+    { value: "switch", label: "Switch" },
+    { value: "firewall", label: "Firewall" },
+  ],
+  fortinet_fortigate: [
+    { value: "firewall", label: "Firewall" },
+    { value: "utm", label: "UTM" },
+  ],
+  mikrotik: [
+    { value: "router", label: "Router" },
+    { value: "switch", label: "Switch" },
+    { value: "firewall", label: "Firewall" },
+  ],
+};
+
+export default function GeneratorPage() {
+  const { t, lang } = useLanguage();
+
+  const [platform, setPlatform] = useState("linux");
+  const [outputType, setOutputType] = useState("command"); // command | python
+  const [mode, setMode] = useState("learn"); // learn | operational
+  const [level, setLevel] = useState("beginner"); // beginner | intermediate | expert
+
+  const [shell, setShell] = useState("bash");
+  const [vendor, setVendor] = useState(NETWORK_VENDORS[0].value);
+  const [deviceType, setDeviceType] = useState(DEVICE_TYPES_BY_VENDOR[NETWORK_VENDORS[0].value][0].value);
+
+  const [input, setInput] = useState("");
+  const [output, setOutput] = useState("");
+
+  const [loading, setLoading] = useState(false);
+  const [apiErr, setApiErr] = useState("");
+
+  const [swapLayout, setSwapLayout] = useState(false);
+
+  const shellOptions = useMemo(
+    () => (platform === "network" ? [] : SHELL_BY_PLATFORM[platform] || []),
+    [platform]
+  );
+
+  const deviceTypeOptions = useMemo(() => DEVICE_TYPES_BY_VENDOR[vendor] || [], [vendor]);
 
   useEffect(() => {
-    function onDoc(e) {
-      if (!ref.current) return;
-      if (!ref.current.contains(e.target)) setOpen(false);
+    if (platform === "network") return;
+    const ok = shellOptions.some((o) => o.value === shell);
+    if (!ok) setShell(shellOptions[0]?.value || "");
+  }, [platform, shellOptions, shell]);
+
+  useEffect(() => {
+    if (platform !== "network") return;
+    const ok = deviceTypeOptions.some((o) => o.value === deviceType);
+    if (!ok) setDeviceType(deviceTypeOptions[0]?.value || "");
+  }, [platform, vendor, deviceTypeOptions, deviceType]);
+
+  const openErrorAnalyzer = () => {
+    window.dispatchEvent(
+      new CustomEvent("open-error-analyzer", {
+        detail: { command: input || "", context: "" },
+      })
+    );
+  };
+
+  const payloadForGenerator = () => {
+    const isNetwork = platform === "network";
+    return {
+      mode: "generate",
+      lang: lang || "fa",
+
+      // important for backend
+      user_request: input.trim(),
+
+      // generator params
+      outputType: outputType, // "command" or "python"
+      modeStyle: mode, // learn/operational
+      knowledgeLevel: level,
+
+      platform: isNetwork ? "network" : platform,
+      os: isNetwork ? "network" : platform,
+      cli: isNetwork ? "network-cli" : shell,
+      vendor: isNetwork ? vendor : "",
+      deviceType: isNetwork ? deviceType : "general",
+    };
+  };
+
+  const generate = async () => {
+    if (!input.trim() || loading) return;
+    setLoading(true);
+    setApiErr("");
+    setOutput("");
+
+    try {
+      const res = await callCCG(payloadForGenerator());
+      const md = res?.markdown || res?.result || "";
+      setOutput(md);
+    } catch (e) {
+      setApiErr(e?.message || (lang === "fa" ? "خطا در ارتباط با API" : "API error"));
+    } finally {
+      setLoading(false);
     }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
+  };
 
   return (
-    <span ref={ref} className="relative inline-flex items-center">
-      <button
-        type="button"
-        onClick={() => setOpen((p) => !p)}
-        className="ccg-btn ccg-btn-ghost ccg-btn-xs"
-        style={{
-          padding: "2px 8px",
-          borderRadius: 999,
-          lineHeight: 1.4,
-          opacity: 0.9,
-        }}
-        aria-label="help"
-        title="help"
-      >
-        ?
-      </button>
+    <div className="space-y-8">
+      {/* Context Bar */}
+      <div className="ccg-container">
+        <div className="ccg-card px-4 sm:px-6 py-4">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+            {/* Platform */}
+            <FieldLabel label={t("platform")} tip={t("tip_platform")} />
+            <select
+              value={platform}
+              onChange={(e) => setPlatform(e.target.value)}
+              className="ccg-select text-sm"
+            >
+              {PLATFORM_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
 
-      {open ? (
-        <span
-          className="ccg-panel"
-          style={{
-            position: "absolute",
-            top: "110%",
-            right: 0,
-            minWidth: 260,
-            maxWidth: 340,
-            padding: 12,
-            zIndex: 9999,
-          }}
-        >
-          <span style={{ fontSize: 12, color: "var(--text)", opacity: 0.92 }}>
-            {text}
-          </span>
-        </span>
-      ) : null}
-    </span>
+            {/* Output Type */}
+            <FieldLabel label={t("outputType")} tip={t("tip_outputType")} />
+            <div className="flex rounded-xl border border-[var(--border)] p-1">
+              <Toggle active={outputType === "command"} onClick={() => setOutputType("command")}>
+                {t("commandShell")}
+              </Toggle>
+              <Toggle active={outputType === "python"} onClick={() => setOutputType("python")}>
+                {t("pythonAutomation")}
+              </Toggle>
+            </div>
+
+            {/* Shell / Network vendor */}
+            {platform === "network" ? (
+              <>
+                <FieldLabel label={t("vendor")} tip={t("tip_vendor")} />
+                <select
+                  value={vendor}
+                  onChange={(e) => setVendor(e.target.value)}
+                  className="ccg-select text-sm"
+                >
+                  {NETWORK_VENDORS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+
+                <FieldLabel label={t("deviceType")} tip={t("tip_deviceType")} />
+                <select
+                  value={deviceType}
+                  onChange={(e) => setDeviceType(e.target.value)}
+                  className="ccg-select text-sm"
+                >
+                  {deviceTypeOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </>
+            ) : (
+              <>
+                <FieldLabel label={t("cliShell")} tip={t("tip_cliShell")} />
+                <select
+                  value={shell}
+                  onChange={(e) => setShell(e.target.value)}
+                  className="ccg-select text-sm"
+                  disabled={outputType !== "command"}
+                  title={outputType !== "command" ? (lang === "fa" ? "در حالت پایتون غیرفعال است" : "Disabled on python output") : ""}
+                >
+                  {shellOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+
+            {/* Mode */}
+            <FieldLabel label={t("mode")} tip={t("tip_mode")} />
+            <div className="flex rounded-xl border border-[var(--border)] p-1">
+              <Toggle active={mode === "learn"} onClick={() => setMode("learn")}>
+                {t("learn")}
+              </Toggle>
+              <Toggle active={mode === "operational"} onClick={() => setMode("operational")}>
+                {t("operational")}
+              </Toggle>
+            </div>
+
+            {/* Knowledge */}
+            <FieldLabel label={t("knowledge")} tip={t("tip_knowledge")} />
+            <select value={level} onChange={(e) => setLevel(e.target.value)} className="ccg-select text-sm">
+              <option value="beginner">{t("beginner")}</option>
+              <option value="intermediate">{t("intermediate")}</option>
+              <option value="expert">{t("expert")}</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Grid */}
+      <div className="ccg-container">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-10">
+          {/* Input Card */}
+          <div
+            className={`ccg-card p-5 sm:p-8 ${swapLayout ? "order-2" : "order-1"}`}
+          >
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold">{t("inputs")}</h2>
+              <button
+                onClick={() => setSwapLayout((v) => !v)}
+                className="ccg-btn"
+                type="button"
+              >
+                ↔ {t("swapIO")}
+              </button>
+            </div>
+
+            <div className="mb-2">
+              <FieldLabel label={t("request")} tip={t("tip_request")} />
+            </div>
+
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={t("placeholderReq")}
+              className="ccg-textarea w-full h-52 sm:h-64 resize-none p-4 text-sm"
+            />
+
+            <button
+              className="mt-5 sm:mt-6 w-full ccg-btn-primary py-3"
+              disabled={!input.trim() || loading}
+              onClick={generate}
+              type="button"
+            >
+              {loading ? (lang === "fa" ? "در حال ساخت..." : "Generating...") : t("generate")}
+            </button>
+          </div>
+
+          {/* Output Card */}
+          <div
+            className={`ccg-card p-5 sm:p-8 ${swapLayout ? "order-1" : "order-2"}`}
+          >
+            <h2 className="text-lg font-semibold mb-4">{t("output")}</h2>
+
+            {apiErr ? (
+              <div className="ccg-error mb-4">
+                <div className="font-semibold mb-1">{lang === "fa" ? "خطا" : "Error"}</div>
+                <div className="text-sm">{apiErr}</div>
+              </div>
+            ) : null}
+
+            {output ? (
+              <SectionedMarkdown markdown={output} lang={lang} />
+            ) : (
+              <div className="text-sm text-slate-500 dark:text-slate-300/70">
+                {t("outputPlaceholder")}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Error Shortcut */}
+      <div className="ccg-container">
+        <div className="ccg-card p-5 sm:p-6 text-sm">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <span>⚠️ {t("errorShortcutText")}</span>
+            <button
+              className="ccg-btn w-full sm:w-auto"
+              type="button"
+              onClick={openErrorAnalyzer}
+            >
+              {t("openErrorAnalyzer")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
-function CopyBtn({ value, lang }) {
-  const [copied, setCopied] = useState(false);
-  async function onCopy() {
-    try {
-      await navigator.clipboard.writeText(value || "");
-      setCopied(true);
-      setTimeout(() => setCopied(false), 900);
-    } catch {
-      // ignore
-    }
-  }
+function Toggle({ active, children, onClick }) {
   return (
-    <button type="button" onClick={onCopy} className="ccg-btn ccg-btn-ghost ccg-btn-xs">
-      {copied ? (lang === "fa" ? "کپی شد" : "Copied") : (lang === "fa" ? "کپی" : "Copy")}
+    <button
+      onClick={onClick}
+      type="button"
+      className={`px-4 py-2 text-sm rounded-lg transition ${
+        active
+          ? "bg-blue-600 text-white"
+          : "text-slate-600 hover:bg-slate-100 dark:text-slate-200/80 dark:hover:bg-white/10"
+      }`}
+    >
+      {children}
     </button>
   );
 }
 
-function SectionTitle({ title, hint }) {
+function FieldLabel({ label, tip }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
-      <div style={{ fontSize: 18, fontWeight: 700 }}>{title}</div>
-      {hint ? <div style={{ fontSize: 12, color: "var(--muted)" }}>{hint}</div> : null}
+    <div className="flex items-center gap-2">
+      <span className="text-sm text-slate-700 dark:text-slate-200/80">{label}</span>
+      <span className="relative group">
+        <button
+          type="button"
+          className="w-5 h-5 rounded-full border text-xs text-slate-500 hover:bg-slate-50 dark:hover:bg-white/10 dark:border-white/10"
+          aria-label={`${label} help`}
+        >
+          ?
+        </button>
+        <span className="pointer-events-none absolute z-50 hidden group-hover:block top-7 left-1/2 -translate-x-1/2 w-72 rounded-lg border bg-white p-2 text-xs text-slate-700 shadow dark:bg-slate-950 dark:text-slate-100 dark:border-white/10">
+          {tip}
+        </span>
+      </span>
     </div>
   );
 }
-
-function Panel({ children, className, style }) {
-  return (
-    <div className={cx("ccg-panel", className)} style={{ padding: 18, ...style }}>
-      {children}
-    </div>
-  );
-}
-
-function Card({ title, right, children }) {
-  return (
-    <div className="ccg-card">
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 10 }}>
-        <div style={{ fontWeight: 700 }}>{title}</div>
-        {right || null}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-/** ✅ Modal (for Error Analyzer) */
-function Modal({ open, title, onClose, children, lang }) {
-  useEffect(() => {
-    function onKey(e) {
-      if (e.key === "Escape") onClose?.();
-    }
-    if (open) document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose?.();
-      }}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 99999,
-        background: "rgba(0,0,0,0.35)",
-        display: "grid",
-        placeItems: "center",
-        padding: 14,
-      }}
-    >
-      <div
-        className="ccg-panel"
-        style={{
-          width: "min(980px, 100%)",
-          maxHeight: "88vh",
-          overflow: "auto",
-          padding: 16,
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-          <div style={{ fontWeight: 800, fontSize: 16 }}>{title}</div>
-          <button type="button" className="ccg-btn ccg-btn-ghost ccg-btn-xs" onClick={onClose}>
-            {lang === "fa" ? "بستن" : "Close"}
-          </button>
-        </div>
-
-        <div style={{ marginTop: 14 }}>{children}</div>
-      </div>
-    </div>
-  );
-}
-
-/* =======================================================================================
-  Main Page
-======================================================================================= */
-
-export default function GeneratorPage() {
-  const { isRTL, lang } = useLanguage();
-
-  // views: generator | compare
-  const [view, setView] = useState("generator");
-
-  // shared
-  const [knowledgeLevel, setKnowledgeLevel] = useState("beginner"); // beginner|intermediate|expert
-
-  // generator inputs
-  const [platform, setPlatform] = useState("Linux");
-  const [cli, setCli] = useState("bash");
-  const [deviceType, setDeviceType] = useState("router"); // only for network platforms
-  const [mode, setMode] = useState("learn"); // learn|operational
-
-  // ✅ Python option: output/script type
-  const [scriptType, setScriptType] = useState("shell"); // shell|python
-
-  const [userRequest, setUserRequest] = useState("");
-
-  // compare inputs
-  const [codeLang, setCodeLang] = useState("bash"); // bash|python|powershell|cmd|...
-  const [codeA, setCodeA] = useState("");
-  const [codeB, setCodeB] = useState("");
-  const [swapAB, setSwapAB] = useState(false);
-
-  // output
-  const [loading, setLoading] = useState(false);
-  const [apiError, setApiError] = useState("");
-  const [result, setResult] = useState(null);
-  const [outputMarkdown, setOutputMarkdown] = useState("");
-
-  // error analyzer modal
-  const [errorModalOpen, setErrorModalOpen] = useState(false);
-  const [errorText, setErrorText] = useState("");
-  const [errorResult, setErrorResult] = useState(null);
-  const [errorLoading, setErrorLoading] = useState(false);
-  const [errorApiError, setErrorApiError] = useState("");
-
-  const normalizedPlatform = (platform || "").trim().toLowerCase();
-  const isNetwork = useMemo(() => ["cisco", "mikrotik", "fortigate"].includes(normalizedPlatform), [normalizedPlatform]);
-
-  // CLI options depending on platform
-  const cliOptions = useMemo(() => {
-    const map = {
-      Linux: ["bash", "zsh"],
-      macOS: ["zsh", "bash"],
-      Windows: ["powershell", "cmd"],
-      "Windows Server": ["powershell"],
-      Cisco: ["ios"],
-      MikroTik: ["routeros"],
-      FortiGate: ["fortios"],
-    };
-    const base = map[platform] || ["bash"];
-
-    // ✅ If scriptType is python, we force cli = python (script)
-    if (scriptType === "python") return ["python"];
-
-    // For shell mode, allow adding python as an extra option if you want (optional)
-    // but we keep it clean: python is scriptType, not shell.
-    return base;
-  }, [platform, scriptType]);
-
-  // keep CLI valid
-  useEffect(() => {
-    if (!cliOptions.includes(cli)) setCli(cliOptions[0]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cliOptions.join("|")]);
-
-  // reset deviceType when leaving network
-  useEffect(() => {
-    if (!isNetwork) setDeviceType("general");
-    if (isNetwork && (!deviceType || deviceType === "general")) setDeviceType("router");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isNetwork]);
-
-  // texts
-  const t = useMemo(() => {
-    const fa = {
-      headerHint: "Markdown + Copy + Safe Output",
-      inputs: "ورودی‌ها",
-      output: "خروجی",
-      generator: "Generator",
-      comparator: "Code Comparator",
-      openAnalyzer: "Error Analyzer",
-      platform: "پلتفرم",
-      cli: "CLI / Shell",
-      deviceType: "نوع دیوایس",
-      mode: "مود خروجی",
-      level: "سطح دانش",
-      request: "درخواست",
-      scriptType: "نوع خروجی",
-      shell: "Command / Shell",
-      python: "Python Automation",
-      learn: "Learn / آموزشی",
-      operational: "Operational / حرفه‌ای",
-      beginner: "Beginner / تازه‌کار",
-      intermediate: "Intermediate / متوسط",
-      expert: "Expert / حرفه‌ای",
-      generateBtn: "تولید خروجی",
-      compareBtn: "تحلیل و مقایسه",
-      codeA: "کد A",
-      codeB: "کد B",
-      swapAB: "Swap A ↔ B",
-      lang: "زبان کد",
-      outCommand: "Command",
-      outExplanation: "Explanation",
-      outAlternatives: "Alternatives (max 3)",
-      outWarnings: "Warnings",
-      outMarkdown: "Markdown Output",
-      empty: "اینجا خروجی نمایش داده می‌شود.",
-      apiError: "خطا در ارتباط با API",
-      fixWithAnalyzer: "اگر به ارور خوردی…",
-      fixWithAnalyzerSub: "Error Analyzer رو باز کن، لاگ/ارور رو بده، Root cause + Fix + Verification بگیر.",
-      open: "باز کردن",
-      close: "بستن",
-      run: "Run",
-      analyze: "تحلیل خطا",
-      errorInput: "لاگ / ارور / استک‌تریس",
-      placeholderReq: "مثلاً: می‌خوام اتصال اینترنت رو تست کنم / می‌خوام فضای دیسک رو بررسی کنم",
-      placeholderErr: "Paste کن: خروجی ترمینال، ارور برنامه، لاگ nginx/node، stack trace...",
-      deviceRouter: "روتر",
-      deviceSwitch: "سوییچ",
-      deviceFirewall: "فایروال",
-      tipPlatform: "سیستم‌عامل/دیوایس هدف که خروجی برای آن ساخته می‌شود.",
-      tipCli: "محیط اجرای دستور (Shell/CLI). اگر Python Automation انتخاب کنی، این خودش Python می‌شود.",
-      tipDevice: "برای خروجی دقیق‌تر روی تجهیزات شبکه (Router/Switch/Firewall).",
-      tipMode: "Learn: توضیح و آموزش بیشتر | Operational: خلاصه‌تر + هشدار دقیق‌تر برای محیط واقعی",
-      tipLevel: "عمق توضیح و تحلیل با این تنظیم تغییر می‌کند.",
-      tipScript: "Command/Shell خروجی دستورات | Python Automation خروجی اسکریپت اتوماسیون با Python",
-      tipCodeLang: "نوع زبان کد برای مقایسه (برای بک‌اند هم ارسال می‌شود).",
-      tipAnalyzer: "لاگ یا ارور رو بده تا علت، راه‌حل و مراحل Verify رو بگیری.",
-    };
-
-    const en = {
-      headerHint: "Markdown + Copy + Safe Output",
-      inputs: "Inputs",
-      output: "Output",
-      generator: "Generator",
-      comparator: "Code Comparator",
-      openAnalyzer: "Error Analyzer",
-      platform: "Platform",
-      cli: "CLI / Shell",
-      deviceType: "Device Type",
-      mode: "Output Mode",
-      level: "Knowledge Level",
-      request: "Request",
-      scriptType: "Output Type",
-      shell: "Command / Shell",
-      python: "Python Automation",
-      learn: "Learn",
-      operational: "Operational",
-      beginner: "Beginner",
-      intermediate: "Intermediate",
-      expert: "Expert",
-      generateBtn: "Generate Output",
-      compareBtn: "Compare & Analyze",
-      codeA: "Code A",
-      codeB: "Code B",
-      swapAB: "Swap A ↔ B",
-      lang: "Code Language",
-      outCommand: "Command",
-      outExplanation: "Explanation",
-      outAlternatives: "Alternatives (max 3)",
-      outWarnings: "Warnings",
-      outMarkdown: "Markdown Output",
-      empty: "Output will appear here.",
-      apiError: "API error",
-      fixWithAnalyzer: "If you hit an error…",
-      fixWithAnalyzerSub: "Open Error Analyzer, paste logs/errors, get root cause + fix + verification steps.",
-      open: "Open",
-      close: "Close",
-      run: "Run",
-      analyze: "Analyze Error",
-      errorInput: "Logs / Error / Stack trace",
-      placeholderReq: "e.g. I want to test internet connectivity / check disk usage",
-      placeholderErr: "Paste: terminal output, app error, nginx/node logs, stack trace...",
-      deviceRouter: "Router",
-      deviceSwitch: "Switch",
-      deviceFirewall: "Firewall",
-      tipPlatform: "Target OS / device to generate for.",
-      tipCli: "Shell/CLI environment. Python Automation forces python output.",
-      tipDevice: "Refines network device output (Router/Switch/Firewall).",
-      tipMode: "Learn: more guidance | Operational: concise + risk-focused warnings",
-      tipLevel: "Affects depth of explanation and analysis.",
-      tipScript: "Command/Shell generates commands | Python Automation generates python script automation",
-      tipCodeLang: "Code language for comparator (also sent to backend).",
-      tipAnalyzer: "Paste logs and get root cause + fix + verification steps.",
-    };
-
-    return lang === "fa" ? fa : en;
-  }, [lang]);
-
-  // reset output when view changes
-  useEffect(() => {
-    setApiError("");
-    setResult(null);
-    setOutputMarkdown("");
-  }, [view]);
-
-  // Submit actions
-  async function onRun() {
-    setApiError("");
-    setResult(null);
-    setOutputMarkdown("");
-
-    // validation
-    if (view === "generator" && !userRequest.trim()) return;
-    if (view === "compare" && (!codeA.trim() || !codeB.trim())) return;
-
-    setLoading(true);
-    try {
-      if (view === "generator") {
-        const payload = {
-          user_request: userRequest.trim(),
-          os: platform,
-          cli,
-          deviceType: isNetwork ? deviceType : "general",
-          lang,
-          mode, // learn | operational
-          knowledgeLevel, // beginner | intermediate | expert
-          scriptType, // shell | python  (✅ new)
-        };
-
-        const res = await generateCommand(payload);
-        setResult(res || null);
-
-        // prefer structured fields if present
-        const md = res?.outputMarkdown || res?.output || "";
-        setOutputMarkdown(md);
-
-        // if backend returns error-like content, open analyzer hint
-        // (optional behavior)
-      } else {
-        const payload = {
-          input_a: swapAB ? codeB : codeA,
-          input_b: swapAB ? codeA : codeB,
-          lang,
-          knowledgeLevel,
-          codeLang, // ✅ new
-        };
-        const res = await compareCode(payload);
-        setResult(res || null);
-        setOutputMarkdown(res?.outputMarkdown || res?.output || "");
-      }
-    } catch (e) {
-      const msg = e?.message || t.apiError;
-      setApiError(msg);
-
-      // ✅ if API errors, suggest analyzer (but do NOT auto open)
-      // You can choose to auto open:
-      // setErrorModalOpen(true);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function onAnalyzeError() {
-    setErrorApiError("");
-    setErrorResult(null);
-
-    if (!errorText.trim()) return;
-
-    setErrorLoading(true);
-    try {
-      const payload = {
-        lang,
-        knowledgeLevel,
-        os: platform,
-        cli: scriptType === "python" ? "python" : cli,
-        deviceType: isNetwork ? deviceType : "general",
-        error: errorText.trim(),
-        // hint fields
-        scriptType,
-      };
-      const res = await analyzeError(payload);
-      setErrorResult(res || null);
-    } catch (e) {
-      setErrorApiError(e?.message || t.apiError);
-    } finally {
-      setErrorLoading(false);
-    }
-  }
-
-  // Output helpers
-  const alternatives = useMemo(() => {
-    const arr = Array.isArray(result?.alternatives) ? result.alternatives : [];
-    return arr.slice(0, 3); // ✅ max 3
-  }, [result]);
-
-  const warnings = useMemo(() => {
-    const arr = Array.isArray(result?.warnings) ? result.warnings : [];
-    return arr;
-  }, [result]);
-
-  // Layout direction for main grid: keep stable, but allow RTL comfortable reading
-  const gridDir = isRTL ? "rtl" : "ltr";
-
-  /* =======================================================================================
-    Render: Inputs Panel
-  ======================================================================================= */
-
-  function ViewTabs() {
-    return (
-      <div
-        style={{
-          display: "flex",
-          gap: 10,
-          flexWrap: "wrap",
-          justifyContent: "center",
-          marginBottom: 14,
-        }}
-      >
-        <button
-          type="button"
-          className={cx("ccg-btn", view === "generator" ? "ccg-btn-primary" : "ccg-btn-ghost")}
-          onClick={() => setView("generator")}
-        >
-          {t.generator}
-        </button>
-
-        <button
-          type="button"
-          className={cx("ccg-btn", view === "compare" ? "ccg-btn-primary" : "ccg-btn-ghost")}
-          onClick={() => setView("compare")}
-        >
-          {t.comparator}
-        </button>
-
-        {/* ✅ Error Analyzer is NOT a tab: modal opener */}
-        <button
-          type="button"
-          className="ccg-btn ccg-btn-ghost"
-          onClick={() => setErrorModalOpen(true)}
-        >
-          {t.openAnalyzer}
-        </button>
-      </div>
-    );
-  }
-
-  function SharedControls() {
-    return (
-      <>
-        {/* Knowledge Level (shared) */}
-        <div style={{ display: "grid", gap: 8 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--muted)", fontSize: 13 }}>
-            {t.level}
-            <HelpTip text={t.tipLevel} />
-          </label>
-
-          <select className="ccg-select" value={knowledgeLevel} onChange={(e) => setKnowledgeLevel(e.target.value)}>
-            <option value="beginner">{t.beginner}</option>
-            <option value="intermediate">{t.intermediate}</option>
-            <option value="expert">{t.expert}</option>
-          </select>
-        </div>
-      </>
-    );
-  }
-
-  function GeneratorControls() {
-    return (
-      <div style={{ display: "grid", gap: 14 }}>
-        {/* Platform */}
-        <div style={{ display: "grid", gap: 8 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--muted)", fontSize: 13 }}>
-            {t.platform}
-            <HelpTip text={t.tipPlatform} />
-          </label>
-
-          <select className="ccg-select" value={platform} onChange={(e) => setPlatform(e.target.value)}>
-            <option>Linux</option>
-            <option>macOS</option>
-            <option>Windows</option>
-            <option>Windows Server</option>
-            <option>Cisco</option>
-            <option>MikroTik</option>
-            <option>FortiGate</option>
-          </select>
-        </div>
-
-        {/* Output Type: Shell vs Python */}
-        <div style={{ display: "grid", gap: 8 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--muted)", fontSize: 13 }}>
-            {t.scriptType}
-            <HelpTip text={t.tipScript} />
-          </label>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <button
-              type="button"
-              className={cx("ccg-btn", scriptType === "shell" ? "ccg-btn-primary" : "ccg-btn-ghost")}
-              onClick={() => setScriptType("shell")}
-            >
-              {t.shell}
-            </button>
-
-            <button
-              type="button"
-              className={cx("ccg-btn", scriptType === "python" ? "ccg-btn-primary" : "ccg-btn-ghost")}
-              onClick={() => setScriptType("python")}
-            >
-              {t.python}
-            </button>
-          </div>
-        </div>
-
-        {/* CLI */}
-        <div style={{ display: "grid", gap: 8 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--muted)", fontSize: 13 }}>
-            {t.cli}
-            <HelpTip text={t.tipCli} />
-          </label>
-
-          <select className="ccg-select" value={cli} onChange={(e) => setCli(e.target.value)}>
-            {cliOptions.map((x) => (
-              <option key={x} value={x}>
-                {x}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Device Type only for network */}
-        {isNetwork ? (
-          <div style={{ display: "grid", gap: 8 }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--muted)", fontSize: 13 }}>
-              {t.deviceType}
-              <HelpTip text={t.tipDevice} />
-            </label>
-
-            <select className="ccg-select" value={deviceType} onChange={(e) => setDeviceType(e.target.value)}>
-              <option value="router">{t.deviceRouter}</option>
-              <option value="switch">{t.deviceSwitch}</option>
-              <option value="firewall">{t.deviceFirewall}</option>
-            </select>
-          </div>
-        ) : null}
-
-        {/* Knowledge (shared) */}
-        <SharedControls />
-
-        {/* Mode */}
-        <div style={{ display: "grid", gap: 8 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--muted)", fontSize: 13 }}>
-            {t.mode}
-            <HelpTip text={t.tipMode} />
-          </label>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            <button
-              type="button"
-              className={cx("ccg-btn", mode === "learn" ? "ccg-btn-primary" : "ccg-btn-ghost")}
-              onClick={() => setMode("learn")}
-            >
-              {t.learn}
-            </button>
-            <button
-              type="button"
-              className={cx("ccg-btn", mode === "operational" ? "ccg-btn-primary" : "ccg-btn-ghost")}
-              onClick={() => setMode("operational")}
-            >
-              {t.operational}
-            </button>
-          </div>
-        </div>
-
-        {/* Request */}
-        <div style={{ display: "grid", gap: 8 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--muted)", fontSize: 13 }}>
-            {t.request}
-            <HelpTip text={lang === "fa" ? "هدفت رو طبیعی بنویس. خروجی دقیق‌تر می‌گیری." : "Describe the goal in natural language."} />
-          </label>
-
-          <textarea
-            className="ccg-textarea"
-            style={{ minHeight: 170, resize: "vertical" }}
-            dir={lang === "fa" ? "rtl" : "ltr"}
-            value={userRequest}
-            onChange={(e) => setUserRequest(e.target.value)}
-            placeholder={t.placeholderReq}
-          />
-        </div>
-
-        {/* Run */}
-        <button
-          type="button"
-          className={cx("ccg-btn", "ccg-btn-primary")}
-          onClick={onRun}
-          disabled={loading}
-          style={{ opacity: loading ? 0.75 : 1 }}
-        >
-          {loading ? (lang === "fa" ? "در حال پردازش..." : "Working...") : t.generateBtn}
-        </button>
-
-        {/* API error */}
-        {apiError ? (
-          <div className="ccg-error">
-            <div style={{ fontWeight: 800, marginBottom: 6 }}>{t.apiError}</div>
-            <div style={{ opacity: 0.9 }}>{String(apiError)}</div>
-            <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
-              <button type="button" className="ccg-btn ccg-btn-ghost" onClick={() => setErrorModalOpen(true)}>
-                {t.openAnalyzer}
-              </button>
-            </div>
-          </div>
-        ) : null}
-
-        {/* Error analyzer hint card (not a tab) */}
-        <div
-          className="ccg-card"
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: 12,
-            alignItems: "center",
-          }}
-        >
-          <div>
-            <div style={{ fontWeight: 800 }}>{t.fixWithAnalyzer}</div>
-            <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 6 }}>{t.fixWithAnalyzerSub}</div>
-          </div>
-
-          <button type="button" className="ccg-btn" onClick={() => setErrorModalOpen(true)}>
-            {t.open}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  function ComparatorControls() {
-    return (
-      <div style={{ display: "grid", gap: 14 }}>
-        {/* ✅ Only knowledge (shared) */}
-        <SharedControls />
-
-        {/* Code language */}
-        <div style={{ display: "grid", gap: 8 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--muted)", fontSize: 13 }}>
-            {t.lang}
-            <HelpTip text={t.tipCodeLang} />
-          </label>
-
-          <select className="ccg-select" value={codeLang} onChange={(e) => setCodeLang(e.target.value)}>
-            <option value="bash">bash</option>
-            <option value="python">python</option>
-            <option value="powershell">powershell</option>
-            <option value="cmd">cmd</option>
-            <option value="yaml">yaml</option>
-            <option value="json">json</option>
-          </select>
-        </div>
-
-        {/* Editors side-by-side */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 12,
-          }}
-        >
-          <div style={{ display: "grid", gap: 8 }}>
-            <div style={{ fontSize: 13, color: "var(--muted)" }}>{t.codeA}</div>
-            <textarea
-              className="ccg-textarea"
-              dir="ltr"
-              style={{ minHeight: 190, resize: "vertical" }}
-              value={swapAB ? codeB : codeA}
-              onChange={(e) => {
-                if (swapAB) setCodeB(e.target.value);
-                else setCodeA(e.target.value);
-              }}
-              placeholder={codeLang === "python" ? "# code A (python)" : "# code A"}
-            />
-          </div>
-
-          <div style={{ display: "grid", gap: 8 }}>
-            <div style={{ fontSize: 13, color: "var(--muted)" }}>{t.codeB}</div>
-            <textarea
-              className="ccg-textarea"
-              dir="ltr"
-              style={{ minHeight: 190, resize: "vertical" }}
-              value={swapAB ? codeA : codeB}
-              onChange={(e) => {
-                if (swapAB) setCodeA(e.target.value);
-                else setCodeB(e.target.value);
-              }}
-              placeholder={codeLang === "python" ? "# code B (python)" : "# code B"}
-            />
-          </div>
-        </div>
-
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "space-between" }}>
-          <button type="button" className="ccg-btn" onClick={() => setSwapAB((p) => !p)}>
-            {t.swapAB}
-          </button>
-
-          <button type="button" className="ccg-btn ccg-btn-primary" onClick={onRun} disabled={loading}>
-            {loading ? (lang === "fa" ? "در حال پردازش..." : "Working...") : t.compareBtn}
-          </button>
-        </div>
-
-        {apiError ? (
-          <div className="ccg-error">
-            <div style={{ fontWeight: 800, marginBottom: 6 }}>{t.apiError}</div>
-            <div style={{ opacity: 0.9 }}>{String(apiError)}</div>
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
-  /* =======================================================================================
-    Render: Output Panel
-  ======================================================================================= */
-
-  function OutputPanel() {
-    return (
-      <div style={{ display: "grid", gap: 12 }}>
-        {/* Structured output (when backend sends it) */}
-        {result?.command ? (
-          <Card title={t.outCommand} right={<CopyBtn value={result.command} lang={lang} />}>
-            <div className="ccg-codeblock">
-              <div className="ccg-codeblock-head">
-                <div className="ccg-codeblock-title">{scriptType === "python" ? "PYTHON" : "COMMAND"}</div>
-                <CopyBtn value={result.command} lang={lang} />
-              </div>
-              <pre className="ccg-pre">
-                <code dir="ltr">{String(result.command)}</code>
-              </pre>
-            </div>
-          </Card>
-        ) : null}
-
-        {result?.explanation ? (
-          <Card title={t.outExplanation}>
-            <div className={lang === "fa" ? "rtl" : "ltr"} style={{ whiteSpace: "pre-wrap", lineHeight: 1.9 }}>
-              {String(result.explanation)}
-            </div>
-          </Card>
-        ) : null}
-
-        {alternatives?.length ? (
-          <Card title={t.outAlternatives}>
-            <div style={{ display: "grid", gap: 10 }}>
-              {alternatives.map((item, idx) => (
-                <div key={idx} className="ccg-codeblock">
-                  <div className="ccg-codeblock-head">
-                    <div className="ccg-codeblock-title">{lang === "fa" ? `گزینه ${idx + 1}` : `Option ${idx + 1}`}</div>
-                    <CopyBtn value={String(item)} lang={lang} />
-                  </div>
-                  <pre className="ccg-pre">
-                    <code dir="ltr">{String(item)}</code>
-                  </pre>
-                </div>
-              ))}
-            </div>
-          </Card>
-        ) : null}
-
-        {warnings?.length ? (
-          <div className="ccg-error">
-            <div style={{ fontWeight: 900, marginBottom: 8 }}>{t.outWarnings}</div>
-            <ul style={{ margin: 0, paddingInlineStart: 20, lineHeight: 1.9 }}>
-              {warnings.map((w, idx) => (
-                <li key={idx}>{String(w)}</li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        {/* Markdown output always available */}
-        <Card title={t.outMarkdown} right={<CopyBtn value={outputMarkdown || ""} lang={lang} />}>
-          {outputMarkdown ? (
-            <MarkdownBox markdown={outputMarkdown} lang={lang} />
-          ) : (
-            <div style={{ color: "var(--muted)" }}>{t.empty}</div>
-          )}
-        </Card>
-      </div>
-    );
-  }
-
-  /* =======================================================================================
-    Error Analyzer Modal content
-  ======================================================================================= */
-
-  function ErrorAnalyzerBody() {
-    return (
-      <div style={{ display: "grid", gap: 12 }}>
-        <div className="ccg-card">
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-            <div>
-              <div style={{ fontWeight: 900 }}>{t.analyze}</div>
-              <div style={{ marginTop: 6, color: "var(--muted)", fontSize: 13 }}>{t.tipAnalyzer}</div>
-            </div>
-            <button type="button" className="ccg-btn" onClick={() => setErrorText(apiError ? String(apiError) : "")}>
-              {lang === "fa" ? "Paste API Error" : "Paste API Error"}
-            </button>
-          </div>
-        </div>
-
-        <div style={{ display: "grid", gap: 8 }}>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--muted)", fontSize: 13 }}>
-            {t.errorInput}
-          </label>
-          <textarea
-            className="ccg-textarea"
-            style={{ minHeight: 170, resize: "vertical" }}
-            dir="ltr"
-            value={errorText}
-            onChange={(e) => setErrorText(e.target.value)}
-            placeholder={t.placeholderErr}
-          />
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" }}>
-          <button type="button" className="ccg-btn" onClick={() => setErrorText("")}>
-            {lang === "fa" ? "پاک کردن" : "Clear"}
-          </button>
-          <button type="button" className="ccg-btn ccg-btn-primary" onClick={onAnalyzeError} disabled={errorLoading}>
-            {errorLoading ? (lang === "fa" ? "در حال تحلیل..." : "Analyzing...") : t.analyze}
-          </button>
-        </div>
-
-        {errorApiError ? (
-          <div className="ccg-error">
-            <div style={{ fontWeight: 900, marginBottom: 6 }}>{t.apiError}</div>
-            <div>{String(errorApiError)}</div>
-          </div>
-        ) : null}
-
-        {errorResult ? (
-          <div style={{ display: "grid", gap: 12 }}>
-            {/* If backend returns structured fields, render them, else markdown */}
-            {errorResult?.rootCause || errorResult?.fix ? (
-              <>
-                {errorResult?.rootCause ? (
-                  <Card title={lang === "fa" ? "Root Cause" : "Root Cause"}>
-                    <div className={lang === "fa" ? "rtl" : "ltr"} style={{ whiteSpace: "pre-wrap", lineHeight: 1.9 }}>
-                      {String(errorResult.rootCause)}
-                    </div>
-                  </Card>
-                ) : null}
-
-                {errorResult?.fix ? (
-                  <Card title={lang === "fa" ? "Fix" : "Fix"}>
-                    <div className={lang === "fa" ? "rtl" : "ltr"} style={{ whiteSpace: "pre-wrap", lineHeight: 1.9 }}>
-                      {String(errorResult.fix)}
-                    </div>
-                  </Card>
-                ) : null}
-
-                {errorResult?.verify ? (
-                  <Card title={lang === "fa" ? "Verification Steps" : "Verification Steps"}>
-                    <MarkdownBox markdown={String(errorResult.verify)} lang={lang} />
-                  </Card>
-                ) : null}
-              </>
-            ) : (
-              <Card title={lang === "fa" ? "Analysis Output" : "Analysis Output"}>
-                <MarkdownBox markdown={errorResult?.outputMarkdown || errorResult?.output || JSON.stringify(errorResult, null, 2)} lang={lang} />
-              </Card>
-            )}
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
-  /* =======================================================================================
-    Page Layout
-  ======================================================================================= */
-
-  return (
-    <MainLayout>
-      <div dir={gridDir} style={{ display: "grid", gap: 18 }}>
-        {/* Top tabs */}
-        <ViewTabs />
-
-        <div
-          style={{
-            display: "grid",
-            gap: 16,
-            gridTemplateColumns: "1fr",
-          }}
-        >
-          {/* Responsive split */}
-          <div
-            style={{
-              display: "grid",
-              gap: 16,
-              gridTemplateColumns: "1fr",
-            }}
-          >
-            {/* two columns on wide screens */}
-            <div
-              style={{
-                display: "grid",
-                gap: 16,
-                gridTemplateColumns: "1fr",
-              }}
-            >
-              {/* we use CSS media using inline approach: keep simple, let MainLayout handle container width */}
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gap: 16,
-            gridTemplateColumns: "1fr",
-          }}
-        >
-          {/* ✅ Main grid: 2 columns on desktop */}
-          <div
-            style={{
-              display: "grid",
-              gap: 16,
-              gridTemplateColumns: "1fr",
-            }}
-          >
-            {/* Use a min-width trick: */}
-            <div
-              style={{
-                display: "grid",
-                gap: 16,
-                gridTemplateColumns: "1fr",
-              }}
-            />
-          </div>
-
-          {/* We do the actual responsive split with a simple CSS-like logic: */}
-          <div
-            style={{
-              display: "grid",
-              gap: 16,
-              gridTemplateColumns: "1fr",
-            }}
-          >
-            {/* Fallback for older browsers: */}
-          </div>
-        </div>
-
-        {/* ✅ Actual responsive grid */}
-        <div
-          style={{
-            display: "grid",
-            gap: 16,
-            gridTemplateColumns: "1fr",
-          }}
-        >
-          <div
-            style={{
-              display: "grid",
-              gap: 16,
-              gridTemplateColumns: "1fr",
-            }}
-          />
-        </div>
-
-        {/* ✅ Final layout (simple & reliable): */}
-        <div
-          style={{
-            display: "grid",
-            gap: 16,
-            gridTemplateColumns: "1fr",
-          }}
-        >
-          {/* Desktop split using minmax with inline style and media-ish via clamp: */}
-          <div
-            style={{
-              display: "grid",
-              gap: 16,
-              gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
-              alignItems: "start",
-            }}
-          >
-            <Panel>
-              <SectionTitle title={t.inputs} hint={t.headerHint} />
-              {view === "generator" ? <GeneratorControls /> : <ComparatorControls />}
-            </Panel>
-
-            <Panel>
-              <SectionTitle title={t.output} hint={t.headerHint} />
-              <OutputPanel />
-            </Panel>
-          </div>
-        </div>
-
-        {/* Error Analyzer Modal */}
-        <Modal
-          open={errorModalOpen}
-          title={t.openAnalyzer}
-          onClose={() => setErrorModalOpen(false)}
-          lang={lang}
-        >
-          <ErrorAnalyzerBody />
-        </Modal>
-      </div>
-    </MainLayout>
-  );
-}
+document.body.classList.add("night-mode");
+document.body.classList.add("day-mode");

@@ -1,24 +1,13 @@
-// client/src/components/layout/MainLayout.jsx
 import { useLanguage } from "../../context/LanguageContext";
-import Header from "../shared/Header";
-import Footer from "../shared/Footer";
 
 export default function MainLayout({ children }) {
-  const { isRTL } = useLanguage();
+  const { lang } = useLanguage();
 
   return (
-    <div
-      className="min-h-screen bg-[var(--bg-main)] text-[var(--text)]"
-      dir={isRTL ? "rtl" : "ltr"}
-    >
-      <Header />
-
-      {/* ✅ فاصله درست زیر هدر */}
-      <main className="mx-auto w-full max-w-6xl px-4 pt-24 pb-20">
-        {children}
-      </main>
-
-      <Footer />
+    <div dir={lang === "fa" ? "rtl" : "ltr"} className="min-h-screen">
+      {children}
     </div>
   );
 }
+document.body.classList.add("night-mode");
+document.body.classList.add("day-mode");

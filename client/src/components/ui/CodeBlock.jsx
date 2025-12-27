@@ -29,3 +29,5 @@ export default function CodeBlock({ title = "Command", code = "" }) {
     </div>
   );
 }
+document.body.classList.add("night-mode");
+document.body.classList.add("day-mode");

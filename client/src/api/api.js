@@ -11,3 +11,5 @@ const api = axios.create({
 
 export default api;
 
+document.body.classList.add("night-mode");
+document.body.classList.add("day-mode");

@@ -1,0 +1,560 @@
+===== CCG DEBUG DUMP @ 20251226_085349 =====
+PWD: /home/cando/CCG
+
+----- PM2 status -----
+┌────┬────────┬─────────────┬─────────┬─────────┬──────────┬────────┬──────┬───────────┬──────────┬──────────┬──────────┬──────────┐
+│ id │ name   │ namespace   │ version │ mode    │ pid      │ uptime │ ↺    │ status    │ cpu      │ mem      │ user     │ watching │
+├────┼────────┼─────────────┼─────────┼─────────┼──────────┼────────┼──────┼───────────┼──────────┼──────────┼──────────┼──────────┤
+│ 0  │ ccg    │ default     │ 3.2.0   │ fork    │ 210109   │ 35m    │ 72   │ online    │ 0%       │ 76.2mb   │ cando    │ disabled │
+└────┴────────┴─────────────┴─────────┴─────────┴──────────┴────────┴──────┴───────────┴──────────┴──────────┴──────────┴──────────┘
+
+----- PM2 logs (last 200 lines, no stream) -----
+[TAILING] Tailing last 200 lines for [ccg] process (change the value with --lines option)
+/home/cando/.pm2/logs/ccg-error.log last 200 lines:
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | TypeError: Cannot read properties of undefined (reading 'body')
+0|ccg      |     at domainGuard (file:///home/cando/CCG/server/middleware/domainGuard.js:2:22)
+0|ccg      |     at file:///home/cando/CCG/server.js:42:9
+0|ccg      |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+0|ccg      |     at async ModuleLoader.import (node:internal/modules/esm/loader:606:24)
+0|ccg      | Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/home/cando/CCG/server/middleware/domainGuard.js' imported from /home/cando/CCG/server.js
+0|ccg      |     at finalizeResolution (node:internal/modules/esm/resolve:283:11)
+0|ccg      |     at moduleResolve (node:internal/modules/esm/resolve:952:10)
+0|ccg      |     at defaultResolve (node:internal/modules/esm/resolve:1188:11)
+0|ccg      |     at ModuleLoader.defaultResolve (node:internal/modules/esm/loader:708:12)
+0|ccg      |     at #cachedDefaultResolve (node:internal/modules/esm/loader:657:25)
+0|ccg      |     at ModuleLoader.resolve (node:internal/modules/esm/loader:640:38)
+0|ccg      |     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:264:38)
+0|ccg      |     at ModuleJob._link (node:internal/modules/esm/module_job:168:49) {
+0|ccg      |   code: 'ERR_MODULE_NOT_FOUND',
+0|ccg      |   url: 'file:///home/cando/CCG/server/middleware/domainGuard.js'
+0|ccg      | }
+0|ccg      | CCG route error: TypeError: fetch failed
+0|ccg      |     at node:internal/deps/undici/undici:14900:13
+0|ccg      |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|ccg      |     at async callOpenAI (file:///home/cando/CCG/server/utils/aiClient.js:36:16)
+0|ccg      |     at async runAI (file:///home/cando/CCG/server/utils/aiClient.js:58:20)
+0|ccg      |     at async file:///home/cando/CCG/server/routes/ccgRoutes.js:41:16 {
+0|ccg      |   [cause]: ConnectTimeoutError: Connect Timeout Error (attempted address: api.openai.com:443, timeout: 10000ms)
+0|ccg      |       at onConnectTimeout (node:internal/deps/undici/undici:2718:28)
+0|ccg      |       at Immediate._onImmediate (node:internal/deps/undici/undici:2699:11)
+0|ccg      |       at process.processImmediate (node:internal/timers:483:21) {
+0|ccg      |     code: 'UND_ERR_CONNECT_TIMEOUT',
+0|ccg      |     [Symbol(undici.error.UND_ERR)]: true,
+0|ccg      |     [Symbol(undici.error.UND_ERR_CONNECT_TIMEOUT)]: true
+0|ccg      |   }
+0|ccg      | }
+0|ccg      | CCG route error: TypeError: fetch failed
+0|ccg      |     at node:internal/deps/undici/undici:14900:13
+0|ccg      |     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+0|ccg      |     at async callOpenAI (file:///home/cando/CCG/server/utils/aiClient.js:36:16)
+0|ccg      |     at async runAI (file:///home/cando/CCG/server/utils/aiClient.js:58:20)
+0|ccg      |     at async file:///home/cando/CCG/server/routes/ccgRoutes.js:41:16 {
+0|ccg      |   [cause]: ConnectTimeoutError: Connect Timeout Error (attempted address: api.openai.com:443, timeout: 10000ms)
+0|ccg      |       at onConnectTimeout (node:internal/deps/undici/undici:2718:28)
+0|ccg      |       at Immediate._onImmediate (node:internal/deps/undici/undici:2699:11)
+0|ccg      |       at process.processImmediate (node:internal/timers:483:21) {
+0|ccg      |     code: 'UND_ERR_CONNECT_TIMEOUT',
+0|ccg      |     [Symbol(undici.error.UND_ERR)]: true,
+0|ccg      |     [Symbol(undici.error.UND_ERR_CONNECT_TIMEOUT)]: true
+0|ccg      |   }
+0|ccg      | }
+
+/home/cando/.pm2/logs/ccg-out.log last 200 lines:
+0|ccg      |   id: 'resp_0384eaf62ef429200069446f21194c8197977f0696de83b3c9',
+0|ccg      |   object: 'response',
+0|ccg      |   created_at: 1766092577,
+0|ccg      |   status: 'completed',
+0|ccg      |   background: false,
+0|ccg      |   billing: { payer: 'developer' },
+0|ccg      |   completed_at: 1766092579,
+0|ccg      |   error: null,
+0|ccg      |   incomplete_details: null,
+0|ccg      |   instructions: null,
+0|ccg      |   max_output_tokens: null,
+0|ccg      |   max_tool_calls: null,
+0|ccg      |   model: 'gpt-4.1-2025-04-14',
+0|ccg      |   output: [
+0|ccg      |     {
+0|ccg      |       id: 'msg_0384eaf62ef429200069446f21d8e48197bda845318ab7754d',
+0|ccg      |       type: 'message',
+0|ccg      |       status: 'completed',
+0|ccg      |       content: [Array],
+0|ccg      |       role: 'assistant'
+0|ccg      |     }
+0|ccg      |   ],
+0|ccg      |   parallel_tool_calls: true,
+0|ccg      |   previous_response_id: null,
+0|ccg      |   prompt_cache_key: null,
+0|ccg      |   prompt_cache_retention: null,
+0|ccg      |   reasoning: { effort: null, summary: null },
+0|ccg      |   safety_identifier: null,
+0|ccg      |   service_tier: 'default',
+0|ccg      |   store: true,
+0|ccg      |   temperature: 1,
+0|ccg      |   text: { format: { type: 'text' }, verbosity: 'medium' },
+0|ccg      |   tool_choice: 'auto',
+0|ccg      |   tools: [],
+0|ccg      |   top_logprobs: 0,
+0|ccg      |   top_p: 1,
+0|ccg      |   truncation: 'disabled',
+0|ccg      |   usage: {
+0|ccg      |     input_tokens: 199,
+0|ccg      |     input_tokens_details: { cached_tokens: 0 },
+0|ccg      |     output_tokens: 76,
+0|ccg      |     output_tokens_details: { reasoning_tokens: 0 },
+0|ccg      |     total_tokens: 275
+0|ccg      |   },
+0|ccg      |   user: null,
+0|ccg      |   metadata: {}
+0|ccg      | }
+0|ccg      | AI RAW: {
+0|ccg      |   id: 'resp_0b67e5e75560f1100069446f479784819d843bc35e10184047',
+0|ccg      |   object: 'response',
+0|ccg      |   created_at: 1766092615,
+0|ccg      |   status: 'completed',
+0|ccg      |   background: false,
+0|ccg      |   billing: { payer: 'developer' },
+0|ccg      |   completed_at: 1766092618,
+0|ccg      |   error: null,
+0|ccg      |   incomplete_details: null,
+0|ccg      |   instructions: null,
+0|ccg      |   max_output_tokens: null,
+0|ccg      |   max_tool_calls: null,
+0|ccg      |   model: 'gpt-4.1-2025-04-14',
+0|ccg      |   output: [
+0|ccg      |     {
+0|ccg      |       id: 'msg_0b67e5e75560f1100069446f48174c819d94ad681a7290cc49',
+0|ccg      |       type: 'message',
+0|ccg      |       status: 'completed',
+0|ccg      |       content: [Array],
+0|ccg      |       role: 'assistant'
+0|ccg      |     }
+0|ccg      |   ],
+0|ccg      |   parallel_tool_calls: true,
+0|ccg      |   previous_response_id: null,
+0|ccg      |   prompt_cache_key: null,
+0|ccg      |   prompt_cache_retention: null,
+0|ccg      |   reasoning: { effort: null, summary: null },
+0|ccg      |   safety_identifier: null,
+0|ccg      |   service_tier: 'default',
+0|ccg      |   store: true,
+0|ccg      |   temperature: 1,
+0|ccg      |   text: { format: { type: 'text' }, verbosity: 'medium' },
+0|ccg      |   tool_choice: 'auto',
+0|ccg      |   tools: [],
+0|ccg      |   top_logprobs: 0,
+0|ccg      |   top_p: 1,
+0|ccg      |   truncation: 'disabled',
+0|ccg      |   usage: {
+0|ccg      |     input_tokens: 200,
+0|ccg      |     input_tokens_details: { cached_tokens: 0 },
+0|ccg      |     output_tokens: 91,
+0|ccg      |     output_tokens_details: { reasoning_tokens: 0 },
+0|ccg      |     total_tokens: 291
+0|ccg      |   },
+0|ccg      |   user: null,
+0|ccg      |   metadata: {}
+0|ccg      | }
+0|ccg      | ✅ MongoDB connected
+0|ccg      | 🚀 CCG API running on port 50000 (production)
+0|ccg      | 🛑 Received SIGINT. Shutting down gracefully...
+0|ccg      | 🧹 HTTP server closed
+0|ccg      | ✅ MongoDB connected
+0|ccg      | 🚀 CCG API running on port 50000 (production)
+0|ccg      | 192.168.150.1 - - [19/Dec/2025:11:35:04 +0000] "GET /api/health HTTP/1.1" 200 79 "-" "curl/8.5.0"
+0|ccg      | 192.168.150.1 - - [19/Dec/2025:11:35:21 +0000] "POST /api/ccg HTTP/1.1" 200 2203 "-" "curl/8.5.0"
+0|ccg      | 217.218.35.199 - - [19/Dec/2025:13:32:55 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 217.218.35.199 - - [19/Dec/2025:13:33:19 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 217.218.35.199 - - [19/Dec/2025:13:33:40 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 217.218.35.199 - - [19/Dec/2025:13:34:22 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 217.218.35.199 - - [19/Dec/2025:13:35:57 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 51.158.254.163 - - [19/Dec/2025:14:47:12 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 51.158.254.162 - - [19/Dec/2025:14:53:59 +0000] "POST /api/ccg HTTP/1.1" 500 68 "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 51.158.254.162 - - [19/Dec/2025:14:54:15 +0000] "POST /api/ccg HTTP/1.1" 500 68 "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 78.153.140.151 - - [19/Dec/2025:16:32:55 +0000] "GET /api/.env HTTP/1.1" 403 61 "-" "Mozilla/5.0 (Linux; Android 6.0.1; SM-J700F Build/MMB29K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.83 Mobile Safari/537.36"
+0|ccg      | 192.168.150.1 - - [19/Dec/2025:17:53:56 +0000] "POST /api/ccg HTTP/1.1" 200 2057 "-" "curl/8.5.0"
+0|ccg      | 217.218.35.199 - - [19/Dec/2025:17:55:07 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 192.168.150.1 - - [19/Dec/2025:18:02:38 +0000] "POST /api/ccg HTTP/1.1" 200 3854 "-" "curl/8.5.0"
+0|ccg      | 217.218.34.202 - - [19/Dec/2025:20:11:25 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 88.151.33.203 - - [19/Dec/2025:21:12:36 +0000] "GET /api/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 403 61 "-" "libredtail-http"
+0|ccg      | 93.117.123.48 - - [19/Dec/2025:23:05:00 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 62.60.131.239 - - [20/Dec/2025:05:01:20 +0000] "POST /api/login HTTP/1.1" 403 61 "-" "Mozilla/5.0 (X11; Linux x86_64; rv:145.0) Gecko/20100101 Firefox/145.0"
+0|ccg      | 62.60.131.239 - - [20/Dec/2025:05:01:23 +0000] "POST /api/health HTTP/1.1" 403 61 "-" "Mozilla/5.0 (X11; Linux x86_64; rv:145.0) Gecko/20100101 Firefox/145.0"
+0|ccg      | 62.60.131.239 - - [20/Dec/2025:05:01:25 +0000] "POST /api/route HTTP/1.1" 403 61 "-" "Mozilla/5.0 (X11; Linux x86_64; rv:145.0) Gecko/20100101 Firefox/145.0"
+0|ccg      | 195.178.110.109 - - [20/Dec/2025:15:01:05 +0000] "GET /api/.env HTTP/1.1" 403 61 "-" "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"
+0|ccg      | 195.178.110.109 - - [20/Dec/2025:15:02:31 +0000] "GET /api/shared/config/config.env HTTP/1.1" 403 61 "-" "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"
+0|ccg      | 195.178.110.109 - - [20/Dec/2025:15:02:31 +0000] "GET /api/shared/config.env HTTP/1.1" 403 61 "-" "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"
+0|ccg      | 195.178.110.109 - - [20/Dec/2025:15:02:32 +0000] "GET /api/shared/config/.env HTTP/1.1" 403 61 "-" "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"
+0|ccg      | 195.178.110.109 - - [20/Dec/2025:15:02:32 +0000] "GET /api/shared/.env HTTP/1.1" 403 61 "-" "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"
+0|ccg      | 195.178.110.109 - - [20/Dec/2025:15:02:32 +0000] "GET /api/config.env HTTP/1.1" 403 61 "-" "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"
+0|ccg      | 195.178.110.109 - - [20/Dec/2025:15:02:39 +0000] "GET /api/config.js HTTP/1.1" 403 61 "-" "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"
+0|ccg      | 195.178.110.109 - - [20/Dec/2025:15:02:40 +0000] "GET /api/objects/codes.php.save HTTP/1.1" 403 61 "-" "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"
+0|ccg      | 195.178.110.109 - - [20/Dec/2025:15:02:44 +0000] "GET /api/config/config.yml HTTP/1.1" 403 61 "-" "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"
+0|ccg      | 195.178.110.109 - - [20/Dec/2025:15:02:47 +0000] "GET /api/stripe.js HTTP/1.1" 403 61 "-" "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"
+0|ccg      | 195.178.110.109 - - [20/Dec/2025:15:02:47 +0000] "GET /api/stripe.ts HTTP/1.1" 403 61 "-" "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"
+0|ccg      | 195.178.110.109 - - [20/Dec/2025:15:02:53 +0000] "GET /api/webhook.js HTTP/1.1" 403 61 "-" "Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"
+0|ccg      | 🛑 Received SIGINT. Shutting down gracefully...
+0|ccg      | 🧹 HTTP server closed
+0|ccg      | 🧹 MongoDB connection closed
+0|ccg      | ✅ MongoDB connected
+0|ccg      | 🚀 CCG API running on port 50000 (production)
+0|ccg      | 51.15.21.208 - - [20/Dec/2025:18:08:22 +0000] "POST /api/ccg HTTP/1.1" 400 76 "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 106.54.176.158 - - [21/Dec/2025:03:45:17 +0000] "GET /api/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 403 61 "-" "libredtail-http"
+0|ccg      | 165.22.136.22 - - [22/Dec/2025:06:32:11 +0000] "GET /api/v1/pods HTTP/1.1" 403 61 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36"
+0|ccg      | 138.68.11.207 - - [22/Dec/2025:06:38:56 +0000] "GET /api/sonicos/auth HTTP/1.1" 403 61 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36"
+0|ccg      | 138.68.11.207 - - [22/Dec/2025:06:38:56 +0000] "GET /api/sonicos/tfa HTTP/1.1" 403 61 "-" "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36"
+0|ccg      | 152.53.229.79 - - [23/Dec/2025:00:07:35 +0000] "GET /api/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 403 61 "-" "libredtail-http"
+0|ccg      | 115.76.218.226 - - [23/Dec/2025:08:06:02 +0000] "GET /api/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 403 61 "-" "libredtail-http"
+0|ccg      | 150.241.106.136 - - [23/Dec/2025:14:03:49 +0000] "GET /api/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 403 61 "-" "libredtail-http"
+0|ccg      | 🛑 Received SIGINT. Shutting down gracefully...
+0|ccg      | 🧹 HTTP server closed
+0|ccg      | 🧹 MongoDB connection closed
+0|ccg      | ✅ MongoDB connected
+0|ccg      | 🚀 CCG API running on port 50000 (production)
+0|ccg      | 62.84.185.10 - - [25/Dec/2025:02:38:20 +0000] "GET /api/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php HTTP/1.1" 403 61 "-" "libredtail-http"
+0|ccg      | 🛑 Received SIGINT. Shutting down gracefully...
+0|ccg      | 🧹 HTTP server closed
+0|ccg      | 🧹 MongoDB connection closed
+0|ccg      | ✅ MongoDB connected
+0|ccg      | 🚀 CCG API running on port 50000 (production)
+0|ccg      | 🛑 Received SIGINT. Shutting down gracefully...
+0|ccg      | 🧹 HTTP server closed
+0|ccg      | 🧹 MongoDB connection closed
+0|ccg      | ✅ MongoDB connected
+0|ccg      | 🚀 CCG API running on port 50000 (production)
+0|ccg      | 🛑 Received SIGINT. Shutting down gracefully...
+0|ccg      | 🧹 HTTP server closed
+0|ccg      | 🧹 MongoDB connection closed
+0|ccg      | ✅ MongoDB connected
+0|ccg      | 🚀 CCG API running on port 50000 (production)
+0|ccg      | 🛑 Received SIGINT. Shutting down gracefully...
+0|ccg      | 🧹 HTTP server closed
+0|ccg      | 🧹 MongoDB connection closed
+0|ccg      | ✅ MongoDB connected
+0|ccg      | 🚀 CCG API running on port 50000 (production)
+0|ccg      | 🛑 Received SIGINT. Shutting down gracefully...
+0|ccg      | 🧹 HTTP server closed
+0|ccg      | 🧹 MongoDB connection closed
+0|ccg      | ✅ MongoDB connected
+0|ccg      | 🚀 CCG API running on port 50000 (production)
+0|ccg      | 🛑 Received SIGINT. Shutting down gracefully...
+0|ccg      | 🧹 HTTP server closed
+0|ccg      | 🧹 MongoDB connection closed
+0|ccg      | ✅ MongoDB connected
+0|ccg      | 🚀 CCG API running on port 50000 (production)
+0|ccg      | 51.81.155.236 - - [25/Dec/2025:15:29:00 +0000] "POST /api/api/ccg HTTP/1.1" 404 42 "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 15.204.43.201 - - [25/Dec/2025:15:54:12 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 15.204.43.201 - - [25/Dec/2025:15:54:33 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 51.81.155.236 - - [25/Dec/2025:16:21:00 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 51.81.155.236 - - [25/Dec/2025:16:21:19 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 51.81.155.236 - - [25/Dec/2025:17:01:03 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 5.175.139.239 - - [25/Dec/2025:17:03:41 +0000] "GET /api/v2/cmdb/system/admin/admin HTTP/1.1" 403 61 "-" "Mozilla/5.0 (X11; Linux i686; rv:1.9.6.20) Gecko/ Firefox/14.0"
+0|ccg      | 51.81.155.236 - - [25/Dec/2025:17:06:29 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 15.204.43.201 - - [25/Dec/2025:17:23:22 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 176.65.149.253 - - [26/Dec/2025:00:31:31 +0000] "GET /api/.env HTTP/1.1" 404 42 "-" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+0|ccg      | 🛑 Received SIGINT. Shutting down gracefully...
+0|ccg      | 🧹 HTTP server closed
+0|ccg      | 🧹 MongoDB connection closed
+0|ccg      | ✅ MongoDB connected
+0|ccg      | 🚀 CCG API running on port 50000 (production)
+0|ccg      | 217.218.35.174 - - [26/Dec/2025:14:22:11 +0000] "POST /api/ccg HTTP/1.1" 400 76 "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 217.218.35.174 - - [26/Dec/2025:14:22:19 +0000] "POST /api/ccg HTTP/1.1" 400 76 "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+0|ccg      | 217.218.35.174 - - [26/Dec/2025:14:22:20 +0000] "POST /api/ccg HTTP/1.1" 400 76 "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+
+
+----- Grep /api/ccg in backend (exclude client/node_modules) -----
+./dump_backend_ccg.sh:274: * withBase("/api/ccg") -> correct URL
+./dump_backend_ccg.sh:276: *  base="/api" + path="/api/ccg" => "/api/ccg" (not "/api/api/ccg")
+./dump_backend_ccg.sh:311: *   POST /api/ccg
+./dump_backend_ccg.sh:316:  const url = withBase("/api/ccg");
+./.ccg_backup_20251226_085136/dump_backend_ccg.sh:274: * withBase("/api/ccg") -> correct URL
+./.ccg_backup_20251226_085136/dump_backend_ccg.sh:276: *  base="/api" + path="/api/ccg" => "/api/ccg" (not "/api/api/ccg")
+./.ccg_backup_20251226_085136/dump_backend_ccg.sh:311: *   POST /api/ccg
+./.ccg_backup_20251226_085136/dump_backend_ccg.sh:316:  const url = withBase("/api/ccg");
+./ccg_autofix_api_and_debug.sh:94: * POST /api/ccg
+./ccg_autofix_api_and_debug.sh:100:  const url = withBase("/api/ccg");
+./ccg_autofix_api_and_debug.sh:227:echo "curl -i -X POST http://localhost:PORT/api/ccg \\"
+./ccg_autofix_api_and_debug.sh:232:echo "curl -i -X POST https://YOURDOMAIN/api/ccg -H 'Content-Type: application/json' -d '{\"mode\":\"generate\",\"lang\":\"fa\",\"user_request\":\"ls\"}'"
+./ccg_apply_learn_patch.sh:100:  const url = withBase("/api/ccg");
+./ccg_apply_learn_patch.sh:104:  console.log("[CCG] POST /api/ccg", payload);
+./ccg_apply_learn_patch.sh:1173:echo "🟡 Backend: I provide the exact backend patch below — but I need you to paste your current backend route/controller file for /api/ccg so I patch it without breaking your structure."
+./ccg_debug_20251226_085349.txt:318:0|ccg      | 192.168.150.1 - - [19/Dec/2025:11:35:21 +0000] "POST /api/ccg HTTP/1.1" 200 2203 "-" "curl/8.5.0"
+./ccg_debug_20251226_085349.txt:319:0|ccg      | 217.218.35.199 - - [19/Dec/2025:13:32:55 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+./ccg_debug_20251226_085349.txt:320:0|ccg      | 217.218.35.199 - - [19/Dec/2025:13:33:19 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+./ccg_debug_20251226_085349.txt:321:0|ccg      | 217.218.35.199 - - [19/Dec/2025:13:33:40 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+./ccg_debug_20251226_085349.txt:322:0|ccg      | 217.218.35.199 - - [19/Dec/2025:13:34:22 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+./ccg_debug_20251226_085349.txt:323:0|ccg      | 217.218.35.199 - - [19/Dec/2025:13:35:57 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+./ccg_debug_20251226_085349.txt:324:0|ccg      | 51.158.254.163 - - [19/Dec/2025:14:47:12 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+./ccg_debug_20251226_085349.txt:325:0|ccg      | 51.158.254.162 - - [19/Dec/2025:14:53:59 +0000] "POST /api/ccg HTTP/1.1" 500 68 "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+./ccg_debug_20251226_085349.txt:326:0|ccg      | 51.158.254.162 - - [19/Dec/2025:14:54:15 +0000] "POST /api/ccg HTTP/1.1" 500 68 "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+./ccg_debug_20251226_085349.txt:328:0|ccg      | 192.168.150.1 - - [19/Dec/2025:17:53:56 +0000] "POST /api/ccg HTTP/1.1" 200 2057 "-" "curl/8.5.0"
+./ccg_debug_20251226_085349.txt:329:0|ccg      | 217.218.35.199 - - [19/Dec/2025:17:55:07 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+./ccg_debug_20251226_085349.txt:330:0|ccg      | 192.168.150.1 - - [19/Dec/2025:18:02:38 +0000] "POST /api/ccg HTTP/1.1" 200 3854 "-" "curl/8.5.0"
+./ccg_debug_20251226_085349.txt:331:0|ccg      | 217.218.34.202 - - [19/Dec/2025:20:11:25 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+./ccg_debug_20251226_085349.txt:333:0|ccg      | 93.117.123.48 - - [19/Dec/2025:23:05:00 +0000] "POST /api/ccg HTTP/1.1" 200 - "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+./ccg_debug_20251226_085349.txt:354:0|ccg      | 51.15.21.208 - - [20/Dec/2025:18:08:22 +0000] "POST /api/ccg HTTP/1.1" 400 76 "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+./ccg_frontend_apply.sh:273: * withBase("/api/ccg") -> correct URL
+./ccg_frontend_apply.sh:275: *  base="/api" + path="/api/ccg" => "/api/ccg" (not "/api/api/ccg")
+./ccg_frontend_apply.sh:310: *   POST /api/ccg
+./ccg_frontend_apply.sh:315:  const url = withBase("/api/ccg");
+./ccg_apply_fix_learn_ui_api.sh:80:  const url = withBase("/api/ccg");
+./ccg_apply_fix_learn_ui_api.sh:82:  console.log("[CCG] POST /api/ccg", payload);
+./ccg_apply_fix_learn_ui_api.sh:1105:echo "==> Trying to patch backend /api/ccg route with normalize middleware..."
+./ccg_apply_fix_learn_ui_api.sh:1107:ROUTE_FILE="$(grep -Rsl --exclude-dir=node_modules --exclude-dir=client "/api/ccg" "${ROOT_DIR}" | head -n 1 || true)"
+./ccg_apply_fix_learn_ui_api.sh:1109:  echo "🟡 Could not find backend file containing /api/ccg. Skipping backend patch."
+./server.js:67:app.use("/api/ccg", ccgRoutes);
+./ccg_collect_debug.sh:22:  echo "----- Grep /api/ccg in backend (exclude client/node_modules) -----"
+./ccg_collect_debug.sh:23:  grep -Rsn --exclude-dir=node_modules --exclude-dir=client "/api/ccg" -n . || true
+./cli/apiService-cli.js:35:        const res = await axios.post("https://ccg.cando.ac/api/ccg", payload, {
+
+----- Grep 'ccgNormalize' (to see if middleware is wired) -----
+./middleware/ccgNormalize.js:1:// middleware/ccgNormalize.js
+./middleware/ccgNormalize.js:31:module.exports = function ccgNormalize(req, res, next) {
+./ccg_apply_fix_learn_ui_api.sh:1122:  MW_FILE="${MW_DIR}/ccgNormalize.js"
+./ccg_apply_fix_learn_ui_api.sh:1126:// middleware/ccgNormalize.js
+./ccg_apply_fix_learn_ui_api.sh:1156:module.exports = function ccgNormalize(req, res, next) {
+./ccg_apply_fix_learn_ui_api.sh:1216:  if grep -q "ccgNormalize" "${ROUTE_FILE}"; then
+./ccg_apply_fix_learn_ui_api.sh:1217:    echo "🟢 Backend route already references ccgNormalize. Skipping modification."
+./ccg_apply_fix_learn_ui_api.sh:1222:      perl -0777 -i -pe 's/(^.*?\n)(.*?require\(.+?\);\n)/$1$2const ccgNormalize = require(".\/middleware\/ccgNormalize");\n/sm' "${ROUTE_FILE}" || true
+./ccg_apply_fix_learn_ui_api.sh:1224:      if ! grep -q "ccgNormalize" "${ROUTE_FILE}"; then
+./ccg_apply_fix_learn_ui_api.sh:1225:        perl -0777 -i -pe 's/^(.*?\n)/$1const ccgNormalize = require(".\/middleware\/ccgNormalize");\n/s' "${ROUTE_FILE}"
+./ccg_apply_fix_learn_ui_api.sh:1229:      perl -0777 -i -pe 's/(app\.post\(\s*["'\'']\/api\/ccg["'\'']\s*,\s*)/\1ccgNormalize, /g' "${ROUTE_FILE}"
+./ccg_apply_fix_learn_ui_api.sh:1230:      perl -0777 -i -pe 's/(router\.post\(\s*["'\'']\/api\/ccg["'\'']\s*,\s*)/\1ccgNormalize, /g' "${ROUTE_FILE}"
+./ccg_apply_fix_learn_ui_api.sh:1233:      echo "   You can manually add middleware/ccgNormalize.js and plug it in your route."
+./ccg_collect_debug.sh:26:  echo "----- Grep 'ccgNormalize' (to see if middleware is wired) -----"
+./ccg_collect_debug.sh:27:  grep -Rsn --exclude-dir=node_modules --exclude-dir=client "ccgNormalize" -n . || true
+
+----- Grep '400' / 'validation' keywords in backend (quick scan) -----
+./install.sh:96:  echo "Sudo privileges are required to move the file to $INSTALL_DIR."
+./dump_backend_ccg.sh:36:import "@fontsource/inter/400.css";
+./dump_backend_ccg.sh:42:import "@fontsource/vazirmatn/400.css";
+./dump_backend_ccg.sh:261: * Normalize joining base + path
+./dump_backend_ccg.sh:263:function joinUrl(base, path) {
+./dump_backend_ccg.sh:286:    return joinUrl(b.slice(0, -4), p); // remove "/api"
+./dump_backend_ccg.sh:289:  return joinUrl(b, p);
+./dump_backend_ccg.sh:705:    const body = current.body.join("\n").trim();
+./dump_backend_ccg.sh:864:        ].join(" ")}
+./.ccg_backup_20251226_085136/dump_backend_ccg.sh:36:import "@fontsource/inter/400.css";
+./.ccg_backup_20251226_085136/dump_backend_ccg.sh:42:import "@fontsource/vazirmatn/400.css";
+./.ccg_backup_20251226_085136/dump_backend_ccg.sh:261: * Normalize joining base + path
+./.ccg_backup_20251226_085136/dump_backend_ccg.sh:263:function joinUrl(base, path) {
+./.ccg_backup_20251226_085136/dump_backend_ccg.sh:286:    return joinUrl(b.slice(0, -4), p); // remove "/api"
+./.ccg_backup_20251226_085136/dump_backend_ccg.sh:289:  return joinUrl(b, p);
+./.ccg_backup_20251226_085136/dump_backend_ccg.sh:705:    const body = current.body.join("\n").trim();
+./.ccg_backup_20251226_085136/dump_backend_ccg.sh:864:        ].join(" ")}
+./server/models/Usage.js:6:  date: { type: String, required: true }, // YYYY-MM-DD
+./server/models/SavedScript.js:8:      required: true,
+./server/models/SavedScript.js:14:    userRequest: { type: String, required: true },
+./server/routes/profileRoutes.js:38:    return res.status(400).json({ error: "Invalid role" });
+./server/routes/profileRoutes.js:57:    return res.status(400).json({ error: "Invalid language" });
+./server/routes/ccgRoutes.js:18:      return res.status(400).json({
+./server/routes/authRoutes.js:35:      return res.status(400).json({ message: "ایمیل و رمز عبور ضروری است." });
+./server/routes/authRoutes.js:39:      return res.status(400).json({ message: "ایمیل قبلاً ثبت شده." });
+./server/routes/authRoutes.js:68:      return res.status(400).json({ message: "ایمیل یافت نشد." });
+./server/routes/authRoutes.js:72:      return res.status(400).json({ message: "رمز عبور اشتباه است." });
+./server/routes/authRoutes.js:90:      return res.status(400).json({ message: "شماره ضروری است." });
+./server/routes/authRoutes.js:123:      return res.status(400).json({ message: "کاربر وجود ندارد." });
+./server/routes/authRoutes.js:126:      return res.status(400).json({ message: "کد اشتباه است." });
+./server/routes/authRoutes.js:129:      return res.status(400).json({ message: "کد منقضی شده." });
+./server/routes/scripts.js:50:      return res.status(400).json({ message: "userRequest is required" });
+./server/routes/googleAuthRoutes.js:26:    if (!credential) return res.status(400).json({ ok: false, error: "Missing credential" });
+./README.md:36:**Administrator Privileges are typically required for global installation.**
+./README.md:161:Absolutely\! Visit the **web version** at [https://ccg.cando.ac/](https://ccg.cando.ac/) to use all core features instantly—no installation required.
+./package-lock.json:494:                "json-schema-traverse": "^1.0.0",
+./package-lock.json:1114:                "json-schema-typed": "^8.0.1",
+./package-lock.json:2979:        "node_modules/json-schema-traverse": {
+./package-lock.json:2981:            "resolved": "https://registry.npmjs.org/json-schema-traverse/-/json-schema-traverse-1.0.0.tgz",
+./package-lock.json:2986:        "node_modules/json-schema-typed": {
+./package-lock.json:2988:            "resolved": "https://registry.npmjs.org/json-schema-typed/-/json-schema-typed-8.0.2.tgz",
+./package-lock.json:3809:                "zod": "^3.23.8"
+./package-lock.json:3815:                "zod": {
+./middleware/ccgNormalize.js:4:// - default می‌گذارد تا 400 های ناشی از نبود فیلد کم شود
+./ccg_debug_20251226_085349.txt:354:0|ccg      | 51.15.21.208 - - [20/Dec/2025:18:08:22 +0000] "POST /api/ccg HTTP/1.1" 400 76 "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+./ccg_debug_20251226_085349.txt:413:0|ccg      | 217.218.35.174 - - [26/Dec/2025:14:22:11 +0000] "POST /api/ccg HTTP/1.1" 400 76 "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+./ccg_debug_20251226_085349.txt:414:0|ccg      | 217.218.35.174 - - [26/Dec/2025:14:22:19 +0000] "POST /api/ccg HTTP/1.1" 400 76 "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+./ccg_debug_20251226_085349.txt:415:0|ccg      | 217.218.35.174 - - [26/Dec/2025:14:22:20 +0000] "POST /api/ccg HTTP/1.1" 400 76 "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+./ccg_debug_20251226_085349.txt:448:./ccg_debug_20251226_085349.txt:354:0|ccg      | 51.15.21.208 - - [20/Dec/2025:18:08:22 +0000] "POST /api/ccg HTTP/1.1" 400 76 "https://ccg.cando.ac/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36"
+./ccg_debug_20251226_085349.txt:480:----- Grep '400' / 'validation' keywords in backend (quick scan) -----
+./.git/hooks/sendemail-validate.sample:13:# validation (successful or not) of the last patch of a series, the worktree
+./.git/hooks/pre-commit.sample:29:	# even required, for portability to Solaris 10's /usr/bin/tr), since
+./ccg_frontend_apply.sh:35:import "@fontsource/inter/400.css";
+./ccg_frontend_apply.sh:41:import "@fontsource/vazirmatn/400.css";
+./ccg_frontend_apply.sh:260: * Normalize joining base + path
+./ccg_frontend_apply.sh:262:function joinUrl(base, path) {
+./ccg_frontend_apply.sh:285:    return joinUrl(b.slice(0, -4), p); // remove "/api"
+./ccg_frontend_apply.sh:288:  return joinUrl(b, p);
+./ccg_frontend_apply.sh:704:    const body = current.body.join("\n").trim();
+./ccg_frontend_apply.sh:863:        ].join(" ")}
+./ccg_apply_fix_learn_ui_api.sh:183:        className="w-5 h-5 rounded-full border text-xs text-slate-400 hover:bg-white/5 dark:border-white/10"
+./ccg_apply_fix_learn_ui_api.sh:262:      const body = cur.body.join("\n").trim();
+./ccg_apply_fix_learn_ui_api.sh:285:      <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-400">
+./ccg_apply_fix_learn_ui_api.sh:1080:      ].join(" ")}
+./ccg_apply_fix_learn_ui_api.sh:1129:// - default می‌گذارد تا 400 های ناشی از نبود فیلد کم شود
+./ccg_collect_debug.sh:30:  echo "----- Grep '400' / 'validation' keywords in backend (quick scan) -----"
+./ccg_collect_debug.sh:31:  grep -Rsn --exclude-dir=node_modules --exclude-dir=client -E "status\\s*\\(?400\\)?|\\b400\\b|validation|zod|joi|yup|required|schema" -n . || true
+./cli/history-enhanced.js:6:const configDir = path.join(os.homedir(), '.cmdgen');
+./cli/history-enhanced.js:7:const configFile = path.join(configDir, 'config.json');
+./cli/history-enhanced.js:8:const historyFile = path.join(configDir, 'history.json');
+./cli/cmdgen-cli.js:26:const configDir = path.join(os.homedir(), '.config', 'ccg');
+./cli/cmdgen-cli.js:27:const configFile = path.join(configDir, 'config.json');
+./cli/cmdgen-cli.js:299:            console.error(chalk.red(`Error: Invalid key "${key}". Valid keys: ${validKeys.join(', ')}`));
+./cli/cmdgen-cli.js:429:            // Ensure required OS/Shell are set either via config or args
+./cli/cmdgen-cli.js:436:                console.error(chalk.red('Error: --device is required for Cisco OS (e.g., --device router). Set a default with "ccg config set device router".'));
+
+----- Environment (API base) -----
+
+
+===== END =====

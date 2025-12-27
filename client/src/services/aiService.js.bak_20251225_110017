@@ -1,0 +1,40 @@
+// client/src/services/aiService.js
+import { withBase } from "../config/api";
+
+async function safeJson(res) {
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * callCCG(payload)
+ * Expected backend:
+ *   POST /api/ccg
+ * Body: JSON
+ * Returns: { ok: true, markdown: "..." } or { markdown: "..." }
+ */
+export async function callCCG(payload) {
+  const url = withBase("/api/ccg");
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload || {}),
+  });
+
+  const data = await safeJson(res);
+
+  if (res.status === 404) {
+    throw new Error("API route not found");
+  }
+  if (!res.ok) {
+    const msg = data?.error || data?.message || "API request failed";
+    throw new Error(msg);
+  }
+
+  // allow either {markdown} or {ok, markdown}
+  return data || { markdown: "" };
+}
