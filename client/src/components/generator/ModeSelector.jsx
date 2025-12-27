@@ -27,3 +27,5 @@ export default function ModeSelector({ mode, setMode }) {
     </div>
   );
 }
+document.body.classList.add("night-mode");
+document.body.classList.add("day-mode");

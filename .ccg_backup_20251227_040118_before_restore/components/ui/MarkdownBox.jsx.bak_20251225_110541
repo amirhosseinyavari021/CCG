@@ -1,0 +1,71 @@
+import { useMemo, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
+function CopyMini({ value, labelCopy, labelCopied }) {
+  const [copied, setCopied] = useState(false);
+
+  async function onCopy() {
+    try {
+      await navigator.clipboard.writeText(value || "");
+      setCopied(true);
+      setTimeout(() => setCopied(false), 900);
+    } catch {
+      // ignore
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onCopy}
+      className="ccg-btn ccg-btn-ghost ccg-btn-xs"
+      title={labelCopy}
+    >
+      {copied ? labelCopied : labelCopy}
+    </button>
+  );
+}
+
+export default function MarkdownBox({ markdown, content, lang = "fa" }) {
+  const md = content ?? markdown ?? "";
+
+  const t = useMemo(() => {
+    const fa = { copy: "کپی", copied: "کپی شد" };
+    const en = { copy: "Copy", copied: "Copied" };
+    return lang === "fa" ? fa : en;
+  }, [lang]);
+
+  return (
+    <div className={`ccg-markdown ${lang === "fa" ? "rtl" : "ltr"}`}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          code({ inline, className, children }) {
+            const raw = String(children ?? "");
+            const value = raw.replace(/\n$/, "");
+            const isBlock = !inline;
+
+            if (!isBlock) return <code className="ccg-inline-code">{children}</code>;
+
+            return (
+              <div className="ccg-codeblock">
+                <div className="ccg-codeblock-head">
+                  <div className="ccg-codeblock-title">
+                    {(className || "").replace("language-", "") || "CODE"}
+                  </div>
+                  <CopyMini value={value} labelCopy={t.copy} labelCopied={t.copied} />
+                </div>
+                <pre className="ccg-pre">
+                  <code dir="ltr">{value}</code>
+                </pre>
+              </div>
+            );
+          },
+        }}
+      >
+        {md}
+      </ReactMarkdown>
+    </div>
+  );
+}

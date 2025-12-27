@@ -1,13 +1,17 @@
 // client/src/config/api.js
+// یکدست‌سازی Base URL برای فرانت
+// اگر VITE_API_BASE ست باشد (مثلاً https://domain.com) از آن استفاده می‌شود
+// در غیر این صورت، درخواست‌ها relative می‌روند (همان دامنه)
 
-// Prefer same-origin in production (nginx will proxy /ai/* to backend)
-export const API_BASE =
-  import.meta.env.VITE_API_BASE?.trim() ||
-  ""; // "" => same origin, e.g. https://ccg.cando.ac
-
-export const API_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 45000);
+export function apiBase() {
+  const b = (import.meta?.env?.VITE_API_BASE || "").trim();
+  return b.replace(/\/+$/, "");
+}
 
 export function withBase(path) {
-  if (!path.startsWith("/")) path = `/${path}`;
-  return `${API_BASE}${path}`;
+  const base = apiBase();
+  if (!path.startsWith("/")) path = "/" + path;
+  return base ? base + path : path;
 }
+document.body.classList.add("night-mode");
+document.body.classList.add("day-mode");

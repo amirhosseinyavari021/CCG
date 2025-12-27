@@ -1,42 +1,25 @@
-import { appConfig } from "../../config/app";
-
 export default function Footer() {
   return (
-    <footer className="border-t border-slate-800 bg-slate-950/90">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex flex-col gap-3 text-center text-xs text-slate-500 md:flex-row md:justify-between md:text-left">
-          
-          {/* Left */}
-          <div>
-            {appConfig.shortName} © {new Date().getFullYear()}
-          </div>
+    <footer className="mt-10 pb-10">
+      <div className="ccg-container">
+        <div className="border-t pt-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm text-slate-500 dark:text-slate-300/70 items-center">
+            <div className="md:text-left text-center">
+              <a href="https://cando.ac" target="_blank" rel="noreferrer">
+                Powered by Cando IT Academy
+              </a>
+            </div>
 
-          {/* Center */}
-          <div>
-            Created & Developed by{" "}
-            <a
-              href="mailto:amirhosseinyavari61@gmail.com"
-              className="text-slate-300 hover:underline"
-            >
-              Amirhossein Yavari
-            </a>
-          </div>
+            <div className="text-center">© 2025 CCG — Cando Command Generator</div>
 
-          {/* Right */}
-          <div>
-            Powered by{" "}
-            <a
-              href="https://cando.ac"
-              target="_blank"
-              rel="noreferrer"
-              className="text-slate-300 hover:underline"
-            >
-              Cando Academy
-            </a>
+            <div className="md:text-right text-center">
+              <a href="mailto:amirhosseinyavari61@gmail.com">Created by Amirhossein Yavari</a>
+            </div>
           </div>
-
         </div>
       </div>
     </footer>
   );
 }
+document.body.classList.add("night-mode");
+document.body.classList.add("day-mode");

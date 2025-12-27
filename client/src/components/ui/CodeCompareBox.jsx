@@ -39,3 +39,5 @@ export default function CodeCompareBox({ data }) {
     </div>
   );
 }
+document.body.classList.add("night-mode");
+document.body.classList.add("day-mode");

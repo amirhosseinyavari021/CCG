@@ -115,3 +115,5 @@ export default function WelcomeModal({ onClose, onComplete }) {
     </div>
   );
 }
+document.body.classList.add("night-mode");
+document.body.classList.add("day-mode");

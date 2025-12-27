@@ -13,3 +13,5 @@ export default function WarningBox({ title = "Warnings", items = [] }) {
     </div>
   );
 }
+document.body.classList.add("night-mode");
+document.body.classList.add("day-mode");
