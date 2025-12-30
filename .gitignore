@@ -24,3 +24,21 @@ logs/
 *.log
 .env
 .env.*
+# --- secrets ---
+!.env.example
+!.env.sample
+# --- backups / dumps ---
+.ccg_backup_*
+.ccg_backup_*/
+**/.ccg_backup_*
+**/.ccg_backup_*/
+*.backup
+*.dump
+*.sql
+# --- logs ---
+server/logs/
+# --- node build ---
+dist/
+client/dist/
+client/node_modules/
+.DS_Store
