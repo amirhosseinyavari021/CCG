@@ -189,7 +189,6 @@ export default function CodeComparatorPage({ onSwitchPage }) {
     try {
       // Backend expects os/cli sometimes؛ ما اینجا زبان کد رو به cli می‌دیم و os رو عمومی می‌ذاریم
       const payload = {
-        mode: "compare",
         input_a: codeA,
         input_b: codeB,
         lang,

@@ -13,7 +13,7 @@ export default function Footer() {
             <div className="text-center">© 2025 CCG — Cando Command Generator</div>
 
             <div className="md:text-right text-center">
-              <a href="mailto:amirhosseinyavari61@gmail.com">Created by Amirhossein Yavari</a>
+              <a href="https://takl.ink/amirhosseinyavar/" target="_blank" rel="noreferrer">Created by Amirhossein Yavari</a>
             </div>
           </div>
         </div>

@@ -1,3 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$HOME/CCG"
+CSS="$ROOT/client/src/index.css"
+
+echo "== CCG FIX THEME + LAYOUT (FINAL) =="
+echo "ROOT=$ROOT"
+
+[ -d "$ROOT/client" ] || { echo "❌ پوشه client پیدا نشد"; exit 1; }
+[ -f "$CSS" ] || { echo "❌ فایل index.css پیدا نشد: $CSS"; exit 1; }
+
+TS="$(date +%Y%m%d_%H%M%S)"
+BACKUP="$ROOT/.ccg_backup_${TS}_theme_layout_final"
+mkdir -p "$BACKUP"
+cp -f "$CSS" "$BACKUP/index.css.bak"
+
+echo "✅ بکاپ ساخته شد: $BACKUP/index.css.bak"
+echo "== درحال بازنویسی CSS برای تم ثابت (Light/Dark) + فاصله‌ها + لینک‌های فوتر =="
+
+cat > "$CSS" <<'CSS'
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -241,3 +262,15 @@ footer a:hover{
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+CSS
+
+echo "== Build فرانت =="
+cd "$ROOT/client"
+npm run build
+
+echo "== Restart PM2 =="
+cd "$ROOT"
+pm2 restart ccg
+
+echo "✅ DONE: تم‌ها ثابت، فاصله از کناره‌ها بیشتر، لینک‌های فوتر آبی و واضح."
+echo "اگر خواستی برگردونی: cp '$BACKUP/index.css.bak' '$CSS' و دوباره build بزن."

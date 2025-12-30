@@ -1,83 +1,130 @@
 import express from "express";
-import ccgNormalize from "../middleware/ccgNormalize.js";
-
-// Try to import existing AI client in a compatible way.
-import * as aiClient from "../utils/aiClient.js";
+import { runAI } from "../utils/aiClient.js";
 
 const router = express.Router();
 
-function extractText(ai) {
-  if (!ai) return "";
-  if (typeof ai === "string") return ai;
-  if (typeof ai.output_text === "string") return ai.output_text;
-  if (typeof ai.text === "string") return ai.text;
-
-  // OpenAI Responses-like format: ai.output -> [{type:"message", content:[...]}]
-  try {
-    if (Array.isArray(ai.output)) {
-      const msg = ai.output.find(x => x && x.type === "message" && Array.isArray(x.content));
-      if (msg) {
-        const texts = msg.content
-          .map(c => (c && (c.text || c.output_text)) ? (c.text || c.output_text) : "")
-          .filter(Boolean);
-        return texts.join("\n").trim();
-      }
-    }
-  } catch {}
-
-  // Fallback: try common shapes
-  try {
-    if (ai.data && typeof ai.data === "string") return ai.data;
-    if (ai.result && typeof ai.result === "string") return ai.result;
-    if (ai.result && typeof ai.result.text === "string") return ai.result.text;
-  } catch {}
-
-  return "";
+function pickUserRequest(body) {
+  const b = (body && typeof body === "object") ? body : {};
+  const ur =
+    b.userRequest ??
+    b.user_request ??
+    b.userrequest ??
+    b.prompt ??
+    b.request ??
+    b.text ??
+    b.message ??
+    b.input ??
+    b.query ??
+    b.q ??
+    (b.data && (b.data.userRequest ?? b.data.user_request ?? b.data.prompt ?? b.data.text)) ??
+    "";
+  return String(ur || "").trim();
 }
 
-router.post("/", ccgNormalize, ccgNormalize, ccgNormalize, async (req, res) => {
-  const body = (req.ccg ?? req.body ?? {});
-  try {
-    const { mode, lang, os, outputStyle, userRequest } = req.body || {};
+function inferMode(body) {
+  const b = (body && typeof body === "object") ? body : {};
+  // if explicit mode sent, accept safe ones
+  const m = String(b.mode ?? "").toLowerCase().trim();
+  if (m === "compare" || m === "error" || m === "generate") return m;
 
-    if (!userRequest || String(userRequest).trim().length === 0) {
-      return res.status(400).json({
+  // infer
+  if ((b.codeA || b.codeB || b.input_a || b.input_b) && (b.codeA || b.codeB)) return "compare";
+  if (b.error_message || b.errorMessage || b.err) return "error";
+  return "generate";
+}
+
+function buildContext(body) {
+  const b = (body && typeof body === "object") ? body : {};
+  const parts = [];
+
+  // keep these as "soft" context (affects output) but does not break stored prompt vars
+  if (b.outputType) parts.push(`outputType=${String(b.outputType)}`);
+  if (b.knowledgeLevel) parts.push(`knowledgeLevel=${String(b.knowledgeLevel)}`);
+  if (b.modeStyle) parts.push(`modeStyle=${String(b.modeStyle)}`);
+  if (b.platform) parts.push(`platform=${String(b.platform)}`);
+  if (b.os) parts.push(`os=${String(b.os)}`);
+  if (b.cli) parts.push(`cli=${String(b.cli)}`);
+  if (b.vendor) parts.push(`vendor=${String(b.vendor)}`);
+  if (b.deviceType) parts.push(`deviceType=${String(b.deviceType)}`);
+
+  return parts.length ? `[context ${parts.join(" | ")}]` : "";
+}
+
+function buildVars(body, userRequest) {
+  const b = (body && typeof body === "object") ? body : {};
+  const contextLine = buildContext(b);
+  const finalRequest = contextLine ? `${contextLine}\n${userRequest}` : userRequest;
+
+  return {
+    mode: inferMode(b),
+    input_a: String(b.input_a ?? b.inputA ?? b.a ?? b.input1 ?? b.codeA ?? b.code_a ?? ""),
+    input_b: String(b.input_b ?? b.inputB ?? b.b ?? b.input2 ?? b.codeB ?? b.code_b ?? ""),
+    cli: String(b.cli ?? b.shell ?? b.terminal ?? "bash"),
+    os: String(b.os ?? b.platform ?? "linux"),
+    lang: String(b.lang ?? b.language ?? "fa"),
+    error_message: String(b.error_message ?? b.errorMessage ?? b.err ?? ""),
+    user_request: String(finalRequest || ""),
+  };
+}
+
+function fallbackPrompt(vars) {
+  return [
+    `mode: ${vars.mode}`,
+    `cli: ${vars.cli}`,
+    `os: ${vars.os}`,
+    `lang: ${vars.lang}`,
+    vars.error_message ? `error_message: ${vars.error_message}` : "",
+    vars.input_a ? `input_a:\n${vars.input_a}` : "",
+    vars.input_b ? `input_b:\n${vars.input_b}` : "",
+    `user_request:\n${vars.user_request || "(empty)"}`,
+  ].filter(Boolean).join("\n\n");
+}
+
+router.get("/ping", (req, res) => {
+  res.json({ ok: true, service: "ccg", ts: Date.now() });
+});
+
+router.post("/", async (req, res) => {
+  const rid = Math.random().toString(36).slice(2, 10);
+  const t0 = Date.now();
+
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+
+  const body = (req.body && typeof req.body === "object") ? req.body : {};
+  const userRequest = pickUserRequest(body);
+
+  if (!userRequest) {
+    return res.status(400).json({ ok: false, error: "userRequest is required" });
+  }
+
+  const vars = buildVars(body, userRequest);
+
+  try {
+    const ai = await runAI({ variables: vars, fallbackPrompt: fallbackPrompt(vars) });
+
+    if (ai?.error) {
+      console.error(`[CCG] rid=${rid} AI_ERROR=${ai.error}`);
+      return res.status(200).json({
         ok: false,
-        error: "userRequest is required",
-        hint: "Send { mode: 'generate'|'learn', lang: 'fa', os: 'windows|linux|macos', userRequest: '...' }"
+        error: ai.error,
+        output: "",
       });
     }
 
-    const runAI = aiClient.runAI || aiClient.default || aiClient.callOpenAI;
-    if (!runAI) {
-      return res.status(500).json({ ok: false, error: "AI client not available (runAI not found)" });
-    }
-
-    // Pass a superset for maximum backward-compatibility
-    const payload = {
-      mode,
-      lang,
-      os,
-      outputStyle,
-      userRequest,
-      user_request: userRequest
-    };
-
-    const ai = await runAI(payload);
-    const text = extractText(ai);
-
-    return res.json({
+    const out = String(ai?.output || "").trim();
+    return res.status(200).json({
       ok: true,
-      mode,
-      lang,
-      os,
-      outputStyle,
-      text: text || "",
-      raw: (!text ? ai : undefined) // only include raw if extraction failed
+      output: out,
+      result: out, // compatibility
     });
   } catch (e) {
-    console.error("CCG route error:", e);
-    return res.status(500).json({ ok: false, error: "Internal error", details: String(e?.message || e) });
+    const msg = e?.message ? e.message : String(e);
+    console.error(`[CCG] rid=${rid} ROUTE_ERROR=${msg}`);
+    return res.status(200).json({ ok: false, error: msg, output: "" });
+  } finally {
+    const ms = Date.now() - t0;
+    console.log(`[CCG] rid=${rid} ms=${ms} keys=${Object.keys(body).join(",")}`);
   }
 });
 

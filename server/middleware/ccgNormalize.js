@@ -1,42 +1,62 @@
-export default function ccgNormalize(req, res, next) {
-  const b = (req && req.body && typeof req.body === "object") ? req.body : {};
+// server/middleware/ccgNormalize.js (ESM)
+// هدف: یکسان‌سازی کلیدهای فرانت/بک برای جلوگیری از 400 های ناشی از mismatch
+export function ccgNormalize(req, res, next) {
+  try {
+    // اطمینان از اینکه body وجود دارد
+    let b = req.body;
+    if (b == null) b = {};
+    if (typeof b === "string") {
+      try { b = JSON.parse(b); } catch { b = { raw: b }; }
+    }
+    if (typeof b !== "object") b = {};
 
-  const modeRaw = String(b.mode ?? b.state ?? b.action ?? b.intent ?? "generate").toLowerCase();
-  const mode = (modeRaw === "learn" || modeRaw === "explain") ? "learn" : "generate";
+    // helper
+    const pick = (...keys) => {
+      for (const k of keys) {
+        if (b[k] !== undefined && b[k] !== null) return b[k];
+      }
+      return undefined;
+    };
 
-  const userRequest = String(
-    b.userRequest ?? b.user_request ?? b.prompt ?? b.input ?? b.command ?? b.code ?? ""
-  ).trim();
+    // فیلدهای اصلی (alias ها)
+    const userRequest = pick("userRequest", "user_request", "request", "prompt", "text", "body", "input");
+    const lang = pick("lang", "language") ?? "fa";
+    const mode = pick("mode", "action", "task") ?? "generate";
 
-  const lang = String(b.lang ?? b.language ?? "fa").trim().slice(0, 8) || "fa";
+    // فیلدهای اختیاری (چیزهایی که تو UI داشتید)
+    const awarenessLevel = pick("awarenessLevel", "awareness_level", "awareness", "level");
+    const outputStyle = pick("outputStyle", "output_style", "style");
+    const network = pick("network", "netword", "netwrok"); // typo tolerant
+    const description = pick("description", "details", "desc");
 
-  const osRaw = String(b.os ?? b.platform ?? b.system ?? "linux").toLowerCase();
-  const os = osRaw.includes("win") ? "windows"
-          : (osRaw.includes("mac") || osRaw.includes("osx")) ? "macos"
-          : "linux";
+    // یک بدنه‌ی نرمال
+    const normalized = {
+      mode,
+      lang,
+      userRequest: typeof userRequest === "string" ? userRequest : (userRequest != null ? String(userRequest) : ""),
+      awarenessLevel,
+      outputStyle,
+      network,
+      description,
+      // باقی فیلدها را هم نگه می‌داریم (بدون شکستن)
+      ...b,
+    };
 
-  const shellRaw = String(b.shell ?? b.cli ?? b.terminal ?? "bash").toLowerCase();
-  let shell = shellRaw;
+    // ولی مطمئن می‌شیم کلید canonical هم وجود دارد
+    normalized.userRequest = normalized.userRequest ?? "";
+    normalized.lang = normalized.lang ?? "fa";
+    normalized.mode = normalized.mode ?? "generate";
 
-  // همخوانی OS/Shell (کیفیت + جلوگیری از جواب‌های غلط)
-  if (os === "windows" && (shell === "bash" || shell === "zsh")) shell = "powershell";
-  if (os !== "windows" && shell === "powershell") shell = "bash";
+    // در req.body بگذار
+    req.body = normalized;
+    // برای دیباگ
+    req.ccgNormalized = { keys: Object.keys(normalized), preview: (normalized.userRequest || "").slice(0, 120) };
 
-  const outputType = String(b.outputType ?? b.type ?? b.output_type ?? "command").toLowerCase();
-  const outputStyle = String(b.outputStyle ?? b.style ?? b.output_style ?? "operational").toLowerCase();
-  const knowledgeLevel = String(b.knowledgeLevel ?? b.level ?? b.skill ?? "beginner").toLowerCase();
-
-  req.ccg = {
-    mode,
-    userRequest,
-    lang,
-    os,
-    shell,
-    outputType,
-    outputStyle,
-    knowledgeLevel,
-    raw: b
-  };
-
-  return next();
+    return next();
+  } catch (e) {
+    // fail-safe
+    return next();
+  }
 }
+
+export default ccgNormalize;

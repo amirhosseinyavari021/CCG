@@ -39,7 +39,6 @@ export default function ErrorAnalyzerModal({ open, onClose, seed }) {
 
     try {
       const payload = {
-        mode: "error",
         lang: lang || "en",
         user_request: command.trim(),
         error_message: context.trim() || "",

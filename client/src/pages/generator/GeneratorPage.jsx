@@ -99,7 +99,6 @@ export default function GeneratorPage() {
   const payloadForGenerator = () => {
     const isNetwork = platform === "network";
     return {
-      mode: "generate",
       lang: lang || "fa",
 
       // important for backend
@@ -107,7 +106,6 @@ export default function GeneratorPage() {
 
       // generator params
       outputType: outputType, // "command" or "python"
-      modeStyle: mode, // learn/operational
       knowledgeLevel: level,
 
       platform: isNetwork ? "network" : platform,
@@ -126,7 +124,7 @@ export default function GeneratorPage() {
 
     try {
       const res = await callCCG(payloadForGenerator());
-      const md = res?.markdown || res?.result || "";
+      const md = res?.markdown || res?.result || res?.output || "";
       setOutput(md);
     } catch (e) {
       setApiErr(e?.message || (lang === "fa" ? "خطا در ارتباط با API" : "API error"));
@@ -214,18 +212,8 @@ export default function GeneratorPage() {
               </>
             )}
 
-            {/* Mode */}
-            <FieldLabel label={t("mode")} tip={t("tip_mode")} />
-            <div className="flex rounded-xl border border-[var(--border)] p-1">
-              <Toggle active={mode === "learn"} onClick={() => setMode("learn")}>
-                {t("learn")}
-              </Toggle>
-              <Toggle active={mode === "operational"} onClick={() => setMode("operational")}>
-                {t("operational")}
-              </Toggle>
-            </div>
-
             {/* Knowledge */}
+
             <FieldLabel label={t("knowledge")} tip={t("tip_knowledge")} />
             <select value={level} onChange={(e) => setLevel(e.target.value)} className="ccg-select text-sm">
               <option value="beginner">{t("beginner")}</option>

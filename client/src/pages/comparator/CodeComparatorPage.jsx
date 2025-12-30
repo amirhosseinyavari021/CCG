@@ -24,7 +24,6 @@ export default function CodeComparatorPage() {
 
     try {
       const payload = {
-        mode: "compare",
         lang: lang || "fa",
         codeA: a,
         codeB: b,
