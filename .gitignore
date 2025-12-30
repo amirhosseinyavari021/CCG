@@ -22,3 +22,5 @@ node_modules/
 # Ignore logs
 logs/
 *.log
+.env
+.env.*
