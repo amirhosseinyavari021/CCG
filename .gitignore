@@ -8,3 +8,17 @@
 # Environment variables
 .env
 /client/.env
+# Ignore environment files
+.env
+.env.*
+
+# Ignore backup files
+.ccg_backup/
+*.bak
+
+# Ignore node_modules folder
+node_modules/
+
+# Ignore logs
+logs/
+*.log
