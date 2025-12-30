@@ -42,3 +42,14 @@ dist/
 client/dist/
 client/node_modules/
 .DS_Store
+# --- CCG junk/ops files (auto) ---
+.ccg_backups*
+*.tmp
+server/logs/*.log
+server/logs/*.bak
+npm-debug.log
+yarn-error.log
+ccg_*.sh
+fix_*.sh
+*_FINAL.sh
+manage_ccg_backups.sh
