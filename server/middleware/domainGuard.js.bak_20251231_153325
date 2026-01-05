@@ -1,0 +1,11 @@
+// server/middleware/domainGuard.js
+// Safe express middleware (never throws, always calls next)
+export default function domainGuard(req, res, next) {
+  try {
+    // Optional: you can enforce allowed origins/hosts here
+    return next();
+  } catch (e) {
+    // Never block the server due to guard failure
+    return next();
+  }
+}

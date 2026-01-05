@@ -1,0 +1,144 @@
+import express from "express";
+import { runAI } from "../utils/aiClient.js";
+
+const router = express.Router();
+
+function pickUserRequest(body) {
+  const b = (body && typeof body === "object") ? body : {};
+  const ur =
+    b.userRequest ??
+    b.user_request ??
+    b.userrequest ??
+    b.prompt ??
+    b.request ??
+    b.text ??
+    b.message ??
+    b.input ??
+    b.query ??
+    b.q ??
+    (b.data && (b.data.userRequest ?? b.data.user_request ?? b.data.prompt ?? b.data.text)) ??
+    "";
+  return String(ur || "").trim();
+}
+
+function inferMode(body) {
+  const b = (body && typeof body === "object") ? body : {};
+  // if explicit mode sent, accept safe ones
+  const m = String(b.mode ?? "").toLowerCase().trim();
+  if (m === "compare" || m === "error" || m === "generate") return m;
+
+  // infer
+  if ((b.codeA || b.codeB || b.input_a || b.input_b) && (b.codeA || b.codeB)) return "compare";
+  if (b.error_message || b.errorMessage || b.err) return "error";
+  return "generate";
+}
+
+function buildContext(body) {
+  const b = (body && typeof body === "object") ? body : {};
+  const parts = [];
+
+  // keep these as "soft" context (affects output) but does not break stored prompt vars
+  if (b.outputType) parts.push(`outputType=${String(b.outputType)}`);
+  if (b.knowledgeLevel) parts.push(`knowledgeLevel=${String(b.knowledgeLevel)}`);
+  if (b.modeStyle) parts.push(`modeStyle=${String(b.modeStyle)}`);
+  if (b.platform) parts.push(`platform=${String(b.platform)}`);
+  if (b.os) parts.push(`os=${String(b.os)}`);
+  if (b.cli) parts.push(`cli=${String(b.cli)}`);
+  if (b.vendor) parts.push(`vendor=${String(b.vendor)}`);
+  if (b.deviceType) parts.push(`deviceType=${String(b.deviceType)}`);
+
+  return parts.length ? `[context ${parts.join(" | ")}]` : "";
+}
+
+function buildVars(body, userRequest) {
+  const b = (body && typeof body === "object") ? body : {};
+  const contextLine = buildContext(b);
+  const finalRequest = contextLine ? `${contextLine}\n${userRequest}` : userRequest;
+
+  return {
+    mode: inferMode(b),
+    input_a: String(b.input_a ?? b.inputA ?? b.a ?? b.input1 ?? b.codeA ?? b.code_a ?? ""),
+    input_b: String(b.input_b ?? b.inputB ?? b.b ?? b.input2 ?? b.codeB ?? b.code_b ?? ""),
+    cli: String(b.cli ?? b.shell ?? b.terminal ?? "bash"),
+    os: String(b.os ?? b.platform ?? "linux"),
+    lang: String(b.lang ?? b.language ?? "fa"),
+    error_message: String(b.error_message ?? b.errorMessage ?? b.err ?? ""),
+    user_request: String(finalRequest || ""),
+  };
+}
+
+function fallbackPrompt(vars) {
+  return [
+    `mode: ${vars.mode}`,
+    `cli: ${vars.cli}`,
+    `os: ${vars.os}`,
+    `lang: ${vars.lang}`,
+    vars.error_message ? `error_message: ${vars.error_message}` : "",
+    vars.input_a ? `input_a:\n${vars.input_a}` : "",
+    vars.input_b ? `input_b:\n${vars.input_b}` : "",
+    `user_request:\n${vars.user_request || "(empty)"}`,
+  ].filter(Boolean).join("\n\n");
+}
+
+router.get("/ping", (req, res) => {
+  res.json({ ok: true, service: "ccg", ts: Date.now() });
+});
+
+router.post("/", async (req, res) => {
+  const rid = Math.random().toString(36).slice(2, 10);
+  const t0 = Date.now();
+
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+
+  const body = (req.body && typeof req.body === "object") ? req.body : {};
+  const userRequest = pickUserRequest(body);
+
+  // compare-safe: comparator payload may not send user_request; infer and default
+  const _b = body || {};
+  const _mode = String(_b.mode ?? "").toLowerCase().trim();
+  const _hasA = String(_b.input_a ?? _b.inputA ?? _b.a ?? _b.input1 ?? _b.codeA ?? _b.code_a ?? "").trim().length > 0;
+  const _hasB = String(_b.input_b ?? _b.inputB ?? _b.b ?? _b.input2 ?? _b.codeB ?? _b.code_b ?? "").trim().length > 0;
+  const _looksLikeCompare = _mode.startsWith("compare") || (_hasA && _hasB);
+
+  if (!userRequest && _looksLikeCompare) {
+    userRequest = "Compare code A and code B. Provide: (1) key differences, (2) risks/breaking changes, (3) recommended merged version if possible.";
+    console.log(`[CCG] rid=${rid} user_request=auto(compare)`);
+  }
+
+
+  if (!userRequest) {
+    return res.status(400).json({ ok: false, error: "userRequest is required" });
+  }
+
+  const vars = buildVars(body, userRequest);
+
+  try {
+    const ai = await runAI({ variables: vars, fallbackPrompt: fallbackPrompt(vars) });
+
+    if (ai?.error) {
+      console.error(`[CCG] rid=${rid} AI_ERROR=${ai.error}`);
+      return res.status(200).json({
+        ok: false,
+        error: ai.error,
+        output: "",
+      });
+    }
+
+    const out = String(ai?.output || "").trim();
+    return res.status(200).json({
+      ok: true,
+      output: out,
+      result: out, // compatibility
+    });
+  } catch (e) {
+    const msg = e?.message ? e.message : String(e);
+    console.error(`[CCG] rid=${rid} ROUTE_ERROR=${msg}`);
+    return res.status(200).json({ ok: false, error: msg, output: "" });
+  } finally {
+    const ms = Date.now() - t0;
+    console.log(`[CCG] rid=${rid} ms=${ms} keys=${Object.keys(body).join(",")}`);
+  }
+});
+
+export default router;

@@ -4,8 +4,8 @@
  */
 import express from "express";
 import ccgRoutes from "./server/routes/ccgRoutes.js";
+
 import domainGuard from "./server/middleware/domainGuard.js";
-import chatRoutes from "./server/routes/chatRoutes.js";
 
 const app = express();
 app.use(domainGuard);
@@ -18,7 +18,6 @@ app.get("/api/health", (req, res) => res.json({ ok: true, service: "ccg", ts: Da
 
 // main api
 app.use("/api/ccg", ccgRoutes);
-app.use("/api/chat", chatRoutes);
 
 // fallback for unknown api routes
 app.use("/api", (req, res) => res.status(404).json({ ok: false, error: "API route not found" }));

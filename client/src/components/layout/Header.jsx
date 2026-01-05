@@ -77,6 +77,10 @@ export default function Header() {
             {t("generator")}
           </DrawerItem>
           <DrawerItem active={view === "comparator"} onClick={() => go("comparator")}>
+              {t("comparator")}
+            </DrawerItem>
+            <DrawerItem active={view === "chat"} onClick={() => go("chat")}>
+              {t("chat")}
             {t("comparator")}
           </DrawerItem>
         </div>
@@ -129,7 +133,20 @@ export default function Header() {
             <Nav active={view === "comparator"} onClick={() => go("comparator")}>
               {t("comparator")}
             </Nav>
-          </nav>
+            <Nav active={view === "chat"} onClick={() => go("chat")}>
+              {t("chat")}
+              {t("comparator")}
+            </Nav>
+          
+          <button
+            type="button"
+            className={view === "chat" ? "ccg-nav__item active" : "ccg-nav__item"}
+            onClick={() => setView("chat")}
+          >
+            {t("chat")}
+          </button>
+
+        </nav>
 
           <div className="flex items-center gap-2 sm:gap-3">
             <button onClick={toggleTheme} className="ccg-btn px-3 py-2" type="button" title="Theme">

@@ -4,6 +4,7 @@ import { createContext, useContext, useMemo, useState } from "react";
  * view:
  *  - generator
  *  - comparator
+ *  - chat
  *
  * error analyzer is a modal overlay (NOT a separate page)
  */

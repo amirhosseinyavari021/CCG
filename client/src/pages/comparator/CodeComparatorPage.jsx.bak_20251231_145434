@@ -29,7 +29,7 @@ export default function CodeComparatorPage() {
         codeB: b,
       };
       const res = await callCCG(payload);
-      setOutput(res?.output || res?.markdown || res?.result || "");
+      setOutput(res?.markdown || res?.result || "");
     } catch (e) {
       setApiErr(e?.message || (lang === "fa" ? "خطا در ارتباط با API" : "API error"));
     } finally {

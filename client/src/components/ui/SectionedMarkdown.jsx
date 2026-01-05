@@ -45,8 +45,11 @@ export default function SectionedMarkdown({ markdown, content, lang = "fa", defa
     <div className="ccg-section-grid">
       {sections.map((sec, idx) => {
         const title = sec.title || defaultTitle || (lang === "fa" ? "خروجی" : "Result");
-        return (
-          <div key={`${title}-${idx}`} className="ccg-section-card">
+        
+        const isWarnTitle = /^(هشدارها|هشدار|warnings?|warning)$/i.test(String(title || "").trim());
+        const cardClass = isWarnTitle ? "ccg-section-card ccg-warn" : "ccg-section-card";
+return (
+          <div key={`${title}-${idx}`} className={cardClass}>
             <div className="ccg-section-title">{title}</div>
             <div className="ccg-section-body">
               <MarkdownBox markdown={sec.body} lang={lang} />

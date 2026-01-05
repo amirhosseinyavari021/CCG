@@ -8,6 +8,8 @@ import Footer from "./components/layout/Footer";
 import GeneratorPage from "./pages/generator/GeneratorPage";
 import CodeComparatorPage from "./pages/comparator/CodeComparatorPage";
 
+import ChatPage from "./pages/chat/ChatPage";
+
 import ErrorAnalyzerModal from "./components/error/ErrorAnalyzerModal";
 
 import { useAppView } from "./hooks/useAppView";
@@ -36,7 +38,9 @@ export default function App() {
       <main className="ccg-container mx-auto py-8">
         {view === "generator" && <GeneratorPage />}
         {view === "comparator" && <CodeComparatorPage />}
-      </main>
+      
+        {view === "chat" && <ChatPage />}
+</main>
 
       <Footer />
 

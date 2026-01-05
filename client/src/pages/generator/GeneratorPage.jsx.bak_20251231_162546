@@ -1,41 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import ToolResult from "../../components/ui/ToolResult";
 import { useLanguage } from "../../context/LanguageContext";
 import { callCCG } from "../../services/aiService";
 import SectionedMarkdown from "../../components/ui/SectionedMarkdown";
-
-
-// CCG_GENERATOR_OPTION1_FIX_V1
-const CCG_GEN_LS_KEY = "ccg_generator_state_v1";
-
-function stripOuterFences(text) {
-  const t = String(text ?? "").trim();
-  const m = t.match(/```(?:[\w-]+)?\n([\s\S]*?)```\s*$/);
-  return (m ? m[1] : t).trim();
-}
-
-function toFencedBlock(text, lang) {
-  const code = stripOuterFences(text);
-  if (!code) return "";
-  const l = (lang || "bash").toLowerCase();
-  return `\`\`\`${l}\n${code}\n\`\`\``;
-}
-
-function normalizeGeneratorOutput(raw, outputType, shell) {
-  const t = String(raw ?? "").trim();
-  if (!t) return "";
-  const ot = String(outputType ?? "").toLowerCase();
-  if (ot === "command") {
-    // prefer selected shell language tag, but keep it simple: bash/powershell/cmd/zsh/sh
-    const lang = (shell || "bash").toLowerCase();
-    return toFencedBlock(t, lang);
-  }
-  if (ot === "python") {
-    return toFencedBlock(t, "python");
-  }
-  // fallback: render as-is (markdown)
-  return t;
-}
 
 const PLATFORM_OPTIONS = [
   { value: "linux", label: "Linux" },
@@ -95,80 +61,15 @@ export default function GeneratorPage() {
   const [vendor, setVendor] = useState(NETWORK_VENDORS[0].value);
   const [deviceType, setDeviceType] = useState(DEVICE_TYPES_BY_VENDOR[NETWORK_VENDORS[0].value][0].value);
 
-  
-  // Shared profile (Generator + Chat)
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("ccg_profile_v1");
-      if (!raw) return;
-      const p = JSON.parse(raw);
-      if (p.platform) setPlatform(p.platform);
-      if (p.outputType) setOutputType(p.outputType);
-      if (p.mode) setMode(p.mode);
-      if (p.level) setLevel(p.level);
-      if (p.shell) setShell(p.shell);
-      if (p.vendor) setVendor(p.vendor);
-      if (p.deviceType) setDeviceType(p.deviceType);
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    try {
-      const p = { platform, outputType, mode, level, shell, vendor, deviceType };
-      localStorage.setItem("ccg_profile_v1", JSON.stringify(p));
-    } catch {}
-  }, [platform, outputType, mode, level, shell, vendor, deviceType]);
-const [input, setInput] = useState("");
+  const [input, setInput] = useState("");
   const [output, setOutput] = useState("");
 
-const [tool, setTool] = useState(null);
-const [toolResult, setToolResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [apiErr, setApiErr] = useState("");
 
   const [swapLayout, setSwapLayout] = useState(false);
 
-  
-  // restore saved generator state (best-effort)
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(CCG_GEN_LS_KEY);
-      if (!raw) return;
-      const st = JSON.parse(raw);
-      if (st?.platform) setPlatform(st.platform);
-      if (st?.outputType) setOutputType(st.outputType);
-      if (st?.mode) setMode(st.mode);
-      if (st?.level) setLevel(st.level);
-      if (st?.shell) setShell(st.shell);
-      if (st?.vendor) setVendor(st.vendor);
-      if (st?.deviceType) setDeviceType(st.deviceType);
-      if (typeof st?.input === "string") setInput(st.input);
-      if (typeof st?.swapLayout === "boolean") setSwapLayout(st.swapLayout);
-      if (typeof st?.output === "string") setOutput(st.output); 
-      setTool(data?.tool || null);
-// restore last output too
-    } catch {}
-  }, []);
-
-  // persist generator state (best-effort)
-  useEffect(() => {
-    try {
-      const st = {
-        platform,
-        outputType,
-        mode,
-        level,
-        shell,
-        vendor,
-        deviceType,
-        input,
-        swapLayout,
-        output,
-      };
-      localStorage.setItem(CCG_GEN_LS_KEY, JSON.stringify(st));
-    } catch {}
-  }, [platform, outputType, mode, level, shell, vendor, deviceType, input, swapLayout, output]);
-const shellOptions = useMemo(
+  const shellOptions = useMemo(
     () => (platform === "network" ? [] : SHELL_BY_PLATFORM[platform] || []),
     [platform]
   );
@@ -204,7 +105,7 @@ const shellOptions = useMemo(
       user_request: input.trim(),
 
       // generator params
-      outputType: outputType === "command" ? "tool" : outputType, // "command" or "python"
+      outputType: outputType, // "command" or "python"
       knowledgeLevel: level,
 
       platform: isNetwork ? "network" : platform,
@@ -221,11 +122,10 @@ const shellOptions = useMemo(
     setApiErr("");
     setOutput("");
 
-      setTool(null);
     try {
       const res = await callCCG(payloadForGenerator());
       const md = res?.markdown || res?.result || res?.output || "";
-      setOutput(normalizeGeneratorOutput(md, outputType, shell));
+      setOutput(md);
     } catch (e) {
       setApiErr(e?.message || (lang === "fa" ? "خطا در ارتباط با API" : "API error"));
     } finally {
@@ -377,7 +277,7 @@ const shellOptions = useMemo(
             ) : null}
 
             {output ? (
-              tool ? <ToolResult tool={tool} /> : {tool ? <ToolResult tool={tool} /> : <SectionedMarkdown markdown={output} lang={lang} />}
+              <SectionedMarkdown markdown={output} lang={lang} />
             ) : (
               <div className="text-sm text-slate-500 dark:text-slate-300/70">
                 {t("outputPlaceholder")}

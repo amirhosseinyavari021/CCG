@@ -6,6 +6,8 @@ const DICT = {
   en: {
     generator: "Generator",
     comparator: "Code Comparator",
+    chat: "گفت‌وگو",
+
     signIn: "Sign in",
     menu: "Menu",
 
@@ -67,6 +69,8 @@ const DICT = {
   fa: {
     generator: "جنریتور",
     comparator: "مقایسه کد",
+    chat: "Chat",
+
     signIn: "ورود",
     menu: "منو",
 

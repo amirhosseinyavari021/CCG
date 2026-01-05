@@ -241,3 +241,10 @@ footer a:hover{
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+
+  /* --- Warning section (for 'هشدارها') --- */
+  .ccg-section-card.ccg-warn{
+    @apply border border-red-500/40 bg-red-500/10;
+  }
+
