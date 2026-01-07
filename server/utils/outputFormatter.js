@@ -1,186 +1,195 @@
 // server/utils/outputFormatter.js
-// ✅ Tool Contract for Generator (stable, non-chatty UI)
-// Output (tool):
-// {
-//   primary: { command, lang },
-//   explanation: string,
-//   warnings: string[],
-//   alternatives: [{ command, note }, ...] (always 3)
-// }
-// Also returns markdown (same template) as fallback.
+// ✅ CCG Stable Tool Contract Normalizer (Generator + Explain)
+//
+// Returns:
+//  - tool: { primary:{command,lang}, explanation, warnings[], alternatives[] }
+//  - markdown: string (strict template)
+//  - output: markdown (alias)
+//
+// Explain mode: if forcedCommand provided, primary.command MUST stay exactly that.
+//
 // Back-compat exports:
 // - formatToolResponse (main)
 // - formatOutput (alias)
 
-function fenceLangFromCli(cli = "bash", outputType = "command") {
+function fenceLangFromCli(cli = "bash", outputType = "tool") {
   const c = String(cli || "").toLowerCase();
   const ot = String(outputType || "").toLowerCase();
   if (ot === "python") return "python";
-  if (c.includes("powershell") || c === "pwsh") return "powershell";
-  if (c.includes("cmd")) return "cmd";
+  if (c.includes("powershell") || c === "pwsh" || c === "powershell") return "powershell";
+  if (c.includes("cmd") || c === "cmd") return "cmd";
   return "bash";
+}
+
+function tryParseJSONMaybe(text) {
+  const t = String(text || "").trim();
+  if (!t) return null;
+  if (!(t.startsWith("{") && t.endsWith("}"))) return null;
+  try { return JSON.parse(t); } catch { return null; }
+}
+
+function stripFences(s) {
+  const t = String(s ?? "").trim();
+  // ```lang\n...\n```
+  const m = t.match(/^\s*```[^\n]*\n([\s\S]*?)\n?```\s*$/);
+  return (m ? m[1] : t).trim();
+}
+
+function stripInlineBackticks(s) {
+  return String(s ?? "").replace(/`+/g, "").trim();
+}
+
+function toOneLineCommand(s) {
+  const t = stripInlineBackticks(stripFences(s));
+  // take first non-empty line
+  const line = t.split("\n").map(x=>x.trim()).find(Boolean) || "";
+  return line;
 }
 
 function splitFirstCodeBlock(text) {
   const t = String(text ?? "").trim();
   const m = t.match(/```[^\n]*\n([\s\S]*?)```/);
   if (!m) return { codeRaw: "", rest: t };
-  const codeRaw = String(m[1] ?? "").trim();
-  const rest = t.replace(m[0], "").trim();
-  return { codeRaw, rest };
+  return { codeRaw: String(m[1] ?? "").trim(), rest: t.replace(m[0], "").trim() };
 }
 
 function looksLikeCommand(line) {
   const s = String(line || "").trim();
   if (!s) return false;
   if (s.length > 220) return false;
-  if (/[.،؛!?]$/.test(s)) return false; // prose ending
-  // starts with sudo/tool-ish token
-  return /^(sudo\s+)?[a-zA-Z0-9._-]+(\s+|$)/.test(s);
+  if (/[.،؛!?]$/.test(s)) return false;
+  if (/^\{.*\}$/.test(s)) return false;
+  // avoid headings
+  if (/^#{1,6}\s/.test(s)) return false;
+  return true;
 }
 
-function normalizePrimaryCommand(rawText, cliLang) {
-  const { codeRaw, rest } = splitFirstCodeBlock(rawText);
-  let cmd = "";
-
+function pickCommandFromText(rawText) {
+  const t = String(rawText ?? "").trim();
+  if (!t) return "";
+  const { codeRaw } = splitFirstCodeBlock(t);
   if (codeRaw) {
-    const lines = codeRaw.split("\n").map((x) => x.trim()).filter(Boolean);
-    const cmdLines = lines.filter(looksLikeCommand);
-    cmd = (cmdLines.length ? cmdLines : lines.slice(0, 1)).join("\n").trim();
+    const first = codeRaw.split("\n").map(x=>x.trim()).find(Boolean) || "";
+    if (looksLikeCommand(first)) return first;
   }
-
-  if (!cmd) {
-    // fallback: first command-like line from whole text
-    const lines = String(rawText || "").split("\n").map((x) => x.trim());
-    const first = lines.find(looksLikeCommand);
-    if (first) cmd = first;
-  }
-
-  // last fallback
-  if (!cmd) cmd = cliLang === "powershell" ? "Get-Help <command>" : "man <command>";
-
-  return { cmd, restText: rest || "" };
+  const lines = t.split("\n").map(x=>x.trim()).filter(Boolean);
+  const cand = lines.find(looksLikeCommand) || "";
+  return cand;
 }
 
-function pickDefaultsByHeuristic(cmd, cliLang, os, userRequest) {
-  const c = String(cmd || "").toLowerCase();
-  const req = String(userRequest || "").toLowerCase();
+function ensure3Alternatives(arr) {
+  const a = Array.isArray(arr) ? arr.slice(0, 3) : [];
+  while (a.length < 3) a.push({ command: "", note: "" });
+  return a.map(x => ({
+    command: toOneLineCommand(x?.command || ""),
+    note: String(x?.note || "").trim()
+  }));
+}
 
-  // defaults
+function mdList(items) {
+  const arr = Array.isArray(items) ? items.filter(Boolean) : [];
+  if (!arr.length) return "- (none)";
+  return arr.map(x => `- ${String(x).trim()}`).join("\n");
+}
+
+function altMarkdown(alts, lang) {
+  const a = ensure3Alternatives(alts);
+  return a.map((x) => {
+    const note = x.note ? `- ${x.note}\n\n` : "";
+    const cmd = x.command || "";
+    return `${note}\`\`\`${lang}\n${cmd}\n\`\`\``.trim();
+  }).join("\n\n");
+}
+
+export function formatToolResponse({
+  rawText = "",
+  text = "",
+  cli = "bash",
+  outputType = "tool",
+  verbosity = "normal", // brief | normal | detailed
+  forcedCommand = "",
+} = {}) {
+  const lang = fenceLangFromCli(cli, outputType);
+  const src = (typeof rawText === "string" && rawText.trim()) ? rawText : String(text || "");
+
+  // Unwrap JSON tool if model returned JSON
+  const parsed = tryParseJSONMaybe(src);
+  const toolFromJson = parsed?.tool && typeof parsed.tool === "object" ? parsed.tool : null;
+  const markdownFromJson = typeof parsed?.markdown === "string" ? parsed.markdown : "";
+
+  let primaryCmd = "";
   let explanation = "";
   let warnings = [];
   let alternatives = [];
 
-  const isWindowsCmd = cliLang === "cmd";
-  const isPowershell = cliLang === "powershell";
+  if (toolFromJson) {
+    primaryCmd = toOneLineCommand(toolFromJson?.primary?.command || "");
+    explanation = String(toolFromJson?.explanation || "").trim();
+    warnings = Array.isArray(toolFromJson?.warnings) ? toolFromJson.warnings.map(x=>String(x).trim()).filter(Boolean) : [];
+    alternatives = Array.isArray(toolFromJson?.alternatives) ? toolFromJson.alternatives : [];
+  }
 
-  // --- Reboot / shutdown
-  if (c.includes("reboot") || c.includes("shutdown") || req.includes("ریستارت") || req.includes("reboot")) {
-    explanation = "این دستور سیستم را ریستارت می‌کند.";
+  // Forced command wins (Explain mode)
+  if (forcedCommand) primaryCmd = toOneLineCommand(forcedCommand);
+
+  // Fallback extraction
+  if (!primaryCmd) primaryCmd = pickCommandFromText(markdownFromJson || src);
+  primaryCmd = toOneLineCommand(primaryCmd);
+
+  // Explanation fallback
+  if (!explanation) {
+    // remove any code fences and keep rest
+    const rest = splitFirstCodeBlock(markdownFromJson || src).rest;
+    explanation = String(rest || "").trim();
+  }
+
+  // Make verbosity behavior deterministic for explain UX
+  if (verbosity === "brief") {
+    // keep 1–2 sentences
+    explanation = explanation.split("\n").join(" ").trim();
+    explanation = explanation.split("。").join("."); // just normalize punctuation a bit
+    if (explanation.length > 180) explanation = explanation.slice(0, 180).trim() + "…";
+  } else if (verbosity === "detailed") {
+    // if no obvious example section, add minimal example hint
+    if (!/مثال|example/i.test(explanation)) {
+      explanation = `${explanation}\n\nمثال:\n- اگر خواستی این عملیات را لغو کنی، از دستور/گزینه‌ی مربوطه استفاده کن.`;
+    }
+  }
+
+  // Warnings fallback minimal safe set if empty
+  if (!warnings.length) {
     warnings = [
-      "قبل از اجرا، کارهای ذخیره‌نشده را ذخیره کنید.",
-      "اگر روی SSH هستید، اتصال شما قطع می‌شود.",
-      "در محیط Production بهتر است زمان‌بندی/اطلاع‌رسانی انجام شود."
+      "قبل از اجرا فایل‌های ذخیره‌نشده را ذخیره کنید.",
+      "اگر روی SSH/Remote هستید ممکن است اتصال شما قطع شود.",
+      "در محیط Production قبل از اجرا، اثرات و Rollback را بررسی کنید."
     ];
-    alternatives = [
-      { command: "sudo systemctl reboot", note: "روش استاندارد در سیستم‌های systemd" },
-      { command: "sudo shutdown -r now", note: "ریستارت فوری" },
-      { command: "sudo shutdown -r +1", note: "ریستارت با ۱ دقیقه تأخیر" },
-    ];
-    return { explanation, warnings, alternatives };
   }
 
-  // --- Linux service restart
-  if (c.startsWith("systemctl") && (c.includes("restart") || req.includes("ریستارت سرویس"))) {
-    explanation = "سرویس را ریستارت می‌کند تا تغییرات اعمال شود یا مشکل موقت برطرف شود.";
-    warnings = [
-      "ریستارت سرویس ممکن است باعث قطعی لحظه‌ای شود.",
-      "اگر سرویس stateful است، قبل از ریستارت وضعیت را بررسی کنید."
-    ];
-    alternatives = [
-      { command: cmd.replace(/\brestart\b/i, "status"), note: "قبل از اقدام، وضعیت سرویس" },
-      { command: cmd.replace(/\brestart\b/i, "reload"), note: "اگر پشتیبانی شود، بدون قطع کامل" },
-      { command: cmd.replace(/\brestart\b/i, "try-restart"), note: "فقط اگر سرویس در حال اجرا باشد" },
-    ];
-    return { explanation, warnings, alternatives };
-  }
-
-  // --- Windows local users
-  if ((req.includes("یوزر") || req.includes("کاربر") || req.includes("user")) && (c.startsWith("net user") || c === "net user")) {
-    explanation = "لیست کاربران محلی را نمایش می‌دهد.";
-    warnings = [
-      "در سیستم‌های Domain، خروجی ممکن است با کاربران دامنه متفاوت باشد.",
-      "برای برخی اطلاعات ممکن است دسترسی Administrator لازم باشد."
-    ];
-    alternatives = [
-      { command: "net user | find /c /v \"\"", note: "تعداد کاربران (شمارش خطوط خروجی)" },
-      { command: "powershell -Command \"Get-LocalUser | Select -Expand Name\"", note: "لیست کاربران با PowerShell" },
-      { command: "whoami", note: "نمایش کاربر فعلی (جایگزین مستقیم نیست، اما رایج)" },
-    ];
-    return { explanation, warnings, alternatives };
-  }
-
-  // --- Fallback generic
-  explanation = "دستور بالا اقدام اصلی مرتبط با درخواست شما را انجام می‌دهد.";
-  warnings = [
-    "قبل از اجرا، مطمئن شوید روی سیستم/محیط درست هستید.",
-    "در صورت نیاز به دسترسی بالا، از sudo/Administrator استفاده کنید."
-  ];
-  alternatives = [
-    { command: cmd, note: "همان دستور (اصلی)" },
-    { command: isWindowsCmd ? "help" : "--help", note: "نمایش راهنمای ابزار" },
-    { command: isWindowsCmd ? "where <command>" : "which <command>", note: "بررسی مسیر/وجود دستور" },
-  ];
-  return { explanation, warnings, alternatives };
-}
-
-function renderMarkdown(primary, explanation, warnings, alternatives, langTag) {
-  const altMd = alternatives.map((a, i) =>
-    `- ${a.note}\n\n\`\`\`${langTag}\n${a.command}\n\`\`\``
-  ).join("\n\n");
-
-  const warnMd = warnings.map((w) => `- ${w}`).join("\n");
-
-  return `\`\`\`${langTag}\n${primary}\n\`\`\`\n\n## توضیح\n${explanation}\n\n## هشدارها\n${warnMd}\n\n## جایگزین‌ها\n${altMd}\n`;
-}
-
-export function formatToolResponse({ text, cli = "bash", outputType = "markdown", os = "linux", lang = "fa", userRequest = "" }) {
-  const langTag = fenceLangFromCli(cli, outputType);
-  const raw = String(text ?? "").trim();
-
-  // Primary command extraction
-  const { cmd, restText } = normalizePrimaryCommand(raw, langTag);
-
-  // Try to reuse some explanation from model if it exists (short), else heuristic
-  const heuristic = pickDefaultsByHeuristic(cmd, langTag, os, userRequest);
-
-  let explanation = heuristic.explanation;
-  if (restText && restText.length >= 10 && restText.length <= 420) {
-    // use short remainder as explanation if it looks like prose
-    explanation = restText.replace(/^#+\s*/g, "").trim() || explanation;
-  }
-
-  // ensure always 3 alternatives
-  const alternatives = (heuristic.alternatives || []).slice(0, 3);
-  while (alternatives.length < 3) alternatives.push({ command: cmd, note: "جایگزین" });
+  alternatives = ensure3Alternatives(alternatives);
 
   const tool = {
-    primary: { command: cmd, lang: langTag },
+    primary: { command: primaryCmd, lang },
     explanation,
-    warnings: (heuristic.warnings || []).length ? heuristic.warnings : ["قبل از اجرا بررسی کنید."],
+    warnings,
     alternatives
   };
 
-  const markdown = renderMarkdown(
-    tool.primary.command,
-    tool.explanation,
-    tool.warnings,
-    tool.alternatives,
-    tool.primary.lang
-  );
+  const md =
+`\`\`\`${lang}
+${primaryCmd}
+\`\`\`
 
-  return { tool, markdown };
+## توضیح
+${explanation}
+
+## هشدارها
+${mdList(warnings)}
+
+## جایگزین‌ها
+${altMarkdown(alternatives, lang)}
+`.trim();
+
+  return { tool, markdown: md, output: md };
 }
 
-// Back-compat alias
 export const formatOutput = formatToolResponse;

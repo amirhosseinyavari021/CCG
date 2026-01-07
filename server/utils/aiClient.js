@@ -86,7 +86,14 @@ function normalizeVars(payload) {
     ),
 
     user_request: asString(ur ?? "").trim(),
-  };
+  
+    // extra context (safe; may be used by fallback prompt or future prompt versions)
+    outputType: asString(b.outputType ?? b.output_type ?? ""),
+    modeStyle: asString(b.modeStyle ?? b.mode_style ?? ""),
+    vendor: asString(b.vendor ?? ""),
+    deviceType: asString(b.deviceType ?? b.device_type ?? ""),
+    force_raw: asString(b.force_raw ?? b.forceRaw ?? ""),
+};
 }
 
 /**
@@ -193,12 +200,18 @@ export async function runAI({ variables, fallbackPrompt, temperature = 0.35 }) {
 
   const v = normalizeVars(variables);
 
-  // If user_request is empty, don't call OpenAI
+  
+
+  const forceRaw = String(v.force_raw || "").trim() === "1";
+  const mode = String(v.mode || "").toLowerCase();
+  const skipStored = forceRaw || mode === "generate" || mode === "chat";
+// If user_request is empty, don't call OpenAI
   if (!v.user_request) {
     return { ok: false, output: "", error: "Empty user_request" };
   }
 
   // ----------------------
+    if (!skipStored) {
   // 1) Stored Prompt attempt
   // ----------------------
   if (PROMPT_ID) {
@@ -231,6 +244,8 @@ export async function runAI({ variables, fallbackPrompt, temperature = 0.35 }) {
   }
 
   // ----------------------
+    }
+
   // 2) Fallback raw prompt
   // ----------------------
   try {

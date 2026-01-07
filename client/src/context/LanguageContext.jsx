@@ -2,138 +2,92 @@ import React, { createContext, useContext, useMemo, useState } from "react";
 
 const LanguageContext = createContext(null);
 
-const DICT = {
+const dict = {
   en: {
     generator: "Generator",
     comparator: "Code Comparator",
-    chat: "گفت‌وگو",
-
-    signIn: "Sign in",
-    menu: "Menu",
-
-    // generator ui
-    platform: "Platform",
-    vendor: "Vendor",
-    deviceType: "Device Type",
-    outputType: "Output Type",
-    cliShell: "CLI / Shell",
-    knowledge: "Knowledge",
-    style: "Output style",
-    request: "Request",
-    learnInput: "Command / code you want to understand",
-    advanced: "Advanced",
-
-    learn: "Learn",
-    generate: "Generate",
-    operational: "Operational",
-    detailed: "Detailed",
-
-    beginner: "Beginner",
-    intermediate: "Intermediate",
-    expert: "Expert",
-
-    commandShell: "Command / Shell",
-    pythonAutomation: "Python Automation",
-
-    inputs: "Inputs",
+    chat: "Chat",
     output: "Output",
-    generateBtn: "Generate Output",
-    learnBtn: "Explain",
-    swapIO: "Swap Input ↔ Output",
-    openErrorAnalyzer: "Open Error Analyzer",
-    errorShortcutText:
-      "If you hit an error… open Error Analyzer to get root cause + fix + verification.",
-
-    placeholderReq: "e.g. safely check disk usage on a Linux server",
-    placeholderLearn: "e.g. ls -la   or   Get-Process",
-    outputPlaceholder: "Output will appear here.",
-
-    tip_platform: "Choose target OS/device so outputs match your environment.",
-    tip_vendor: "Select network vendor (must match backend supported vendors).",
-    tip_deviceType: "Choose device type for more accurate network commands.",
-    tip_outputType: "Command output or Python automation script.",
-    tip_cliShell: "Choose shell to match your system.",
-    tip_knowledge: "Controls depth of explanation.",
-    tip_style: "Operational: concise. Detailed: more explanation + warnings.",
-    tip_request: "Describe what you want. Include constraints and safety requirements.",
-    tip_learnInput: "Paste the command/code you want explained.",
-
-    ea_title: "Error Analyzer",
-    ea_command: "Command / Error / Log",
-    ea_context: "Extra context (optional)",
-    ea_analyze: "Analyze",
-    ea_clear: "Clear",
-    ea_result: "Analysis result will appear here.",
+    outputPlaceholder: "Your result will appear here.",
+    request: "Request",
+    placeholderReq: "درخواستت را واضح بنویس (هدف + محدودیت‌ها). مثال: «می‌خوام فضای خالی دیسک رو ببینم»",
+    generate: "Generate",
+    explainMore: "Explain this command",
+    platform: "Platform",
+    shell: "Shell/CLI",
+    outputType: "Output type",
+    tool: "Tool (recommended)",
+    commandShell: "Command",
+    pythonAutomation: "Python automation",
+    advanced: "Advanced",
+    verbosity: "Verbosity",
+    concise: "Concise",
+    normal: "Normal",
+    detailed: "Detailed",
+    osDetails: "OS details",
+    osFamily: "OS family",
+    osName: "OS name",
+    osVersion: "OS version (optional)",
+    customOS: "Custom OS (validated)",
+    customShell: "Custom shell (validated)",
+    tip_platform: "Choose your target platform (what you want commands for).",
+    tip_outputType: "Tool=command+explanation+warnings+alternatives. Command=copy-only. Python=automation script.",
+    tip_vendor: "Network vendor/device type.",
+    tip_shell: "Target shell/CLI (bash/pwsh/cmd...).",
+    tip_verbosity: "Only affects explanation depth. Command and warnings remain stable.",
+    errorShortcutText: "Got an error? Use the analyzer or chat.",
+    openErrorAnalyzer: "Open error analyzer",
+    vendor: "Vendor",
+    deviceType: "Device type",
   },
-
   fa: {
     generator: "جنریتور",
     comparator: "مقایسه کد",
-    chat: "Chat",
-
-    signIn: "ورود",
-    menu: "منو",
-
-    platform: "پلتفرم",
-    vendor: "وندور",
-    deviceType: "نوع دستگاه",
-    outputType: "نوع خروجی",
-    cliShell: "شل / CLI",
-    knowledge: "سطح دانش",
-    style: "استایل خروجی",
-    request: "درخواست",
-    learnInput: "کامند/کد برای یادگیری",
-    advanced: "تنظیمات بیشتر",
-
-    learn: "Learn",
-    generate: "Generate",
-    operational: "عملیاتی",
-    detailed: "Detailed",
-
-    beginner: "مبتدی",
-    intermediate: "متوسط",
-    expert: "حرفه‌ای",
-
-    commandShell: "کامند / شل",
-    pythonAutomation: "اتوماسیون پایتون",
-
-    inputs: "ورودی‌ها",
+    chat: "گفت‌وگو",
     output: "خروجی",
-    generateBtn: "ساخت خروجی",
-    learnBtn: "توضیح بده",
-    swapIO: "جابجایی ورودی ↔ خروجی",
-    openErrorAnalyzer: "باز کردن آنالیز خطا",
-    errorShortcutText:
-      "اگر به خطا خوردی… آنالیز خطا را باز کن تا علت + رفع + صحت‌سنجی را بگیری.",
-
-    placeholderReq: "مثلاً: بررسی امن فضای دیسک روی سرور لینوکس",
-    placeholderLearn: "مثلاً: ls -la  یا  Get-Process",
     outputPlaceholder: "خروجی اینجا نمایش داده می‌شود.",
-
-    tip_platform: "سیستم مقصد را انتخاب کن تا خروجی دقیق و درست باشد.",
-    tip_vendor: "وندور شبکه را انتخاب کن (با بک‌اند باید یکی باشد).",
-    tip_deviceType: "نوع دستگاه شبکه را انتخاب کن.",
-    tip_outputType: "خروجی کامند/شل یا اسکریپت پایتون بگیر.",
-    tip_cliShell: "شل متناسب سیستم را انتخاب کن.",
-    tip_knowledge: "عمق توضیح را کنترل می‌کند.",
-    tip_style: "عملیاتی: خلاصه. Detailed: توضیح بیشتر + هشدارها.",
-    tip_request: "درخواستت را دقیق بنویس و محدودیت‌ها را بگو.",
-    tip_learnInput: "کامند/کدی که می‌خواهی توضیح داده شود را قرار بده.",
-
-    ea_title: "آنالیز خطا",
-    ea_command: "کامند / خطا / لاگ",
-    ea_context: "توضیح تکمیلی (اختیاری)",
-    ea_analyze: "تحلیل",
-    ea_clear: "پاک کردن",
-    ea_result: "نتیجه تحلیل اینجا نمایش داده می‌شود.",
+    request: "درخواست",
+    placeholderReq: "درخواستت را واضح بنویس (هدف + محدودیت‌ها). مثال: «می‌خوام فضای خالی دیسک رو ببینم»",
+    generate: "Generate",
+    explainMore: "توضیح همین دستور",
+    platform: "پلتفرم",
+    shell: "شل / CLI",
+    outputType: "نوع خروجی",
+    tool: "Tool (پیشنهادی)",
+    commandShell: "کامند",
+    pythonAutomation: "اتوماسیون پایتون",
+    advanced: "Advanced",
+    verbosity: "Verbosity",
+    concise: "خلاصه",
+    normal: "نرمال",
+    detailed: "جزئی",
+    osDetails: "جزئیات سیستم‌عامل",
+    osFamily: "خانواده OS",
+    osName: "نام OS",
+    osVersion: "ورژن (اختیاری)",
+    customOS: "OS سفارشی (با اعتبارسنجی)",
+    customShell: "Shell سفارشی (با اعتبارسنجی)",
+    tip_platform: "برای چه پلتفرمی خروجی می‌خواهی (Target)؟",
+    tip_outputType: "Tool=کامند+توضیح+هشدار+جایگزین‌ها. کامند=فقط قابل کپی. پایتون=اسکریپت اتوماسیون.",
+    tip_vendor: "برند/نوع دستگاه شبکه.",
+    tip_shell: "شل مقصد (bash/pwsh/cmd...).",
+    tip_verbosity: "فقط روی میزان توضیح اثر دارد. کامند و هشدارها ثابت می‌مانند.",
+    errorShortcutText: "ارور داری؟ از آنالیزور یا چت استفاده کن.",
+    openErrorAnalyzer: "باز کردن آنالیزور خطا",
+    vendor: "Vendor",
+    deviceType: "Device Type",
   },
 };
 
 export function LanguageProvider({ children }) {
-  const [lang, setLang] = useState(() => localStorage.getItem("ccg_lang") || "en");
-  const t = (key) => (DICT[lang] && DICT[lang][key]) || DICT.en[key] || key;
+  const [lang, setLang] = useState("fa");
 
-  const value = useMemo(() => ({ lang, setLang, t }), [lang]);
+  const t = useMemo(() => {
+    return (key) => dict?.[lang]?.[key] ?? dict?.en?.[key] ?? key;
+  }, [lang]);
+
+  const value = useMemo(() => ({ lang, setLang, t }), [lang, t]);
+
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }
 
@@ -142,5 +96,3 @@ export function useLanguage() {
   if (!ctx) throw new Error("useLanguage must be used within LanguageProvider");
   return ctx;
 }
-document.body.classList.add("night-mode");
-document.body.classList.add("day-mode");
