@@ -60,110 +60,96 @@ function normBody(req) {
   };
 }
 
+
 router.post("/", async (req, res) => {
-  const body = (req && req.body && typeof req.body === "object") ? req.body : {};
+  const body = (req?.body && typeof req.body === "object") ? req.body : {};
+  const mode = String(body.mode || "generate").toLowerCase(); // generate | explain
+  const lang = String(body.lang || "fa");
+  const platform = String(body.platform || "linux");
+  const os = String(body.os || platform || "linux");
+  const cli = String(body.cli || "bash");
+  const vendor = body.vendor ? String(body.vendor) : "";
+  const deviceType = body.deviceType ? String(body.deviceType) : "general";
+  const verbosity = String(body.verbosity || "normal").toLowerCase(); // brief|normal|detailed
+  const outputType = String(body.outputType || "tool").toLowerCase(); // tool|command|python
 
-  // Back-compat fields
-  const mode = String(body.mode || "generate").toLowerCase();
-  const verbosity = String(body.verbosity || body.knowledgeLevel || "normal").toLowerCase(); // brief|normal|detailed (or old levels)
-  const outputType = String(body.outputType || "tool").toLowerCase();
+  const user_request = String(body.user_request || body.userRequest || "").trim();
+  const targetCommand = String(body.targetCommand || body.command || "").trim();
 
-  const userRequest = String(
-    body.user_request ?? body.userRequest ?? body.request ?? body.prompt ?? ""
-  ).trim();
-
-  const targetCommand = String(body.targetCommand || "").trim();
-
-  if (!userRequest && mode !== "explain") {
-    return res.status(400).json({ ok: false, error: "MISSING_USER_REQUEST" });
-  }
-  if (mode === "explain" && !targetCommand) {
-    return res.status(400).json({ ok: false, error: "MISSING_TARGET_COMMAND" });
-  }
+  if (!user_request) return res.status(400).json({ ok:false, error:"MISSING_USER_REQUEST" });
 
   try {
-    // Normalize context
-    const lang = String(body.lang || "fa");
-    const platform = String(body.platform || body.os || "linux");
-    const os = String(body.os || platform || "linux");
-    const cli = String(body.cli || body.shell || "bash");
-    const vendor = body.vendor ? String(body.vendor) : "";
-    const deviceType = body.deviceType ? String(body.deviceType) : "";
-
-    // Build prompt variables (use existing transformer if present)
     const vars = toPromptVariables({
       ...body,
-      mode,
-      verbosity,
-      outputType,
       lang,
       platform,
       os,
       cli,
       vendor,
       deviceType,
-      user_request: userRequest
+      verbosity,
+      outputType,
+      user_request
     });
 
-    // Deterministic hint — makes verbosity/mode actually take effect
-    const toolHint =
-`[CCG_MODE=${mode}]
-[VERBOSITY=${verbosity}]
-[PLATFORM=${platform}]
-[OS=${os}]
-[CLI=${cli}]
-[VENDOR=${vendor}]
-[DEVICE_TYPE=${deviceType}]
-Return tool-style output. In explain mode: DO NOT change the command.`;
+    // Strong hint for model behaviour
+    const hint = `[CCG]
+mode=${mode}
+outputType=${outputType}
+verbosity=${verbosity}
+platform=${platform}
+os=${os}
+cli=${cli}
+vendor=${vendor}
+deviceType=${deviceType}
+Rules:
+- tool: command + explanation + warnings + alternatives
+- command: command + warnings + alternatives (NO explanation)
+- python: python code only (NO explanation/warnings/alternatives)`;
 
-    const finalUserRequest =
-      (mode === "explain")
-        ? `Explain this exact command WITHOUT changing it:\n${targetCommand}\n\nContext:\n${userRequest}\n\n${toolHint}`
-        : `${userRequest}\n\n${toolHint}`;
+    const finalUser = (mode === "explain" && targetCommand)
+      ? `${hint}\nExplain this exact command WITHOUT changing it:\n${targetCommand}\nContext:\n${user_request}`
+      : `${hint}\n${user_request}`;
 
-    vars.user_request = finalUserRequest;
-
+    vars.user_request = finalUser;
+    vars.force_raw = "1";
     const fallbackPrompt = buildFallbackPrompt(vars);
 
-    const ai = await withTimeout(runAI({
-      userRequest: finalUserRequest,
+    const ai = await runAI({
+      userRequest: finalUser,
       variables: vars,
       fallbackPrompt,
-    }), 18000, "openai_timeout");
+    });
 
-    const out = String(ai?.output ?? ai?.result ?? "").trim();
+    const raw = String(ai?.output ?? ai?.result ?? "").trim();
+    const forced = (mode === "explain" && targetCommand) ? targetCommand : "";
 
-    // formatToolResponse must accept forcedCommand for explain mode
     const formatted = formatToolResponse({
-      rawText: out,
+      rawText: raw,
       cli,
       outputType,
-      userRequest: finalUserRequest,
-      forcedCommand: mode === "explain" ? targetCommand : ""
+      forcedCommand: forced,
     });
 
-    // Backward compatible response:
-    // - output: markdown string
-    // - tool: tool object
+    // Always return stable shape
     return res.json({
       ok: true,
-      output: formatted.output || formatted.markdown || "",
-      tool: formatted.tool || null,
-      markdown: formatted.markdown || formatted.output || "",
-      result: formatted.output || formatted.markdown || ""
+      output: formatted.output,
+      tool: formatted.tool,
+      meta: { mode, outputType, verbosity, platform, os, cli }
     });
+
   } catch (e) {
-    const msg = String(e?.message || e || "");
-    const code = msg.includes("openai_timeout") ? "OPENAI_TIMEOUT" : "AI_ERROR";
+    console.error("[CCG] ROUTE_ERROR", e);
     return res.status(200).json({
       ok: false,
-      error: code,
-      message: msg.slice(0, 500),
+      error: e?.message || "CCG_ERROR",
       output: "",
       tool: null
     });
   }
 });
+
 
 
 export default router;

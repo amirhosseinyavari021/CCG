@@ -4,7 +4,7 @@ import { useLanguage } from "../../context/LanguageContext";
 
 export default function WelcomeModal({ onClose, onComplete }) {
   const { loginAsGuest } = useAuth();
-  const { lang } = useLanguage();
+  const { lang, setLang, t } = useLanguage();
 
   const tryAsGuest = () => {
     loginAsGuest();

@@ -12,7 +12,7 @@ function safeParse(json, fallback) {
 }
 
 export default function ChatPage() {
-  const { t, lang } = useLanguage();
+  const { lang, setLang, t } = useLanguage();
 
   const [profile] = useState(() => safeParse(localStorage.getItem(LS_PROFILE) || "{}", {}));
   const [sessionId, setSessionId] = useState(() => localStorage.getItem(LS_SESSION) || "");

@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useLanguage } from "../../context/LanguageContext";
 
 export default function RoleSelectModal({ onClose }) {
-  const { lang } = useLanguage();
+  const { lang, setLang, t } = useLanguage();
   const [role, setRole] = useState("expert"); // ✅ default expert (چون پیش‌فرض زبان en است و تو محصول pro-DevOps می‌خوای)
 
   useEffect(() => {

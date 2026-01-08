@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useLanguage } from "../../context/LanguageContext";
 
 export default function LanguageSelectModal({ onClose }) {
-  const { changeLanguage } = useLanguage();
+  const { lang, setLang, t } = useLanguage();
 
   // ✅ default English
   const [selectedLang, setSelectedLang] = useState("en");

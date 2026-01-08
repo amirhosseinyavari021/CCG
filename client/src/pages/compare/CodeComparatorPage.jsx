@@ -116,7 +116,7 @@ function ErrorAnalyzerModal({ open, onClose, lang, defaultText, context }) {
 }
 
 export default function CodeComparatorPage({ onSwitchPage }) {
-  const { isRTL, lang } = useLanguage();
+  const { lang, setLang, t } = useLanguage();
 
   const [knowledgeLevel, setKnowledgeLevel] = useState("intermediate"); // default
   const [codeLang, setCodeLang] = useState("bash"); // bash | powershell | python | ios | routeros | fortios
@@ -168,7 +168,6 @@ export default function CodeComparatorPage({ onSwitchPage }) {
       analyzer: "Error Analyzer",
     };
     return lang === "fa" ? fa : en;
-  }, [lang]);
 
   function doSwapAB() {
     setSwapAB((p) => !p);

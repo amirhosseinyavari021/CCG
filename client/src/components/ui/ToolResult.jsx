@@ -1,97 +1,110 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
-function CopyBtn({ value }) {
+
+
+// CCG_TOOLRESULT_JSON_GUARD_V1
+function tryParseToolJsonString(maybe) {
+  const t = String(maybe || "").trim();
+  if (!t) return null;
+  if (!(t.startsWith("{") && t.endsWith("}"))) return null;
+  try {
+    const obj = JSON.parse(t);
+    const tool = (obj && typeof obj.tool === "object") ? obj.tool : obj;
+    if (!tool || typeof tool !== "object") return null;
+    if (!fixedTool.primary || typeof fixedTool.primary !== "object") return null;
+    if (typeof fixedTool.primary.command !== "string") return null;
+    return tool;
+  } catch {
+    return null;
+  }
+}
+
+
+function CopyBtn({ text }) {
   const [ok, setOk] = useState(false);
 
-  const onCopy = async () => {
+  const copy = async () => {
     try {
-      await navigator.clipboard.writeText(String(value || ""));
+      await navigator.clipboard.writeText(text || "");
       setOk(true);
       setTimeout(() => setOk(false), 900);
-    } catch {
-      // ignore
-    }
+    } catch {}
   };
 
   return (
-    <button
-      type="button"
-      onClick={onCopy}
-      className="ccg-btn px-3 py-1 text-xs"
-      disabled={!value}
-      title={value ? "Copy" : "Nothing to copy"}
-    >
+    <button className="ccg-btn text-xs px-3 py-1" type="button" onClick={copy}>
       {ok ? "Copied" : "Copy"}
     </button>
   );
 }
 
-function oneLineCommand(s) {
-  const t = String(s || "").trim();
-  const m = t.match(/^\s*```[^\n]*\n([\s\S]*?)\n?```\s*$/);
-  const un = (m ? m[1] : t).trim();
-  const first = un.split("\n").map(x=>x.trim()).find(Boolean) || "";
-  return first;
+function CodeBlock({ lang, code }) {
+  return (
+    <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 text-xs bg-white/5">
+        <span className="opacity-80">lang: {lang || "bash"}</span>
+        <CopyBtn text={code} />
+      </div>
+      <pre className="p-3 text-sm overflow-auto"><code>{code}</code></pre>
+    </div>
+  );
 }
 
 export default function ToolResult({ tool }) {
-  const t = tool || {};
-  const primary = t.primary || {};
-  const cmd = useMemo(() => oneLineCommand(primary.command || ""), [primary.command]);
-  const lang = String(primary.lang || "bash");
+  
+  const fixedTool = (() => {
+    const parsed = tryParseToolJsonString(fixedTool?.explanation);
+    return parsed ? { ...tool, ...parsed } : tool;
+  })();
+const safe = useMemo(() => {
+    const t = (tool && typeof tool === "object") ? tool : {};
+    const primary = (t.primary && typeof t.primary === "object") ? t.primary : {};
+    return {
+      primary: { command: String(primary.command || ""), lang: String(primary.lang || "bash") },
+      explanation: typeof t.explanation === "string" ? t.explanation : "",
+      warnings: Array.isArray(t.warnings) ? t.warnings : [],
+      alternatives: Array.isArray(t.alternatives) ? t.alternatives : []
+    };
+  }, [tool]);
 
-  const warnings = Array.isArray(t.warnings) ? t.warnings : [];
-  const alts = Array.isArray(t.alternatives) ? t.alternatives : [];
+  const cmd = safe.primary.command.trim();
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1">
-          <div className="text-sm font-semibold mb-2">Command</div>
-          <div className="rounded-xl border border-[var(--border)] bg-white/60 dark:bg-white/5 p-3">
-            <div className="flex items-start justify-between gap-3">
-              <pre className="text-sm overflow-auto m-0 leading-6"><code>{cmd}</code></pre>
-              <CopyBtn value={cmd} />
-            </div>
-            <div className="text-xs text-slate-500 mt-2">lang: {lang}</div>
+    <div className="space-y-6">
+      <div>
+        <div className="text-sm font-semibold mb-2">Command</div>
+        <CodeBlock lang={safe.primary.lang} code={cmd || 'echo "No command produced"'} />
+      </div>
+
+      {safe.explanation?.trim() ? (
+        <div>
+          <div className="text-sm font-semibold mb-2">Explanation</div>
+          <div className="text-sm leading-7 opacity-90 whitespace-pre-wrap">{safe.explanation}</div>
+        </div>
+      ) : null}
+
+      {safe.warnings?.length ? (
+        <div>
+          <div className="text-sm font-semibold mb-2">Warnings</div>
+          <ul className="list-disc pl-5 text-sm leading-7 opacity-90">
+            {safe.warnings.map((w, i) => <li key={i}>{w}</li>)}
+          </ul>
+        </div>
+      ) : null}
+
+      {safe.alternatives?.length ? (
+        <div>
+          <div className="text-sm font-semibold mb-2">Alternatives</div>
+          <div className="space-y-4">
+            {safe.alternatives.slice(0,3).map((a, i) => (
+              <div key={i} className="space-y-2">
+                {a?.note ? <div className="text-xs opacity-75">- {a.note}</div> : null}
+                <CodeBlock lang={safe.primary.lang} code={String(a.command || "").trim()} />
+              </div>
+            ))}
           </div>
         </div>
-      </div>
-
-      <div>
-        <div className="text-sm font-semibold mb-2">Explanation</div>
-        <div className="text-sm text-slate-700 dark:text-slate-200/80 whitespace-pre-wrap">
-          {String(t.explanation || "").trim()}
-        </div>
-      </div>
-
-      <div>
-        <div className="text-sm font-semibold mb-2">Warnings</div>
-        <ul className="list-disc pr-5 text-sm text-slate-700 dark:text-slate-200/80 space-y-1">
-          {warnings.map((w, i) => (
-            <li key={i}>{String(w)}</li>
-          ))}
-        </ul>
-      </div>
-
-      <div>
-        <div className="text-sm font-semibold mb-2">Alternatives</div>
-        <div className="space-y-3">
-          {alts.map((a, i) => {
-            const c = oneLineCommand(a?.command || "");
-            const note = String(a?.note || "").trim();
-            return (
-              <div key={i} className="rounded-xl border border-[var(--border)] p-3">
-                {note ? <div className="text-xs text-slate-500 mb-2">{note}</div> : null}
-                <div className="flex items-start justify-between gap-3">
-                  <pre className="text-sm overflow-auto m-0 leading-6"><code>{c}</code></pre>
-                  <CopyBtn value={c} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      ) : null}
     </div>
   );
 }

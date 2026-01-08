@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 
 export default function LanguageSelect() {
-  const { changeLanguage } = useLanguage();
+  const { lang, setLang, t } = useLanguage();
   const navigate = useNavigate();
   const [selectedLang, setSelectedLang] = useState('fa');
 

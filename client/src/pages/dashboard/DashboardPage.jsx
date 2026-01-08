@@ -12,7 +12,7 @@ import ProtectedRoute from '../../components/ProtectedRoute';
 
 export default function Dashboard() {
   const { user, token, loading } = useAuth();
-  const { t, lang } = useLanguage();
+  const { lang, setLang, t } = useLanguage();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('generator');
   const [guestRequests, setGuestRequests] = useState(0);

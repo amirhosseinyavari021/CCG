@@ -15,22 +15,8 @@ export default function ErrorAnalyzerModal({
   initialError = "",
   contextHint = {},
 }) {
-  const { lang } = useLanguage();
+  const { lang, setLang, t } = useLanguage();
 
-  const t = useMemo(() => {
-    if (lang === "fa") {
-      return {
-        title: "Error Analyzer",
-        input1: "خطا / لاگ / خروجی / کامند",
-        input2: "توضیحات تکمیلی (اختیاری)",
-        ph1: "مثال: permission denied / command not found / stack trace / nginx error ...",
-        ph2: "مثال: روی Ubuntu 22.04، بعد از آپدیت این اتفاق افتاد...",
-        run: "تحلیل کن",
-        close: "بستن",
-        apiError: "خطا در ارتباط با API",
-        outTitle: "خروجی تحلیل",
-        empty: "اینجا خروجی نمایش داده می‌شود.",
-      };
     }
     return {
       title: "Error Analyzer",
@@ -44,7 +30,6 @@ export default function ErrorAnalyzerModal({
       outTitle: "Analysis Output",
       empty: "Output will appear here.",
     };
-  }, [lang]);
 
   const [text, setText] = useState(initialError || "");
   const [extra, setExtra] = useState("");

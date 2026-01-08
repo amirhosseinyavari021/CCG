@@ -4,7 +4,7 @@ import { useLanguage } from "../../context/LanguageContext";
 
 export default function LandingPage() {
   const nav = useNavigate();
-  const { lang, changeLanguage, isRTL, t } = useLanguage();
+  const { lang, setLang, t } = useLanguage();
 
   return (
     <MainLayout>

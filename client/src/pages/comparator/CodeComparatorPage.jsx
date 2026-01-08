@@ -4,7 +4,7 @@ import SectionedMarkdown from "../../components/ui/SectionedMarkdown";
 import { callCCG } from "../../services/aiService";
 
 export default function CodeComparatorPage() {
-  const { t, lang } = useLanguage();
+  const { lang, setLang, t } = useLanguage();
 
   const [inputs, setInputs] = useState({ a: "", b: "" });
   const [output, setOutput] = useState("");

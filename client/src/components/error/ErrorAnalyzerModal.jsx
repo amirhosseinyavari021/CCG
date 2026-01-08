@@ -5,7 +5,7 @@ import MarkdownBox from "../ui/MarkdownBox";
 import { useLanguage } from "../../context/LanguageContext";
 
 export default function ErrorAnalyzerModal({ open, onClose, seed }) {
-  const { lang, t } = useLanguage();
+  const { lang, setLang, t } = useLanguage();
 
   const [command, setCommand] = useState("");
   const [context, setContext] = useState("");

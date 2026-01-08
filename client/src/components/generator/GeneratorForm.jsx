@@ -6,7 +6,7 @@ import WarningBox from "../ui/WarningBox";
 import { useLanguage } from "../../context/LanguageContext";
 
 export default function GeneratorForm() {
-  const { lang, isRTL } = useLanguage();
+  const { lang, setLang, t } = useLanguage();
   const [request, setRequest] = useState("");
   const [os, setOs] = useState("linux");
   const [result, setResult] = useState(null);

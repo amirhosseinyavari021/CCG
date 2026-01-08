@@ -1,7 +1,7 @@
 import { useLanguage } from "../../context/LanguageContext";
 
 export default function MainLayout({ children }) {
-  const { lang } = useLanguage();
+  const { lang, setLang, t } = useLanguage();
 
   return (
     <div dir={lang === "fa" ? "rtl" : "ltr"} className="min-h-screen">

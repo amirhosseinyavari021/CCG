@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useLanguage } from "../../context/LanguageContext";
 
 export default function ErrorAnalyzerDrawer({ open, onClose, initial = {} }) {
-  const { t, lang } = useLanguage();
+  const { lang, setLang, t } = useLanguage();
 
   const [command, setCommand] = useState(initial.command || "");
   const [context, setContext] = useState(initial.context || "");

@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useLanguage } from "../../context/LanguageContext";
-import { callCCG } from "../../services/aiService";
+import { useEffect, useMemo, useState } from "react";
 import ToolResult from "../../components/ui/ToolResult";
 import SectionedMarkdown from "../../components/ui/SectionedMarkdown";
+import { useLanguage } from "../../context/LanguageContext";
+import { callCCG } from "../../services/aiService";
 
+// local storage keys
 const LS_KEY = "ccg_generator_state_v2";
 
 const PLATFORM_OPTIONS = [
@@ -11,589 +12,540 @@ const PLATFORM_OPTIONS = [
   { value: "windows", label: "Windows" },
   { value: "mac", label: "macOS" },
   { value: "network", label: "Network Device" },
-  { value: "other", label: "Other (Custom)" },
+  { value: "other", label: "Other (Custom OS)" },
+];
+
+const OUTPUT_TYPES = [
+  { value: "tool", labelFa: "Tool (کامل)", labelEn: "Tool (Full)" },
+  { value: "command", labelFa: "Command (فقط دستور)", labelEn: "Command (Commands only)" },
+  { value: "python", labelFa: "Python", labelEn: "Python" },
+];
+
+const VERBOSITY = [
+  { value: "brief", labelFa: "خلاصه", labelEn: "Brief" },
+  { value: "normal", labelFa: "نرمال", labelEn: "Normal" },
+  { value: "detailed", labelFa: "جزئی", labelEn: "Detailed" },
 ];
 
 const SHELL_BY_PLATFORM = {
   linux: ["bash", "zsh", "sh"],
-  mac: ["zsh", "bash"],
   windows: ["powershell", "cmd"],
+  mac: ["zsh", "bash"],
+  network: ["cli"],
   other: ["bash", "zsh", "sh", "powershell", "cmd"],
 };
 
-const LINUX_DISTROS = ["Ubuntu","Debian","RHEL","Rocky","AlmaLinux","CentOS","Fedora","Arch","Manjaro","openSUSE","SLES","Alpine","Kali"];
-const WINDOWS_EDITIONS = ["Windows 11","Windows 10","Windows Server 2022","Windows Server 2019"];
-const NETWORK_VENDORS = [
-  { value: "cisco", label: "Cisco" },
-  { value: "mikrotik", label: "MikroTik" },
-  { value: "fortinet", label: "Fortinet" },
-  { value: "juniper", label: "Juniper" },
-  { value: "paloalto", label: "Palo Alto" },
-  { value: "arista", label: "Arista" },
-  { value: "hpe_aruba", label: "HPE Aruba" },
-  { value: "ubiquiti", label: "Ubiquiti" },
-  { value: "other", label: "Other" },
-];
+const LINUX_DISTROS = ["Ubuntu","Debian","RHEL","Rocky","AlmaLinux","CentOS","Fedora","Arch","Manjaro","openSUSE","Alpine","Kali"];
+const WINDOWS_FLAVORS = ["Windows 10","Windows 11","Windows Server 2019","Windows Server 2022"];
+const MAC_FLAVORS = ["macOS"];
 
-const NETWORK_DEVICE_TYPES = [
-  { value: "router", label: "Router" },
-  { value: "switch", label: "Switch" },
-  { value: "firewall", label: "Firewall" },
-  { value: "loadbalancer", label: "Load Balancer" },
-  { value: "wireless", label: "Wireless/AP" },
-  { value: "vpn", label: "VPN Gateway" },
-  { value: "general", label: "General" },
-];
-
-const NETWORK_OS_FLAVOR = {
-  cisco: ["Cisco IOS", "Cisco IOS-XE", "Cisco NX-OS", "Cisco ASA", "Cisco FTD"],
-  mikrotik: ["RouterOS"],
-  fortinet: ["FortiOS"],
-  juniper: ["JunOS"],
-  paloalto: ["PAN-OS"],
-  arista: ["EOS"],
-  hpe_aruba: ["ArubaOS-CX", "ArubaOS"],
-  ubiquiti: ["EdgeOS", "UniFi OS"],
-  other: ["Network OS"],
+const NETWORK_VENDORS = ["Cisco","MikroTik","FortiGate","Juniper","Aruba","Huawei","Generic"];
+const DEVICE_TYPES_BY_VENDOR = {
+  Cisco: ["switch","router","firewall"],
+  MikroTik: ["router","switch"],
+  FortiGate: ["firewall"],
+  Juniper: ["switch","router","firewall"],
+  Aruba: ["switch","controller"],
+  Huawei: ["switch","router","firewall"],
+  Generic: ["router","switch","firewall","appliance"],
 };
 
-function cleanToken(v) {
-  return String(v || "").trim().replace(/\s+/g, " ");
-}
-
-function isSafeFreeText(v, minLen = 2, maxLen = 40) {
-  const s = cleanToken(v);
-  if (s.length < minLen || s.length > maxLen) return false;
+function isSafeFreeText(v, min=2, max=40) {
+  const s = String(v||"").trim().replace(/\s+/g," ");
+  if (s.length < min || s.length > max) return false;
   return /^[a-zA-Z0-9 ._+\-\/]{2,40}$/.test(s);
 }
 
-function qsSet(params) {
-  const p = new URLSearchParams();
-  Object.entries(params).forEach(([k,v]) => {
-    if (v === undefined || v === null) return;
-    const s = String(v).trim();
-    if (!s) return;
-    p.set(k, s);
+function qsToObj() {
+  const q = new URLSearchParams(window.location.search);
+  return {
+    platform: q.get("platform") || "",
+    cli: q.get("cli") || "",
+    out: q.get("out") || "",
+    v: q.get("v") || "",
+    adv: q.get("adv") || "",
+    swap: q.get("swap") || "",
+    lang: q.get("lang") || "",
+  };
+}
+function setQS(p) {
+  const q = new URLSearchParams(window.location.search);
+  Object.entries(p).forEach(([k,v]) => {
+    if (v === "" || v == null) q.delete(k);
+    else q.set(k, String(v));
   });
-  const q = p.toString();
-  const url = q ? `?${q}` : location.pathname;
+  const url = `${window.location.pathname}?${q.toString()}`;
   window.history.replaceState({}, "", url);
 }
 
-function qsGet(key) {
-  try { return new URLSearchParams(location.search).get(key); } catch { return null; }
+function FieldLabel({ label, tip }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-sm opacity-90">{label}</span>
+      {tip ? (
+        <span className="relative group">
+          <button
+            type="button"
+            className="w-5 h-5 rounded-full border text-xs opacity-70 hover:opacity-100 dark:border-white/10"
+            aria-label={`${label} help`}
+          >
+            ?
+          </button>
+          <span className="pointer-events-none absolute z-50 hidden group-hover:block top-7 left-1/2 -translate-x-1/2 w-80 rounded-lg border bg-white p-2 text-xs text-slate-700 shadow dark:bg-slate-950 dark:text-slate-100 dark:border-white/10">
+            {tip}
+          </span>
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 export default function GeneratorPage() {
-  const { lang, t } = useLanguage();
+  const { lang, setLang, t } = useLanguage();
+  const isRTL = (lang === "fa");
 
-  // core
+    const en = {
+      platform: "Platform",
+      outputType: "Output type",
+      cli: "Shell / CLI",
+      verbosity: "Verbosity",
+      advanced: "Advanced",
+      custom: "Custom OS/Shell",
+      distro: "Distro / Flavor",
+      version: "Version (optional)",
+      vendor: "Vendor",
+      deviceType: "Device type",
+      request: "Request",
+      gen: "Generate",
+      explain: "Explain command",
+      swap: "Swap",
+      errFix: "Fix this first:",
+      tip_platform: "Target platform to generate commands for.",
+      tip_output: "Tool: full output. Command: command + warnings + alternatives (no explanation). Python: python code only.",
+      tip_cli: "Target shell/CLI (bash, PowerShell, cmd, ...).",
+      tip_verbosity: "Brief: short. Normal: standard. Detailed: full explanation + examples.",
+      tip_advanced: "Advanced fields for the selected platform only.",
+      tip_custom: "Use for custom OS/Shell. Invalid values will be blocked before sending.",
+      placeholder: "Write a clear request (goal + constraints). Example: “Restart my system”",
+    };
+
+  // Defaults
   const [platform, setPlatform] = useState("linux");
   const [cli, setCli] = useState("bash");
-  const [outputType, setOutputType] = useState("tool"); // tool | markdown
-  const [verbosity, setVerbosity] = useState("normal"); // brief|normal|detailed
-
-  // input/output
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [apiErr, setApiErr] = useState("");
-  const [formErr, setFormErr] = useState("");
-
-  const [markdown, setMarkdown] = useState("");
-  const [toolResult, setToolResult] = useState(null);
-
-  // network fields (NORMAL)
-  const [vendor, setVendor] = useState("cisco");
-  const [deviceType, setDeviceType] = useState("general");
-
-  // advanced toggles
+  const [outputType, setOutputType] = useState("tool");
+  const [verbosity, setVerbosity] = useState("normal");
   const [advanced, setAdvanced] = useState(false);
-  const [customEnabled, setCustomEnabled] = useState(false);
+  const [swap, setSwap] = useState(false);
 
-  // advanced per platform
+  // advanced per-platform
   const [linuxDistro, setLinuxDistro] = useState("Ubuntu");
-  const [linuxVersion, setLinuxVersion] = useState("");
+  const [windowsFlavor, setWindowsFlavor] = useState("Windows 11");
+  const [macFlavor, setMacFlavor] = useState("macOS");
+  const [osVersion, setOsVersion] = useState("");
 
-  const [windowsEdition, setWindowsEdition] = useState("Windows 11");
-  const [windowsVersion, setWindowsVersion] = useState("");
+  // network
+  const [vendor, setVendor] = useState("Cisco");
+  const [deviceType, setDeviceType] = useState("router");
 
-  const [macVersion, setMacVersion] = useState("");
-
-  const [netOs, setNetOs] = useState("Cisco IOS");
-  const [netOsVersion, setNetOsVersion] = useState("");
-
-  // custom (validated before API)
+  // custom
+  const [customOn, setCustomOn] = useState(false);
   const [customOS, setCustomOS] = useState("");
   const [customShell, setCustomShell] = useState("");
 
-  const isNetwork = platform === "network";
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+  const [output, setOutput] = useState("");
+  const [tool, setTool] = useState(null);
 
-  const shellOptions = useMemo(() => {
-    if (isNetwork) return ["network"];
-    const arr = SHELL_BY_PLATFORM[platform] || ["bash"];
-    return arr;
-  }, [platform, isNetwork]);
-
-  // keep cli valid when platform changes
+  // Load persisted state
   useEffect(() => {
-    if (isNetwork) {
-      setCli("network");
-      return;
-    }
-    const opts = SHELL_BY_PLATFORM[platform] || ["bash"];
-    if (!opts.includes(cli)) setCli(opts[0]);
-  }, [platform, isNetwork]); // eslint-disable-line
+    try {
+      const saved = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
+      const q = qsToObj();
 
-  // advanced options must follow platform (no mismatch)
-  useEffect(() => {
-    setFormErr("");
-    setApiErr("");
-    if (platform === "linux") {
-      // keep sane defaults
-      if (!LINUX_DISTROS.includes(linuxDistro)) setLinuxDistro("Ubuntu");
-    }
-    if (platform === "windows") {
-      if (!WINDOWS_EDITIONS.includes(windowsEdition)) setWindowsEdition("Windows 11");
-    }
-    if (platform === "network") {
-      const list = NETWORK_OS_FLAVOR[vendor] || ["Network OS"];
-      if (!list.includes(netOs)) setNetOs(list[0]);
-    }
-    if (platform !== "other") {
-      // custom mode only meaningful inside advanced, but keep state
-    }
-  }, [platform, vendor]); // eslint-disable-line
+      const p = q.platform || saved.platform || "linux";
+      const c = q.cli || saved.cli || (SHELL_BY_PLATFORM[p]?.[0] || "bash");
+      const out = q.out || saved.outputType || "tool";
+      const v = q.v || saved.verbosity || "normal";
+      const adv = (q.adv ? q.adv === "1" : !!saved.advanced);
+      const sw = (q.swap ? q.swap === "1" : !!saved.swap);
 
-  // persistence (localStorage + URL query)
-  const firstLoad = useRef(true);
-  useEffect(() => {
-    const saved = (() => {
-      try { return JSON.parse(localStorage.getItem(LS_KEY) || "null"); } catch { return null; }
-    })();
+      if (q.lang) setLang(q.lang);
 
-    const qPlatform = qsGet("platform");
-    const qCli = qsGet("cli");
-    const qVerb = qsGet("v");
-    const qOut = qsGet("out");
+      setPlatform(p);
+      setCli(c);
+      setOutputType(out);
+      setVerbosity(v);
+      setAdvanced(adv);
+      setSwap(sw);
 
-    const s = saved || {};
-    setPlatform(qPlatform || s.platform || "linux");
-    setCli(qCli || s.cli || "bash");
-    setVerbosity(qVerb || s.verbosity || "normal");
-    setOutputType(qOut || s.outputType || "tool");
+      setLinuxDistro(saved.linuxDistro || "Ubuntu");
+      setWindowsFlavor(saved.windowsFlavor || "Windows 11");
+      setMacFlavor(saved.macFlavor || "macOS");
+      setOsVersion(saved.osVersion || "");
 
-    setVendor(s.vendor || "cisco");
-    setDeviceType(s.deviceType || "general");
+      setVendor(saved.vendor || "Cisco");
+      setDeviceType(saved.deviceType || "router");
 
-    setAdvanced(Boolean(s.advanced));
-    setCustomEnabled(Boolean(s.customEnabled));
+      setCustomOn(!!saved.customOn);
+      setCustomOS(saved.customOS || "");
+      setCustomShell(saved.customShell || "");
 
-    setLinuxDistro(s.linuxDistro || "Ubuntu");
-    setLinuxVersion(s.linuxVersion || "");
-
-    setWindowsEdition(s.windowsEdition || "Windows 11");
-    setWindowsVersion(s.windowsVersion || "");
-
-    setMacVersion(s.macVersion || "");
-
-    setNetOs(s.netOs || "Cisco IOS");
-    setNetOsVersion(s.netOsVersion || "");
-
-    setCustomOS(s.customOS || "");
-    setCustomShell(s.customShell || "");
-
-    firstLoad.current = false;
+      setInput(saved.input || "");
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keep cli valid per platform
   useEffect(() => {
-    if (firstLoad.current) return;
+    const allowed = SHELL_BY_PLATFORM[platform] || ["bash"];
+    if (!allowed.includes(cli)) setCli(allowed[0]);
+    // If leaving network, reset vendor/deviceType
+    if (platform !== "network") {
+      setVendor("Cisco");
+      setDeviceType("router");
+    }
+    // Custom only relevant on "other"
+    if (platform !== "other") setCustomOn(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platform]);
 
-    const state = {
-      platform, cli, outputType, verbosity,
+  // persist state + URL
+  useEffect(() => {
+    const st = {
+      platform, cli, outputType, verbosity, advanced, swap,
+      linuxDistro, windowsFlavor, macFlavor, osVersion,
       vendor, deviceType,
-      advanced, customEnabled,
-      linuxDistro, linuxVersion,
-      windowsEdition, windowsVersion,
-      macVersion,
-      netOs, netOsVersion,
-      customOS, customShell,
+      customOn, customOS, customShell,
+      input
     };
-    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch {}
-    qsSet({ platform, cli, v: verbosity, out: outputType });
-  }, [
-    platform, cli, outputType, verbosity,
-    vendor, deviceType, advanced, customEnabled,
-    linuxDistro, linuxVersion, windowsEdition, windowsVersion, macVersion,
-    netOs, netOsVersion, customOS, customShell
-  ]);
-
-  function buildOsString() {
-    if (!advanced) {
-      // minimal: platform name only
-      if (platform === "linux") return "linux";
-      if (platform === "windows") return "windows";
-      if (platform === "mac") return "mac";
-      if (platform === "network") return "network";
-      return "other";
-    }
-
-    if (customEnabled) {
-      return cleanToken(customOS);
-    }
-
-    if (platform === "linux") {
-      const base = linuxDistro;
-      const ver = cleanToken(linuxVersion);
-      return ver ? `${base} ${ver}` : base;
-    }
-    if (platform === "windows") {
-      const base = windowsEdition;
-      const ver = cleanToken(windowsVersion);
-      return ver ? `${base} ${ver}` : base;
-    }
-    if (platform === "mac") {
-      const ver = cleanToken(macVersion);
-      return ver ? `macOS ${ver}` : "macOS";
-    }
-    if (platform === "network") {
-      const ver = cleanToken(netOsVersion);
-      return ver ? `${netOs} ${ver}` : netOs;
-    }
-    return "other";
-  }
+    localStorage.setItem(LS_KEY, JSON.stringify(st));
+    setQS({
+      platform,
+      cli,
+      out: outputType,
+      v: verbosity,
+      adv: advanced ? "1" : "",
+      swap: swap ? "1" : "",
+      lang,
+    });
+  }, [platform, cli, outputType, verbosity, advanced, swap, linuxDistro, windowsFlavor, macFlavor, osVersion, vendor, deviceType, customOn, customOS, customShell, input, lang]);
 
   function validateBeforeSend() {
-    setFormErr("");
+    const errs = [];
 
-    if (!input.trim()) {
-      setFormErr(lang === "fa" ? "درخواست را وارد کنید." : "Please enter a request.");
-      return false;
+    if (!input.trim()) errs.push(isRTL ? "درخواست خالی است." : "Request is empty.");
+
+    // outputType strict
+    if (!["tool","command","python"].includes(outputType)) errs.push("Invalid output type.");
+
+    // platform strict
+    if (!["linux","windows","mac","network","other"].includes(platform)) errs.push("Invalid platform.");
+
+    // Custom validation (block before API)
+    if (platform === "other" && customOn) {
+      if (!isSafeFreeText(customOS, 2, 40)) errs.push(isRTL ? "Custom OS نامعتبر است." : "Invalid Custom OS.");
+      if (!isSafeFreeText(customShell, 2, 20)) errs.push(isRTL ? "Custom Shell/CLI نامعتبر است." : "Invalid Custom Shell/CLI.");
     }
 
-    if (customEnabled) {
-      const osOk = isSafeFreeText(customOS, 2, 40);
-      const shOk = isSafeFreeText(customShell, 2, 20);
-
-      if (!osOk && !shOk) {
-        setFormErr(lang === "fa"
-          ? "Custom OS و Custom Shell نامعتبر است. فقط حروف/عدد/فاصله و کاراکترهای . _ + - / مجاز است (۲ تا ۴۰ کاراکتر)."
-          : "Invalid Custom OS/Shell (allowed: letters/numbers/space and . _ + - /).");
-        return false;
-      }
-      if (!osOk) {
-        setFormErr(lang === "fa"
-          ? "Custom OS نامعتبر است. مثال درست: Ubuntu, FreeBSD, Windows Server 2022"
-          : "Invalid Custom OS.");
-        return false;
-      }
-      if (!shOk) {
-        setFormErr(lang === "fa"
-          ? "Custom Shell نامعتبر است. مثال درست: bash, zsh, cmd, powershell"
-          : "Invalid Custom Shell.");
-        return false;
-      }
+    // Advanced validation: only for selected platform
+    if (advanced && platform === "linux") {
+      if (linuxDistro && !LINUX_DISTROS.includes(linuxDistro)) errs.push(isRTL ? "Distro نامعتبر است." : "Invalid distro.");
+      if (osVersion && !isSafeFreeText(osVersion, 1, 20)) errs.push(isRTL ? "Version نامعتبر است (اختیاری)." : "Invalid version (optional).");
+    }
+    if (advanced && platform === "windows") {
+      if (windowsFlavor && !WINDOWS_FLAVORS.includes(windowsFlavor)) errs.push(isRTL ? "Windows نوع نامعتبر است." : "Invalid Windows flavor.");
+      if (osVersion && !isSafeFreeText(osVersion, 1, 20)) errs.push(isRTL ? "Version/Build نامعتبر است (اختیاری)." : "Invalid version/build (optional).");
+    }
+    if (advanced && platform === "mac") {
+      if (macFlavor && !MAC_FLAVORS.includes(macFlavor)) errs.push(isRTL ? "macOS نامعتبر است." : "Invalid macOS flavor.");
+      if (osVersion && !isSafeFreeText(osVersion, 1, 20)) errs.push(isRTL ? "Version نامعتبر است (اختیاری)." : "Invalid version (optional).");
     }
 
-    // prevent mismatch: network must not send non-network cli
-    if (isNetwork && cli !== "network") setCli("network");
+    // Network validation always available in normal mode (not hidden)
+    if (platform === "network") {
+      if (!NETWORK_VENDORS.includes(vendor)) errs.push(isRTL ? "Vendor نامعتبر است." : "Invalid vendor.");
+      const dt = DEVICE_TYPES_BY_VENDOR[vendor] || [];
+      if (!dt.includes(deviceType)) errs.push(isRTL ? "Device type نامعتبر است." : "Invalid device type.");
+    }
 
-    return true;
+    return errs;
   }
 
-  function payloadForGenerate() {
-    const osString = buildOsString();
+  function computeOS() {
+    // version optional, but don't force users to fill it
+    if (platform === "linux") return advanced ? (osVersion ? `${linuxDistro} ${osVersion}` : linuxDistro) : "linux";
+    if (platform === "windows") return advanced ? (osVersion ? `${windowsFlavor} ${osVersion}` : windowsFlavor) : "windows";
+    if (platform === "mac") return advanced ? (osVersion ? `${macFlavor} ${osVersion}` : macFlavor) : "mac";
+    if (platform === "network") return "network";
+    if (platform === "other") return customOn ? customOS.trim() : "other";
+    return platform;
+  }
 
-    // IMPORTANT: when customEnabled, do not send vendor/deviceType or other advanced OS fields
-    if (customEnabled) {
-      return {
-        mode: "generate",
-        lang,
-        user_request: input.trim(),
-        outputType,
-        verbosity,
-        platform: "other",
-        os: cleanToken(customOS),
-        cli: cleanToken(customShell),
-      };
-    }
-
-    return {
-      mode: "generate",
+  function payloadFor(mode="generate", targetCommand="") {
+    const base = {
+      mode,
       lang,
       user_request: input.trim(),
       outputType,
       verbosity,
-      platform,
-      os: osString,
-      cli,
-      vendor: isNetwork ? vendor : "",
-      deviceType: isNetwork ? deviceType : "general",
     };
-  }
 
-  function payloadForExplain(targetCommand) {
-    const osString = buildOsString();
-
-    if (customEnabled) {
+    // custom ON => send ONLY custom fields (no extra)
+    if (platform === "other" && customOn) {
       return {
-        mode: "explain",
-        lang,
-        targetCommand,
-        user_request: input.trim() || "context",
-        outputType,
-        verbosity,
+        ...base,
         platform: "other",
-        os: cleanToken(customOS),
-        cli: cleanToken(customShell),
+        os: customOS.trim(),
+        cli: customShell.trim(),
+        vendor: "",
+        deviceType: "general",
+        ...(mode === "explain" ? { targetCommand } : {}),
       };
     }
 
+    // normal platforms
+    const pl = platform;
+    const os = computeOS();
+    const c = cli;
+
     return {
-      mode: "explain",
-      lang,
-      targetCommand,
-      user_request: input.trim() || "context",
-      outputType,
-      verbosity,
-      platform,
-      os: osString,
-      cli,
-      vendor: isNetwork ? vendor : "",
-      deviceType: isNetwork ? deviceType : "general",
+      ...base,
+      platform: pl,
+      os,
+      cli: c,
+      vendor: pl === "network" ? vendor : "",
+      deviceType: pl === "network" ? deviceType : "general",
+      ...(mode === "explain" ? { targetCommand } : {}),
     };
   }
 
-  const onGenerate = async () => {
-    if (loading) return;
-    setApiErr("");
-    setToolResult(null);
-    setMarkdown("");
+  async function runGenerate() {
+    const errs = validateBeforeSend();
+    if (errs.length) { setErr(`${t.errFix} ${errs[0]}`); return; }
 
-    if (!validateBeforeSend()) return;
-
+    setErr("");
     setLoading(true);
-    try {
-      const res = await callCCG(payloadForGenerate());
-      const tool = res?.tool && typeof res.tool === "object" ? res.tool : null;
-      const md = String(res?.output || res?.markdown || res?.result || "").trim();
+    setOutput("");
+    setTool(null);
 
-      if (outputType === "tool") {
-        setToolResult(tool);
-        setMarkdown(md);
-      } else {
-        setMarkdown(md);
-      }
+    try {
+      const res = await callCCG(payloadFor("generate"));
+      setOutput(res?.output || "");
+      setTool(res?.tool || null);
     } catch (e) {
-      setApiErr(e?.message || (lang === "fa" ? "خطا در ارتباط با API" : "API error"));
+      setErr(e?.message || (isRTL ? "خطا در ارتباط با API" : "API error"));
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const onExplain = async () => {
-    if (!toolResult?.primary?.command) {
-      setFormErr(lang === "fa" ? "اول یک خروجی تولید کنید تا بتوان توضیح داد." : "Generate first, then explain.");
-      return;
-    }
-    if (loading) return;
-    setApiErr("");
-    setFormErr("");
+  async function runExplain() {
+    // explain should use last produced tool.primary.command if possible
+    const cmd = tool?.primary?.command ? String(tool.primary.command) : "";
+    if (!cmd.trim()) { setErr(isRTL ? "اول یک دستور تولید کنید." : "Generate a command first."); return; }
 
+    setErr("");
     setLoading(true);
     try {
-      const target = String(toolResult.primary.command).trim();
-      const res = await callCCG(payloadForExplain(target));
-      const tool = res?.tool && typeof res.tool === "object" ? res.tool : null;
-      const md = String(res?.output || res?.markdown || res?.result || "").trim();
-      setToolResult(tool);
-      setMarkdown(md);
+      const res = await callCCG(payloadFor("explain", cmd.trim()));
+      setOutput(res?.output || "");
+      setTool(res?.tool || null);
     } catch (e) {
-      setApiErr(e?.message || (lang === "fa" ? "خطا در ارتباط با API" : "API error"));
+      setErr(e?.message || (isRTL ? "خطا در ارتباط با API" : "API error"));
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  const cliOptions = SHELL_BY_PLATFORM[platform] || ["bash"];
+
+  const leftPanelClass = `ccg-card p-5 sm:p-6 ${(!swap ? (isRTL ? "order-2" : "order-1") : (isRTL ? "order-1" : "order-2"))}`;
+  const rightPanelClass = `ccg-card p-5 sm:p-6 ${(!swap ? (isRTL ? "order-1" : "order-2") : (isRTL ? "order-2" : "order-1"))}`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="ccg-container">
         <div className="ccg-card px-4 sm:px-6 py-4">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-700 dark:text-slate-200/80">{t("platform") || "Platform"}</span>
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 justify-between">
+
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+              <FieldLabel label={t.platform} tip={t.tip_platform} />
               <select value={platform} onChange={(e)=>setPlatform(e.target.value)} className="ccg-select text-sm">
                 {PLATFORM_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
-            </div>
 
-            {!isNetwork ? (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-slate-700 dark:text-slate-200/80">{t("shell") || "Shell"}</span>
-                <select value={cli} onChange={(e)=>setCli(e.target.value)} className="ccg-select text-sm">
-                  {shellOptions.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-700 dark:text-slate-200/80">{t("vendor") || "Vendor"}</span>
-                  <select value={vendor} onChange={(e)=>setVendor(e.target.value)} className="ccg-select text-sm">
-                    {NETWORK_VENDORS.map(v => <option key={v.value} value={v.value}>{v.label}</option>)}
-                  </select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-700 dark:text-slate-200/80">{t("deviceType") || "Device"}</span>
-                  <select value={deviceType} onChange={(e)=>setDeviceType(e.target.value)} className="ccg-select text-sm">
-                    {NETWORK_DEVICE_TYPES.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
-                  </select>
-                </div>
-              </>
-            )}
+              <FieldLabel label={t.cli} tip={t.tip_cli} />
+              <select value={cli} onChange={(e)=>setCli(e.target.value)} className="ccg-select text-sm">
+                {cliOptions.map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
 
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-700 dark:text-slate-200/80">Output</span>
+              <FieldLabel label={t.outputType} tip={t.tip_output} />
               <select value={outputType} onChange={(e)=>setOutputType(e.target.value)} className="ccg-select text-sm">
-                <option value="tool">Tool (UI)</option>
-                <option value="markdown">Markdown</option>
+                {OUTPUT_TYPES.map(o => (
+                  <option key={o.value} value={o.value}>{isRTL ? o.labelFa : o.labelEn}</option>
+                ))}
               </select>
+
+              <FieldLabel label={t.verbosity} tip={t.tip_verbosity} />
+              <select value={verbosity} onChange={(e)=>setVerbosity(e.target.value)} className="ccg-select text-sm">
+                {VERBOSITY.map(o => <option key={o.value} value={o.value}>{isRTL ? o.labelFa : o.labelEn}</option>)}
+              </select>
+
+              <div className="flex items-center gap-2">
+                <input id="ccg-adv" type="checkbox" checked={advanced} onChange={(e)=>setAdvanced(e.target.checked)} />
+                <label htmlFor="ccg-adv" className="text-sm opacity-90">{t.advanced}</label>
+              </div>
+
+              <button type="button" className="ccg-btn text-sm" onClick={()=>setSwap(s=>!s)}>
+                {t.swap}
+              </button>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-sm text-slate-700 dark:text-slate-200/80">Verbosity</span>
-              <select value={verbosity} onChange={(e)=>setVerbosity(e.target.value)} className="ccg-select text-sm">
-                <option value="brief">brief</option>
-                <option value="normal">normal</option>
-                <option value="detailed">detailed</option>
-              </select>
+              <button type="button" className="ccg-btn text-sm" onClick={()=>setLang(isRTL ? "en" : "fa")}>
+                {isRTL ? "EN" : "FA"}
+              </button>
             </div>
 
-            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200/80">
-              <input type="checkbox" checked={advanced} onChange={(e)=>setAdvanced(e.target.checked)} />
-              Advanced
-            </label>
           </div>
 
+          {/* Advanced row (platform-specific only) */}
           {advanced ? (
-            <div className="mt-4 rounded-xl border border-[var(--border)] p-4 space-y-3">
-              <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200/80">
-                <input type="checkbox" checked={customEnabled} onChange={(e)=>setCustomEnabled(e.target.checked)} />
-                Custom OS/Shell
-              </label>
+            <div className="mt-4 rounded-2xl border border-[var(--border)] p-4">
+              <div className="flex flex-wrap items-center gap-4 justify-between">
+                <div className="text-sm opacity-80">{t.tip_advanced}</div>
 
-              {customEnabled ? (
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <div>
-                    <div className="text-xs text-slate-500 mb-1">Custom OS (validated)</div>
-                    <input value={customOS} onChange={(e)=>setCustomOS(e.target.value)} className="ccg-input text-sm w-full" placeholder="Ubuntu / FreeBSD / Windows Server 2022" />
+                {platform === "other" ? (
+                  <div className="flex items-center gap-2">
+                    <input id="ccg-custom" type="checkbox" checked={customOn} onChange={(e)=>setCustomOn(e.target.checked)} />
+                    <label htmlFor="ccg-custom" className="text-sm opacity-90">{t.custom}</label>
                   </div>
-                  <div>
-                    <div className="text-xs text-slate-500 mb-1">Custom Shell/CLI (validated)</div>
-                    <input value={customShell} onChange={(e)=>setCustomShell(e.target.value)} className="ccg-input text-sm w-full" placeholder="bash / zsh / cmd / powershell" />
-                  </div>
-                </div>
-              ) : platform === "linux" ? (
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <div>
-                    <div className="text-xs text-slate-500 mb-1">Distro</div>
-                    <select value={linuxDistro} onChange={(e)=>setLinuxDistro(e.target.value)} className="ccg-select text-sm w-full">
-                      {LINUX_DISTROS.map(x => <option key={x} value={x}>{x}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <div className="text-xs text-slate-500 mb-1">Version (optional)</div>
-                    <input value={linuxVersion} onChange={(e)=>setLinuxVersion(e.target.value)} className="ccg-input text-sm w-full" placeholder="22.04 / 12 / 9 ..." />
-                  </div>
-                </div>
-              ) : platform === "windows" ? (
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <div>
-                    <div className="text-xs text-slate-500 mb-1">Edition</div>
-                    <select value={windowsEdition} onChange={(e)=>setWindowsEdition(e.target.value)} className="ccg-select text-sm w-full">
-                      {WINDOWS_EDITIONS.map(x => <option key={x} value={x}>{x}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <div className="text-xs text-slate-500 mb-1">Version/Build (optional)</div>
-                    <input value={windowsVersion} onChange={(e)=>setWindowsVersion(e.target.value)} className="ccg-input text-sm w-full" placeholder="23H2 / build 22631 ..." />
-                  </div>
-                </div>
-              ) : platform === "mac" ? (
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <div>
-                    <div className="text-xs text-slate-500 mb-1">macOS Version (optional)</div>
-                    <input value={macVersion} onChange={(e)=>setMacVersion(e.target.value)} className="ccg-input text-sm w-full" placeholder="14 / 13.6 ..." />
-                  </div>
-                </div>
-              ) : platform === "network" ? (
-                <div className="grid sm:grid-cols-2 gap-3">
-                  <div>
-                    <div className="text-xs text-slate-500 mb-1">Network OS</div>
-                    <select value={netOs} onChange={(e)=>setNetOs(e.target.value)} className="ccg-select text-sm w-full">
-                      {(NETWORK_OS_FLAVOR[vendor] || ["Network OS"]).map(x => <option key={x} value={x}>{x}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <div className="text-xs text-slate-500 mb-1">OS Version (optional)</div>
-                    <input value={netOsVersion} onChange={(e)=>setNetOsVersion(e.target.value)} className="ccg-input text-sm w-full" placeholder="16.12 / 7.2 / ..." />
-                  </div>
-                </div>
-              ) : (
-                <div className="text-sm text-slate-500">Advanced options for this platform are limited.</div>
-              )}
+                ) : null}
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                {platform === "linux" ? (
+                  <>
+                    <div>
+                      <FieldLabel label={t.distro} />
+                      <select value={linuxDistro} onChange={(e)=>setLinuxDistro(e.target.value)} className="ccg-select w-full">
+                        {LINUX_DISTROS.map(x => <option key={x} value={x}>{x}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <FieldLabel label={t.version} />
+                      <input value={osVersion} onChange={(e)=>setOsVersion(e.target.value)} className="ccg-input w-full" placeholder={isRTL ? "مثلاً 22.04" : "e.g. 22.04"} />
+                    </div>
+                  </>
+                ) : null}
+
+                {platform === "windows" ? (
+                  <>
+                    <div>
+                      <FieldLabel label={t.distro} />
+                      <select value={windowsFlavor} onChange={(e)=>setWindowsFlavor(e.target.value)} className="ccg-select w-full">
+                        {WINDOWS_FLAVORS.map(x => <option key={x} value={x}>{x}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <FieldLabel label={t.version} />
+                      <input value={osVersion} onChange={(e)=>setOsVersion(e.target.value)} className="ccg-input w-full" placeholder={isRTL ? "اختیاری" : "optional"} />
+                    </div>
+                  </>
+                ) : null}
+
+                {platform === "mac" ? (
+                  <>
+                    <div>
+                      <FieldLabel label={t.distro} />
+                      <select value={macFlavor} onChange={(e)=>setMacFlavor(e.target.value)} className="ccg-select w-full">
+                        {MAC_FLAVORS.map(x => <option key={x} value={x}>{x}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <FieldLabel label={t.version} />
+                      <input value={osVersion} onChange={(e)=>setOsVersion(e.target.value)} className="ccg-input w-full" placeholder={isRTL ? "اختیاری" : "optional"} />
+                    </div>
+                  </>
+                ) : null}
+
+                {platform === "network" ? (
+                  <>
+                    <div>
+                      <FieldLabel label={t.vendor} />
+                      <select value={vendor} onChange={(e)=>{ setVendor(e.target.value); setDeviceType((DEVICE_TYPES_BY_VENDOR[e.target.value]||["router"])[0]); }} className="ccg-select w-full">
+                        {NETWORK_VENDORS.map(x => <option key={x} value={x}>{x}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <FieldLabel label={t.deviceType} />
+                      <select value={deviceType} onChange={(e)=>setDeviceType(e.target.value)} className="ccg-select w-full">
+                        {(DEVICE_TYPES_BY_VENDOR[vendor] || []).map(x => <option key={x} value={x}>{x}</option>)}
+                      </select>
+                    </div>
+                  </>
+                ) : null}
+
+                {platform === "other" && customOn ? (
+                  <>
+                    <div>
+                      <FieldLabel label="Custom OS" tip={t.tip_custom} />
+                      <input value={customOS} onChange={(e)=>setCustomOS(e.target.value)} className="ccg-input w-full" placeholder={isRTL ? "مثلاً FreeBSD" : "e.g. FreeBSD"} />
+                    </div>
+                    <div>
+                      <FieldLabel label="Custom Shell/CLI" tip={t.tip_custom} />
+                      <input value={customShell} onChange={(e)=>setCustomShell(e.target.value)} className="ccg-input w-full" placeholder={isRTL ? "مثلاً tcsh" : "e.g. tcsh"} />
+                    </div>
+                  </>
+                ) : null}
+              </div>
             </div>
           ) : null}
+
         </div>
       </div>
 
       <div className="ccg-container">
-        <div className="ccg-card p-5 sm:p-6 space-y-4">
-          <textarea
-            value={input}
-            onChange={(e)=>setInput(e.target.value)}
-            rows={4}
-            className="ccg-textarea w-full"
-            placeholder={t("placeholderReq") || "درخواستت را واضح بنویس."}
-          />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          {/* Request */}
+          <div className={rightPanelClass}>
+            <h2 className="text-lg font-semibold mb-3">{t.request}</h2>
+            <textarea
+              className="ccg-textarea w-full min-h-[200px]"
+              value={input}
+              onChange={(e)=>setInput(e.target.value)}
+              placeholder={t.placeholder}
+            />
+            {err ? (
+              <div className="ccg-error mt-3">
+                <div className="font-semibold mb-1">{isRTL ? "خطا" : "Error"}</div>
+                <div className="text-sm">{err}</div>
+              </div>
+            ) : null}
 
-          {formErr ? (
-            <div className="ccg-error">
-              <div className="font-semibold mb-1">{lang === "fa" ? "خطا" : "Error"}</div>
-              <div className="text-sm">{formErr}</div>
+            <div className="mt-4 flex items-center gap-3 justify-end">
+              <button className="ccg-btn" type="button" disabled={loading} onClick={runExplain}>
+                {t.explain}
+              </button>
+              <button className="ccg-btn primary" type="button" disabled={loading} onClick={runGenerate}>
+                {loading ? (isRTL ? "در حال اجرا..." : "Running...") : t.gen}
+              </button>
             </div>
-          ) : null}
-
-          {apiErr ? (
-            <div className="ccg-error">
-              <div className="font-semibold mb-1">{lang === "fa" ? "خطا" : "Error"}</div>
-              <div className="text-sm">{apiErr}</div>
-            </div>
-          ) : null}
-
-          <div className="flex flex-col sm:flex-row gap-3">
-            <button className="ccg-btn w-full sm:w-auto" onClick={onGenerate} disabled={loading}>
-              {loading ? (lang === "fa" ? "در حال تولید..." : "Generating...") : (lang === "fa" ? "Generate" : "Generate")}
-            </button>
-
-            <button className="ccg-btn w-full sm:w-auto" onClick={onExplain} disabled={loading || !toolResult?.primary?.command}>
-              {lang === "fa" ? "Explain command" : "Explain command"}
-            </button>
           </div>
-        </div>
-      </div>
 
-      <div className="ccg-container">
-        <div className="ccg-card p-5 sm:p-8">
-          <h2 className="text-lg font-semibold mb-4">{t("output") || "Output"}</h2>
-
-          {outputType === "tool" && toolResult ? (
-            <ToolResult tool={toolResult} />
-          ) : markdown ? (
-            <SectionedMarkdown markdown={markdown} lang={lang} />
-          ) : (
-            <div className="text-sm text-slate-500 dark:text-slate-300/70">
-              {t("outputPlaceholder") || "Output will appear here."}
-            </div>
-          )}
+          {/* Output */}
+          <div className={leftPanelClass}>
+            <h2 className="text-lg font-semibold mb-3">{isRTL ? "خروجی" : "Output"}</h2>
+            {outputType === "tool" && tool ? (
+              <ToolResult tool={tool} />
+            ) : output ? (
+              <SectionedMarkdown markdown={output} lang={lang} />
+            ) : (
+              <div className="text-sm opacity-70">{isRTL ? "خروجی اینجا نمایش داده می‌شود." : "Output will appear here."}</div>
+            )}
+          </div>
         </div>
       </div>
     </div>
