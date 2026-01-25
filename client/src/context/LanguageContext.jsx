@@ -7,11 +7,14 @@ import React, {
   useState,
 } from "react";
 
-const LanguageContext = createContext(null);
+const LanguageContext = createContext({
+  lang: "en",
+  setLang: () => {},
+  t: (k) => String(k || ""),
+});
 
 const LS_LANG = "ccg_lang_v1";
 
-// Keep it permissive: missing keys fall back to EN then the key itself.
 const DICT = {
   en: {
     generator: "Generator",
@@ -34,8 +37,6 @@ const DICT = {
     explain: "Explain",
     copy: "Copy",
     copied: "Copied",
-    invalid_custom: "Invalid custom values. Allowed: letters/numbers/space . _ + - /",
-    invalid_platform_mismatch: "Advanced details must match selected platform.",
   },
   fa: {
     generator: "جنریتور",
@@ -50,84 +51,61 @@ const DICT = {
     outputType: "نوع خروجی",
     output_tool: "Tool (دستور + توضیح + هشدار + جایگزین‌ها)",
     output_command: "Command (فقط دستور)",
-    output_python: "Python Automation",
-    advanced: "تنظیمات بیشتر",
+    output_python: "اتوماسیون پایتون",
+    advanced: "پیشرفته",
     custom: "سفارشی",
     swap: "جابجایی",
-    generate: "تولید",
-    explain: "توضیح دستور",
+    generate: "ساخت",
+    explain: "توضیح",
     copy: "کپی",
     copied: "کپی شد",
-    invalid_custom: "مقادیر Custom نامعتبر است. فقط حروف/عدد/._+-/ و فاصله مجاز است.",
-    invalid_platform_mismatch: "جزئیات Advanced باید با پلتفرم انتخابی هم‌خوان باشد.",
   },
 };
 
-function readLangFromUrl() {
+function pickInitialLang() {
   try {
     const u = new URL(window.location.href);
     const q = (u.searchParams.get("lang") || "").toLowerCase();
-    return q === "fa" || q === "en" ? q : "";
-  } catch {
-    return "";
-  }
-}
-
-function writeLangToUrl(lang) {
-  try {
-    const u = new URL(window.location.href);
-    u.searchParams.set("lang", lang);
-    window.history.replaceState({}, "", u.toString());
+    if (q === "fa" || q === "en") return q;
   } catch {}
+
+  const ls = (localStorage.getItem(LS_LANG) || "").toLowerCase();
+  if (ls === "fa" || ls === "en") return ls;
+  return "en";
 }
 
 export function LanguageProvider({ children }) {
-  const [lang, setLangState] = useState(() => {
-    const fromUrl = readLangFromUrl();
-    if (fromUrl) return fromUrl;
-    const saved = (localStorage.getItem(LS_LANG) || "").toLowerCase();
-    if (saved === "fa" || saved === "en") return saved;
-    return "en";
-  });
-
-  const setLang = useCallback((next) => {
-    const v = String(next || "").toLowerCase();
-    if (v !== "fa" && v !== "en") return;
-    setLangState(v);
-  }, []);
+  const [lang, setLang] = useState(pickInitialLang);
 
   useEffect(() => {
     try {
       localStorage.setItem(LS_LANG, lang);
     } catch {}
-    writeLangToUrl(lang);
-    // also set dir attribute for better RTL/LTR behavior
+
+    // Persist in URL too (nice for refresh/share)
     try {
-      document.documentElement.dir = lang === "fa" ? "rtl" : "ltr";
+      const u = new URL(window.location.href);
+      u.searchParams.set("lang", lang);
+      window.history.replaceState({}, "", u.toString());
     } catch {}
   }, [lang]);
 
-  // ✅ IMPORTANT: define t BEFORE it is used in value/useMemo (prevents TDZ)
-  const t = useCallback(
-    (key) => {
-      const k = String(key || "");
-      const dLang = DICT[lang] || {};
-      const dEn = DICT.en || {};
-      return dLang[k] ?? dEn[k] ?? k;
-    },
-    [lang]
+  // IMPORTANT: `t` is defined BEFORE it is ever referenced anywhere in this module.
+  const t = useCallback((key) => {
+    const k = String(key || "");
+    const table = DICT[lang] || DICT.en;
+    return table[k] ?? DICT.en[k] ?? k;
+  }, [lang]);
+
+  const value = useMemo(() => ({ lang, setLang, t }), [lang, t]);
+
+  return (
+    <LanguageContext.Provider value={value}>
+      {children}
+    </LanguageContext.Provider>
   );
-
-  const value = useMemo(() => ({ lang, setLang, t }), [lang, setLang, t]);
-
-  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }
 
 export function useLanguage() {
-  const ctx = useContext(LanguageContext);
-  if (!ctx) {
-    // Safe fallback: never throw during render
-    return { lang: "en", setLang: () => {}, t: (k) => String(k || "") };
-  }
-  return ctx;
+  return useContext(LanguageContext);
 }

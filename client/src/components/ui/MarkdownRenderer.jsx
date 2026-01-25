@@ -1,11 +1,9 @@
-import ReactMarkdown from "react-markdown";
+import SectionedMarkdown from "./SectionedMarkdown";
 
-export default function MarkdownRenderer({ content }) {
-  return (
-    <div className="prose prose-invert max-w-none">
-      <ReactMarkdown>{content}</ReactMarkdown>
-    </div>
-  );
+/**
+ * Compatibility wrapper used by some pages.
+ * TDZ-safe pass-through.
+ */
+export default function MarkdownRenderer({ markdown, content, lang = "fa" }) {
+  return <SectionedMarkdown markdown={markdown} content={content} lang={lang} />;
 }
-document.body.classList.add("night-mode");
-document.body.classList.add("day-mode");

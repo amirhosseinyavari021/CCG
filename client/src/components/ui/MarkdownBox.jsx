@@ -1,41 +1,85 @@
 import { useMemo, useState } from "react";
-import { useLanguage } from "../../context/LanguageContext";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
-// Minimal + TDZ-safe MarkdownBox:
-// - NO local `const t = ...`
-// - Use `t()` only from LanguageContext
-export default function MarkdownBox({ value = "", title = "" }) {
-  const { lang, t } = useLanguage();
-  const isRTL = lang === "fa";
+/**
+ * TDZ-safe MarkdownBox:
+ * - No local const/object named "t" used in closures before initialization
+ * - Copy button never throws
+ */
+function CopyMini({ value, labelCopy, labelCopied }) {
   const [copied, setCopied] = useState(false);
 
-  const text = useMemo(() => String(value || ""), [value]);
-
-  async function copyAll() {
+  async function onCopy() {
     try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 900);
-    } catch {
-      // ignore
+      const v = String(value || "");
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(v);
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 900);
+      }
+    } catch (e) {
+      // never crash UI
+      console.error("Clipboard copy failed:", e);
     }
   }
 
-  // Very lightweight sectioning: keep raw markdown, let parent renderer handle if needed.
   return (
-    <div className="ccg-card p-4 sm:p-5">
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <div className="text-sm font-semibold text-slate-700 dark:text-slate-200/80">
-          {title || (isRTL ? "خروجی" : "Output")}
-        </div>
-        <button type="button" onClick={copyAll} className="ccg-btn text-sm">
-          {copied ? (t("copied") || (isRTL ? "کپی شد" : "Copied")) : (t("copy") || (isRTL ? "کپی" : "Copy"))}
-        </button>
-      </div>
+    <button
+      type="button"
+      onClick={onCopy}
+      className="ccg-btn ccg-btn-ghost ccg-btn-xs"
+      title={labelCopy}
+      disabled={!value}
+    >
+      {copied ? labelCopied : labelCopy}
+    </button>
+  );
+}
 
-      <pre className="whitespace-pre-wrap text-sm leading-6 text-slate-800 dark:text-slate-100/90">
-{text}
-      </pre>
+export default function MarkdownBox({ markdown, content, lang = "fa" }) {
+  const md = content ?? markdown ?? "";
+
+  const labels = useMemo(() => {
+    const fa = { copy: "کپی", copied: "کپی شد" };
+    const en = { copy: "Copy", copied: "Copied" };
+    return lang === "fa" ? fa : en;
+  }, [lang]);
+
+  return (
+    <div className={`ccg-markdown ${lang === "fa" ? "rtl" : "ltr"}`}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          code({ inline, className, children }) {
+            const raw = String(children ?? "");
+            const value = raw.replace(/\n$/, "");
+            const isBlock = !inline;
+
+            if (!isBlock) return <code className="ccg-inline-code">{children}</code>;
+
+            return (
+              <div className="ccg-codeblock">
+                <div className="ccg-codeblock-head">
+                  <div className="ccg-codeblock-title">
+                    {(className || "").replace("language-", "") || "CODE"}
+                  </div>
+                  <CopyMini
+                    value={value}
+                    labelCopy={labels.copy}
+                    labelCopied={labels.copied}
+                  />
+                </div>
+                <pre className="ccg-pre">
+                  <code dir="ltr">{value}</code>
+                </pre>
+              </div>
+            );
+          },
+        }}
+      >
+        {String(md)}
+      </ReactMarkdown>
     </div>
   );
 }

@@ -1,41 +1,44 @@
 import { useMemo } from "react";
 import MarkdownBox from "./MarkdownBox";
 
+/**
+ * TDZ-safe SectionedMarkdown:
+ * - pure helpers (no closures referencing const before init)
+ */
 function splitByHeadings(md) {
   const raw = String(md || "").replace(/\r\n/g, "\n");
   const lines = raw.split("\n");
-
   const sections = [];
-  let current = { title: null, body: [] };
+  let currentTitle = null;
+  let currentBody = [];
 
-  const pushCurrent = () => {
-    const body = current.body.join("\n").trim();
-    if (!current.title && !body) return;
-    sections.push({ title: current.title, body });
-  };
+  function push() {
+    const body = currentBody.join("\n").trim();
+    if (!currentTitle && !body) return;
+    sections.push({ title: currentTitle, body });
+  }
 
   for (const line of lines) {
     const m = line.match(/^(#{2,6})\s+(.+)\s*$/);
     if (m) {
-      if (current.title !== null || current.body.length) pushCurrent();
-      current = { title: m[2].trim(), body: [] };
-      continue;
+      if (currentTitle !== null || currentBody.length) push();
+      currentTitle = m[2].trim();
+      currentBody = [];
+    } else {
+      currentBody.push(line);
     }
-    current.body.push(line);
   }
-
-  pushCurrent();
+  push();
 
   if (!sections.length && raw.trim()) return [{ title: null, body: raw.trim() }];
-
-  return sections.filter((s) => (s.title || s.body).toString().trim().length > 0);
+  return sections;
 }
 
 export default function SectionedMarkdown({ markdown, content, lang = "fa", defaultTitle }) {
   const md = content ?? markdown ?? "";
   const sections = useMemo(() => splitByHeadings(md), [md]);
 
-  if (!md || !String(md).trim()) return <MarkdownBox markdown={""} lang={lang} />;
+  if (!String(md).trim()) return <MarkdownBox markdown={""} lang={lang} />;
 
   if (sections.length === 1 && !sections[0].title) {
     return <MarkdownBox markdown={sections[0].body} lang={lang} />;
@@ -44,21 +47,17 @@ export default function SectionedMarkdown({ markdown, content, lang = "fa", defa
   return (
     <div className="ccg-section-grid">
       {sections.map((sec, idx) => {
-        const title = sec.title || defaultTitle || (lang === "fa" ? "خروجی" : "Result");
-        
-        const isWarnTitle = /^(هشدارها|هشدار|warnings?|warning)$/i.test(String(title || "").trim());
-        const cardClass = isWarnTitle ? "ccg-section-card ccg-warn" : "ccg-section-card";
-return (
-          <div key={`${title}-${idx}`} className={cardClass}>
-            <div className="ccg-section-title">{title}</div>
-            <div className="ccg-section-body">
-              <MarkdownBox markdown={sec.body} lang={lang} />
-            </div>
+        const title =
+          sec.title ||
+          defaultTitle ||
+          (lang === "fa" ? `بخش ${idx + 1}` : `Section ${idx + 1}`);
+        return (
+          <div key={idx} className="ccg-card p-4 sm:p-5">
+            <div className="font-semibold mb-3">{title}</div>
+            <MarkdownBox markdown={sec.body} lang={lang} />
           </div>
         );
       })}
     </div>
   );
 }
-document.body.classList.add("night-mode");
-document.body.classList.add("day-mode");
