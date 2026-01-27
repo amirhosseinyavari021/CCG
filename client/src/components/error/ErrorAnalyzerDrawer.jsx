@@ -30,7 +30,7 @@ export default function ErrorAnalyzerDrawer({ open, onClose, initial = {} }) {
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
-    };
+}
   }, [open]);
 
   const dir = useMemo(() => (lang === "fa" ? "rtl" : "ltr"), [lang]);
@@ -131,5 +131,3 @@ export default function ErrorAnalyzerDrawer({ open, onClose, initial = {} }) {
     document.body
   );
 }
-document.body.classList.add("night-mode");
-document.body.classList.add("day-mode");

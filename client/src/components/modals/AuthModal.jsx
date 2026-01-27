@@ -77,12 +77,12 @@ export default function AuthModal({ open, onClose }) {
 
     return () => {
       cancelled = true;
-    };
+}
   }, [open, googleEnabled, clientId, loginWithGoogleCredential, onClose]);
 
   const comingSoon = () => {
     toast("به‌زودی فعال می‌شود", { icon: "⏳" });
-  };
+}
 
   return (
     <Modal open={open} title="Sign in to CCG" onClose={onClose}>
@@ -131,5 +131,3 @@ export default function AuthModal({ open, onClose }) {
     </Modal>
   );
 }
-document.body.classList.add("night-mode");
-document.body.classList.add("day-mode");

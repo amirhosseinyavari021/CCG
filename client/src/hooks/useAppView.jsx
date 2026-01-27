@@ -23,7 +23,7 @@ export function AppViewProvider({ children }) {
       context: seed?.context || "",
     });
     setErrorAnalyzerOpen(true);
-  };
+}
 
   const closeErrorAnalyzer = () => setErrorAnalyzerOpen(false);
 
@@ -48,5 +48,3 @@ export function useAppView() {
   if (!ctx) throw new Error("useAppView must be used within AppViewProvider");
   return ctx;
 }
-document.body.classList.add("night-mode");
-document.body.classList.add("day-mode");

@@ -14,7 +14,7 @@ export default function RoleSelectModal({ onClose }) {
   const save = () => {
     localStorage.setItem("ccg_role", role);
     onClose();
-  };
+}
 
   const text = {
     title: lang === "fa" ? "انتخاب نقش" : "Choose your role",
@@ -29,7 +29,7 @@ export default function RoleSelectModal({ onClose }) {
         ? "خروجی آموزشی، توضیح مرحله‌به‌مرحله + نکات و هشدارها"
         : "Educational output with step-by-step explanation + tips",
     btn: lang === "fa" ? "ادامه" : "Continue",
-  };
+}
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
@@ -84,5 +84,3 @@ export default function RoleSelectModal({ onClose }) {
     </div>
   );
 }
-document.body.classList.add("night-mode");
-document.body.classList.add("day-mode");

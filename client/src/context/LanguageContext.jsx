@@ -60,7 +60,7 @@ const DICT = {
     copy: "کپی",
     copied: "کپی شد",
   },
-};
+}
 
 function pickInitialLang() {
   try {

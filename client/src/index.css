@@ -2,249 +2,437 @@
 @tailwind components;
 @tailwind utilities;
 
-/*
-  ✅ CCG Stable Theme System
-  - فقط یک منبع حقیقت برای رنگ‌ها: CSS Variables
-  - پشتیبانی همزمان از:
-    1) [data-theme="dark"]  (اگر پروژه از این استفاده کند)
-    2) html.dark            (اگر Tailwind dark class استفاده شود)
-  - حذف تداخل day-mode/night-mode و !important های خراب‌کننده
-*/
+/* ===== CCG STABLE THEME SYSTEM ===== */
 
 @layer base {
-  :root{
+  :root {
     --font-en: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial;
     --font-fa: "Vazirmatn", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial;
-
-    /* Light */
+    
+    /* Light theme */
     --bg: #f6f7fb;
     --text: #0f172a;
-    --muted: rgba(15,23,42,.62);
-
-    --card: rgba(255,255,255,.92);
-    --border: rgba(15,23,42,.10);
-
-    --input-bg: rgba(255,255,255,.88);
-
+    --muted: #64748b;
+    --card: rgba(255, 255, 255, 0.85);
+    --card-solid: #ffffff;
+    --border: rgba(15, 23, 42, 0.12);
     --primary: #2563eb;
-    --primary-2: #60a5fa;
+    --primary-light: rgba(37, 99, 235, 0.1);
   }
 
-  /* Dark: پشتیبانی از data-theme و کلاس dark */
-  html.dark,
-  [data-theme="dark"]{
-    --bg: #070b14;
+  [data-theme="dark"] {
+    --bg: #0b1020;
     --text: #e5e7eb;
-    --muted: rgba(148,163,184,.70);
-
-    /* کارت‌ها کمی opaque تر تا “نوار/باند” و بهم‌ریختگی کمتر شود */
-    --card: rgba(15,23,42,.78);
-    --border: rgba(148,163,184,.18);
-
-    --input-bg: rgba(2,6,23,.55);
-
+    --muted: #94a3b8;
+    --card: rgba(15, 23, 42, 0.75);
+    --card-solid: #1a2332;
+    --border: rgba(148, 163, 184, 0.2);
     --primary: #60a5fa;
-    --primary-2: #93c5fd;
+    --primary-light: rgba(96, 165, 250, 0.15);
   }
 
-  html, body { height: 100%; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
 
-  html{
+  html {
     background: var(--bg);
     color: var(--text);
     font-family: var(--font-en);
+    font-size: 16px;
+    line-height: 1.5;
   }
-  html[dir="rtl"]{ font-family: var(--font-fa); }
 
-  body{
-    margin: 0;
-    min-height: 100%;
-    color: var(--text);
+  html[dir="rtl"] {
+    font-family: var(--font-fa);
+  }
+
+  body {
+    min-height: 100vh;
     background:
-      radial-gradient(1200px 700px at 25% 15%, rgba(37,99,235,.10), transparent 55%),
-      radial-gradient(900px 600px at 80% 55%, rgba(96,165,250,.08), transparent 60%),
+      radial-gradient(1200px 700px at 30% 20%, var(--primary-light), transparent 55%),
+      radial-gradient(900px 600px at 80% 60%, var(--primary-light), transparent 60%),
       var(--bg);
+    background-attachment: fixed;
   }
 
-  html.dark body,
-  [data-theme="dark"] body{
-    background:
-      radial-gradient(1200px 700px at 25% 15%, rgba(37,99,235,.18), transparent 55%),
-      radial-gradient(900px 600px at 80% 55%, rgba(96,165,250,.12), transparent 60%),
-      var(--bg);
-  }
-
-  #root{
+  #root {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
   }
 
-  a{
+  a {
     color: var(--primary);
     text-decoration: none;
+    transition: opacity 0.2s;
   }
-  a:hover{
+
+  a:hover {
     text-decoration: underline;
-    text-underline-offset: 3px;
+    opacity: 0.9;
   }
 
-  ::placeholder{ color: rgba(100,116,139,.75); }
-  html.dark ::placeholder,
-  [data-theme="dark"] ::placeholder{ color: rgba(148,163,184,.70); }
+  ::placeholder {
+    color: var(--muted);
+    opacity: 0.7;
+  }
 
-  *{ box-sizing: border-box; }
+  * {
+    box-sizing: border-box;
+  }
+
+  /* بهبود scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 5px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 5px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--primary);
+  }
 }
 
 @layer components {
-  /* ✅ فاصله از کناره‌ها بیشتر + یکدست کردن container */
-  .ccg-container,
-  .container{
-    @apply mx-auto w-full;
-    padding-left: 1.25rem;   /* 20px */
-    padding-right: 1.25rem;  /* 20px */
-    max-width: 1280px;
-  }
-  @media (min-width: 640px){
-    .ccg-container,
-    .container{
-      padding-left: 2rem;   /* 32px */
-      padding-right: 2rem;  /* 32px */
-    }
-  }
-  @media (min-width: 1024px){
-    .ccg-container,
-    .container{
-      padding-left: 2.5rem; /* 40px */
-      padding-right: 2.5rem;/* 40px */
-    }
+  /* Container */
+  .ccg-container {
+    @apply mx-auto w-full px-4 sm:px-6 lg:px-8;
+    max-width: 1200px;
   }
 
-  /* کارت‌ها */
-  .ccg-card, .ccg-panel,
-  .card, .panel{
+  /* Card */
+  .ccg-card {
     background: var(--card);
-    border: 1px solid var(--border);
-    @apply rounded-2xl shadow-sm;
-    /* blur خیلی کم که ظاهر شیشه‌ای حفظ بشه ولی مشکل band کمتر */
     backdrop-filter: blur(10px);
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
   }
 
-  /* ورودی‌ها */
-  .ccg-input, .ccg-select, .ccg-textarea{
-    background: var(--input-bg);
+  .ccg-card:hover {
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    border-color: var(--primary);
+  }
+
+  /* Inputs */
+  .ccg-input, .ccg-select, .ccg-textarea {
+    background: var(--card-solid);
     border: 1px solid var(--border);
     color: var(--text);
-    @apply rounded-xl px-3 py-2 outline-none;
+    border-radius: 0.75rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+    width: 100%;
   }
 
-  .ccg-input:focus, .ccg-select:focus, .ccg-textarea:focus{
-    @apply ring-2 ring-blue-500/40;
+  .ccg-input:focus, .ccg-select:focus, .ccg-textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-light);
   }
 
-  /* دکمه‌ها */
-  .ccg-btn{
+  .ccg-textarea {
+    min-height: 120px;
+    resize: vertical;
+    line-height: 1.6;
+  }
+
+  /* Buttons */
+  .ccg-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--card-solid);
     border: 1px solid var(--border);
-    background: rgba(255,255,255,.60);
     color: var(--text);
-    @apply rounded-xl px-4 py-2 text-sm transition active:translate-y-[1px];
-  }
-  html.dark .ccg-btn,
-  [data-theme="dark"] .ccg-btn{
-    background: rgba(2,6,23,.35);
-  }
-
-  .ccg-btn-primary{
-    @apply ccg-btn;
-    background: linear-gradient(180deg, rgba(37,99,235,.95), rgba(37,99,235,.82));
-    border-color: rgba(37,99,235,.40);
-    color: #fff;
-    box-shadow: 0 10px 26px rgba(96,165,250,.18);
+    border-radius: 0.75rem;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    gap: 0.5rem;
   }
 
-  .ccg-btn-ghost{
-    @apply ccg-btn;
+  .ccg-btn:hover {
+    background: var(--primary-light);
+    border-color: var(--primary);
+    transform: translateY(-1px);
+  }
+
+  .ccg-btn:active {
+    transform: translateY(0);
+  }
+
+  .ccg-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .ccg-btn-primary {
+    background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 80%, black));
+    border: none;
+    color: white;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+  }
+
+  .ccg-btn-primary:hover {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 90%, white), var(--primary));
+    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
+    transform: translateY(-2px);
+  }
+
+  .ccg-btn-ghost {
     background: transparent;
+    border: 1px solid transparent;
   }
 
-  .ccg-btn-xs{
-    @apply px-2 py-1 text-xs rounded-lg;
+  .ccg-btn-ghost:hover {
+    background: var(--primary-light);
+    border-color: var(--border);
   }
 
-  .ccg-error{
-    border: 1px solid rgba(239,68,68,.35);
-    background: rgba(239,68,68,.08);
-    @apply rounded-2xl p-4;
-    color: var(--text);
+  /* Layout utilities */
+  .ccg-grid {
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  .ccg-flex {
+    display: flex;
+  }
+
+  .ccg-flex-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ccg-flex-between {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* Typography */
+  .ccg-heading-1 {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 1rem;
+  }
+
+  .ccg-heading-2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.3;
+    margin-bottom: 0.75rem;
+  }
+
+  .ccg-heading-3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.4;
+    margin-bottom: 0.5rem;
+  }
+
+  .ccg-text-sm {
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .ccg-text-base {
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  .ccg-text-lg {
+    font-size: 1.125rem;
+    line-height: 1.6;
+  }
+
+  /* Code blocks */
+  .ccg-code-block {
+    background: rgba(2, 6, 23, 0.95);
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    margin: 1rem 0;
+  }
+
+  .ccg-code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: rgba(2, 6, 23, 0.8);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  }
+
+  .ccg-code-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .ccg-code-content {
+    padding: 1rem;
+    overflow-x: auto;
+  }
+
+  .ccg-code-content pre {
+    margin: 0;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: #e2e8f0;
   }
 
   /* Markdown */
-  .ccg-markdown{
-    @apply text-sm leading-7;
+  .ccg-markdown {
+    line-height: 1.7;
+  }
+
+  .ccg-markdown.rtl {
+    direction: rtl;
+    text-align: right;
+  }
+
+  .ccg-markdown.ltr {
+    direction: ltr;
+    text-align: left;
+  }
+
+  .ccg-markdown h1, .ccg-markdown h2, .ccg-markdown h3 {
+    margin-top: 1.5em;
+    margin-bottom: 0.75em;
+    font-weight: 600;
     color: var(--text);
   }
-  .ccg-markdown.rtl{ direction: rtl; }
-  .ccg-markdown.ltr{ direction: ltr; }
 
-  .ccg-markdown h1, .ccg-markdown h2, .ccg-markdown h3{
-    @apply font-semibold mt-4 mb-2;
-  }
-  .ccg-markdown ul{ @apply list-disc ps-6 my-2; }
-  .ccg-markdown ol{ @apply list-decimal ps-6 my-2; }
-
-  .ccg-inline-code{
-    @apply px-1 py-0.5 rounded;
-    background: rgba(15,23,42,.06);
-  }
-  html.dark .ccg-inline-code,
-  [data-theme="dark"] .ccg-inline-code{
-    background: rgba(255,255,255,.10);
+  .ccg-markdown p {
+    margin-bottom: 1em;
   }
 
-  .ccg-codeblock{
-    @apply my-3 rounded-2xl overflow-hidden border;
-    border-color: var(--border);
-    background: rgba(2,6,23,.92);
+  .ccg-markdown ul, .ccg-markdown ol {
+    margin-bottom: 1em;
+    padding-left: 1.5em;
   }
-  .ccg-codeblock-head{
-    @apply flex items-center justify-between gap-3 px-4 py-2 border-b;
-    border-color: rgba(148,163,184,.18);
+
+  .ccg-markdown.rtl ul, .ccg-markdown.rtl ol {
+    padding-left: 0;
+    padding-right: 1.5em;
   }
-  .ccg-codeblock-title{ @apply text-xs font-semibold text-slate-200; }
-  .ccg-pre{ @apply overflow-auto p-4 text-xs text-slate-100; }
+
+  .ccg-markdown code {
+    background: var(--primary-light);
+    color: var(--primary);
+    padding: 0.2em 0.4em;
+    border-radius: 0.25em;
+    font-size: 0.9em;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  .ccg-markdown pre {
+    margin: 1em 0;
+  }
+
+  /* Error states */
+  .ccg-error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    color: #ef4444;
+  }
+
+  .ccg-success {
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    color: #22c55e;
+  }
+
+  /* Loading */
+  .ccg-loading {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--muted);
+  }
+
+  .ccg-loading-spinner {
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: ccg-spin 1s linear infinite;
+  }
+
+  @keyframes ccg-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Tooltip */
+  .ccg-tooltip {
+    position: relative;
+    display: inline-block;
+  }
+
+  .ccg-tooltip .ccg-tooltip-text {
+    visibility: hidden;
+    position: absolute;
+    z-index: 1000;
+    background: var(--card-solid);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .ccg-tooltip:hover .ccg-tooltip-text {
+    visibility: visible;
+    opacity: 1;
+  }
+
+  /* Responsive utilities */
+  @media (max-width: 640px) {
+    .ccg-container {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+    
+    .ccg-card {
+      padding: 1rem;
+    }
+    
+    .ccg-btn {
+      padding: 0.625rem 1.25rem;
+    }
+  }
 }
-
-/* ✅ Tooltip/Popover همیشه روی همه چی */
-.ccg-tooltip,
-.tooltip,
-.popover,
-[data-tooltip],
-[data-popover],
-[data-radix-popper-content-wrapper],
-[role="tooltip"]{
-  z-index: 9999 !important;
-}
-
-/* ✅ جلوگیری از قیچی شدن tooltip */
-.ccg-card, .ccg-panel, .card, .panel,
-.rounded-2xl, .rounded-3xl,
-.input-card, .controls-card{
-  overflow: visible;
-}
-
-/* ✅ فوتر: لینک‌ها کاملاً آبی و مشخص */
-footer a{
-  color: var(--primary) !important;
-  text-decoration: none;
-}
-footer a:hover{
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-
-  /* --- Warning section (for 'هشدارها') --- */
-  .ccg-section-card.ccg-warn{
-    @apply border border-red-500/40 bg-red-500/10;
-  }
-

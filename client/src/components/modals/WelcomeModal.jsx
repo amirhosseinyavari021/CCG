@@ -10,17 +10,17 @@ export default function WelcomeModal({ onClose, onComplete }) {
     loginAsGuest();
     onComplete();
     onClose();
-  };
+}
 
   const goToAuth = () => {
     onComplete();
     onClose();
     window.dispatchEvent(new CustomEvent("open-auth-modal"));
-  };
+}
 
   const openTelegram = () => {
     window.open("https://t.me/CCG127", "_blank", "noopener,noreferrer");
-  };
+}
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
@@ -115,5 +115,3 @@ export default function WelcomeModal({ onClose, onComplete }) {
     </div>
   );
 }
-document.body.classList.add("night-mode");
-document.body.classList.add("day-mode");

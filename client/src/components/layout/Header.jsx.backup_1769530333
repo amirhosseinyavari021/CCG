@@ -1,11 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLanguage } from "../../context/LanguageContext";
 import { useTheme } from "../../context/ThemeContext";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Header() {
   const { lang, setLang, t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
+  const { user } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+      setScrolled(window.scrollY > 20);
+    };
+  }, []);
 
   const toggleLang = () => {
     const newLang = lang === "fa" ? "en" : "fa";
@@ -13,12 +21,17 @@ export default function Header() {
   };
 
   const navigationItems = [
-    { id: "generator", label: t("generator") || "Generator" },
-    { id: "chat", label: t("chat") || "Chat" },
+    { id: "generator", label: t("generator") },
+    { id: "comparator", label: t("comparator") },
+    { id: "chat", label: t("chat") },
   ];
 
   return (
-    <header className="sticky top-0 z-50 bg-[var(--card)] border-b border-[var(--border)] shadow-sm">
+    <header
+      className={`sticky top-0 z-50 transition-all duration-300 ${
+        scrolled ? "bg-[var(--card)] backdrop-blur-lg border-b border-[var(--border)] shadow-lg" : "bg-transparent"
+      }`}
+    >
       <div className="ccg-container">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -36,7 +49,9 @@ export default function Header() {
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                 <span className="text-white font-bold text-sm">CCG</span>
               </div>
-              <span className="font-bold text-lg">Cando Command Generator</span>
+              <span className="font-bold text-lg bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Cando Command Generator
+              </span>
             </div>
           </div>
 
@@ -62,15 +77,24 @@ export default function Header() {
             <button
               onClick={toggleTheme}
               className="ccg-btn p-2 rounded-full"
-              aria-label="Toggle theme"
+              aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             >
-              {theme === "dark" ? "☀️" : "🌙"}
+              {theme === "dark" ? (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+              )}
             </button>
 
             {/* Language toggle */}
             <button
               onClick={toggleLang}
               className="ccg-btn p-2 rounded-full"
+              aria-label={lang === "fa" ? "Switch to English" : "تغییر به فارسی"}
             >
               {lang === "fa" ? "EN" : "فا"}
             </button>
@@ -80,7 +104,7 @@ export default function Header() {
               className="ccg-btn-primary px-4 py-2"
               onClick={() => window.dispatchEvent(new CustomEvent("ccg-auth-modal", { detail: true }))}
             >
-              Sign In
+              {user ? t("menu") : t("signIn")}
             </button>
           </div>
         </div>
@@ -103,6 +127,24 @@ export default function Header() {
                   {item.label}
                 </button>
               ))}
+              
+              <div className="border-t border-[var(--border)] mt-2 pt-4">
+                <div className="text-sm text-[var(--muted)] mb-2">تنظیمات سریع</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={toggleTheme}
+                    className="ccg-btn py-2 flex items-center justify-center gap-2"
+                  >
+                    {theme === "dark" ? "حالت روشن" : "حالت تاریک"}
+                  </button>
+                  <button
+                    onClick={toggleLang}
+                    className="ccg-btn py-2 flex items-center justify-center gap-2"
+                  >
+                    {lang === "fa" ? "English" : "فارسی"}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

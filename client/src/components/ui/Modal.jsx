@@ -8,7 +8,7 @@ export default function Modal({ open, onClose, title, children }) {
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = prev;
-    };
+}
   }, [open]);
 
   if (!open) return null;
@@ -29,5 +29,3 @@ export default function Modal({ open, onClose, title, children }) {
     document.body
   );
 }
-document.body.classList.add("night-mode");
-document.body.classList.add("day-mode");

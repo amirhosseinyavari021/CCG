@@ -27,5 +27,3 @@ export function useAuth() {
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
 }
-document.body.classList.add("night-mode");
-document.body.classList.add("day-mode");

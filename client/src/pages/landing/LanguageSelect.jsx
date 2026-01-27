@@ -10,7 +10,7 @@ export default function LanguageSelect() {
   const handleSelect = () => {
     changeLanguage(selectedLang);
     navigate('/welcome');
-  };
+}
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-ccg-bg p-4">
@@ -74,5 +74,3 @@ export default function LanguageSelect() {
     </div>
   );
 }
-document.body.classList.add("night-mode");
-document.body.classList.add("day-mode");

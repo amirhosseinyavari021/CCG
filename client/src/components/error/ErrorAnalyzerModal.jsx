@@ -50,7 +50,7 @@ export default function ErrorAnalyzerModal({ open, onClose, seed }) {
         outputType: "command",
         output_style: "detailed",
         knowledgeLevel: "beginner",
-      };
+}
 
       const res = await callCCG(payload);
       setOutput(res.markdown || "");
@@ -112,5 +112,3 @@ export default function ErrorAnalyzerModal({ open, onClose, seed }) {
     </div>
   );
 }
-document.body.classList.add("night-mode");
-document.body.classList.add("day-mode");

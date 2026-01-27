@@ -13,7 +13,7 @@ export default function ErrorHelper({ onAnalyze, labels }) {
     ctxLabel: "Context (optional)",
     analyze: "Analyze",
     close: "Close",
-  };
+}
 
   return (
     <div className="ccg-card">
@@ -66,5 +66,3 @@ export default function ErrorHelper({ onAnalyze, labels }) {
     </div>
   );
 }
-document.body.classList.add("night-mode");
-document.body.classList.add("day-mode");

@@ -29,5 +29,3 @@ export function useTheme() {
   if (!ctx) throw new Error("useTheme must be used within ThemeProvider");
   return ctx;
 }
-document.body.classList.add("night-mode");
-document.body.classList.add("day-mode");

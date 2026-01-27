@@ -39,5 +39,3 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     </LanguageProvider>
   </React.StrictMode>
 );
-document.body.classList.add("night-mode");
-document.body.classList.add("day-mode");

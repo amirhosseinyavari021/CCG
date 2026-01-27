@@ -29,7 +29,7 @@ export default function ErrorAnalyzerModal({
       apiError: "API error",
       outTitle: "Analysis Output",
       empty: "Output will appear here.",
-    };
+}
 
   const [text, setText] = useState(initialError || "");
   const [extra, setExtra] = useState("");
@@ -65,7 +65,7 @@ export default function ErrorAnalyzerModal({
         // hints (safe extra fields)
         lang,
         ...contextHint,
-      };
+}
 
       const res = await analyzeError(payload);
       const md = s(res?.outputMarkdown || res?.output || res);
@@ -123,5 +123,3 @@ export default function ErrorAnalyzerModal({
     </Modal>
   );
 }
-document.body.classList.add("night-mode");
-document.body.classList.add("day-mode");

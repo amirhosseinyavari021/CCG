@@ -1,91 +1,37 @@
-// client/src/components/ui/Tooltip.jsx
-import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useState } from "react";
 
-/**
- * Tooltip Portaled:
- * - مشکل رفتن متن زیر باکس‌ها/overflow را حل می‌کند
- * - روی موبایل با click باز/بسته می‌شود
- */
-export default function Tooltip({ text, side = "top" }) {
-  const btnRef = useRef(null);
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState({ top: 0, left: 0, width: 280 });
-
-  const bubbleStyle = useMemo(() => {
-    return {
-      position: "fixed",
-      top: pos.top,
-      left: pos.left,
-      width: pos.width,
-      zIndex: 99999,
-    };
-  }, [pos]);
-
-  useEffect(() => {
-    function onDoc(e) {
-      if (!open) return;
-      const b = btnRef.current;
-      if (!b) return;
-      if (b.contains(e.target)) return;
-      setOpen(false);
-    }
-    document.addEventListener("click", onDoc, true);
-    return () => document.removeEventListener("click", onDoc, true);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const b = btnRef.current;
-    if (!b) return;
-
-    const r = b.getBoundingClientRect();
-    const vw = Math.min(window.innerWidth, 520);
-    const width = Math.min(320, vw - 24);
-
-    let left = r.left + r.width / 2 - width / 2;
-    left = Math.max(12, Math.min(left, window.innerWidth - width - 12));
-
-    let top;
-    if (side === "bottom") top = r.bottom + 10;
-    else top = r.top - 10;
-
-    // اگر بالا جا نبود → پایین
-    if (top < 10) top = r.bottom + 10;
-    // اگر پایین هم جا نبود → بالا
-    if (top + 90 > window.innerHeight) top = Math.max(10, r.top - 100);
-
-    setPos({ top, left, width });
-  }, [open, side]);
-
-  if (!text) return null;
+export default function Tooltip({ children, text, position = "top" }) {
+  const [visible, setVisible] = useState(false);
+  
+  const positionClasses = {
+    top: "bottom-full left-1/2 -translate-x-1/2 mb-2",
+    bottom: "top-full left-1/2 -translate-x-1/2 mt-2",
+    left: "right-full top-1/2 -translate-y-1/2 mr-2",
+    right: "left-full top-1/2 -translate-y-1/2 ml-2",
+}
 
   return (
-    <>
-      <button
-        ref={btnRef}
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="w-5 h-5 rounded-full border text-xs text-slate-400 hover:bg-white/5 dark:border-white/10"
-        aria-label="Help"
-        title="Help"
-      >
-        ?
-      </button>
-
-      {open
-        ? createPortal(
-            <div style={bubbleStyle} dir="auto">
-              <div className="rounded-xl border border-white/10 bg-slate-950/95 text-slate-100 shadow-2xl p-3 text-xs leading-6">
-                {text}
-              </div>
-            </div>,
-            document.body
-          )
-        : null}
-    </>
+    <div 
+      className="relative inline-block"
+      onMouseEnter={() => setVisible(true)}
+      onMouseLeave={() => setVisible(false)}
+      onFocus={() => setVisible(true)}
+      onBlur={() => setVisible(false)}
+    >
+      {children}
+      {visible && text && (
+        <div
+          className={`absolute z-50 px-3 py-2 text-sm bg-gray-900 text-white rounded-lg whitespace-nowrap ${positionClasses[position]}`}
+        >
+          {text}
+          <div className={`absolute w-2 h-2 bg-gray-900 transform rotate-45 ${
+            position === "top" ? "top-full -translate-x-1/2 left-1/2 -mt-1" :
+            position === "bottom" ? "bottom-full -translate-x-1/2 left-1/2 -mb-1" :
+            position === "left" ? "left-full -translate-y-1/2 top-1/2 -ml-1" :
+            "right-full -translate-y-1/2 top-1/2 -mr-1"
+          }`} />
+        </div>
+      )}
+    </div>
   );
 }
-document.body.classList.add("night-mode");
-document.body.classList.add("day-mode");

@@ -17,7 +17,7 @@ export default function LanguageSelectModal({ onClose }) {
     changeLanguage(selectedLang);
     localStorage.setItem("ccg_lang", selectedLang);
     onClose();
-  };
+}
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
@@ -68,5 +68,3 @@ export default function LanguageSelectModal({ onClose }) {
     </div>
   );
 }
-document.body.classList.add("night-mode");
-document.body.classList.add("day-mode");

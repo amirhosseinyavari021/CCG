@@ -24,5 +24,3 @@ export default function ProtectedRoute({ children }) {
 
   return isAllowed ? children : <Navigate to="/landing" replace />;
 }	
-document.body.classList.add("night-mode");
-document.body.classList.add("day-mode");
