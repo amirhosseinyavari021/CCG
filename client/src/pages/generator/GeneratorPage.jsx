@@ -1,87 +1,114 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState, useMemo } from "react";
 import { useLanguage } from "../../context/LanguageContext";
+import { usePersistState, usePersistComplexState } from "../../hooks/usePersistState";
 import { callCCG } from "../../services/aiService";
-import SectionedMarkdown from "../../components/ui/SectionedMarkdown";
 import CodeBlock from "../../components/ui/CodeBlock";
-import Tooltip from "../../components/ui/Tooltip";
+import AdvancedSettings from "../../components/generator/AdvancedSettings";
+import FeedbackButton from "../../components/ui/FeedbackButton";
 
-const PLATFORM_OPTIONS = [
-  { value: "linux", label: "Linux", tips: {
-    fa: "توزیع‌های لینوکس مانند Ubuntu, CentOS, Debian",
-    en: "Linux distributions like Ubuntu, CentOS, Debian"
-  }},
-  { value: "windows", label: "Windows", tips: {
-    fa: "ویندوز ۱۰/۱۱، ویندوز سرور",
-    en: "Windows 10/11, Windows Server"
-  }},
-  { value: "mac", label: "macOS", tips: {
-    fa: "سیستم عامل مک (macOS)",
-    en: "Apple macOS"
-  }},
-  { value: "network", label: "Network Device", tips: {
-    fa: "تجهیزات شبکه مانند روتر، سوئیچ، فایروال",
-    en: "Network equipment like routers, switches, firewalls"
-  }},
-  { value: "other", label: "Other OS", tips: {
-    fa: "سیستم‌عامل‌های دیگر مانند FreeBSD, Solaris",
-    en: "Other OS like FreeBSD, Solaris"
-  }},
+const PLATFORMS = [
+  { value: "linux", label: "Linux", icon: "🐧", shortLabel: { fa: "لینوکس", en: "Linux" } },
+  { value: "windows", label: "Windows", icon: "🪟", shortLabel: { fa: "ویندوز", en: "Windows" } },
+  { value: "mac", label: "macOS", icon: "🍎", shortLabel: { fa: "مک", en: "macOS" } },
+  { value: "network", label: "Network", icon: "🌐", shortLabel: { fa: "شبکه", en: "Network" } }
+];
+
+// لیست سیستم‌عامل‌های پشتیبانی شده برای Other
+const SUPPORTED_OTHER_OS = [
+  { value: "freebsd", label: "FreeBSD", icon: "🐡", description: { fa: "سیستم عامل FreeBSD", en: "FreeBSD OS" } },
+  { value: "openbsd", label: "OpenBSD", icon: "🐡", description: { fa: "سیستم عامل OpenBSD", en: "OpenBSD OS" } },
+  { value: "netbsd", label: "NetBSD", icon: "🐡", description: { fa: "سیستم عامل NetBSD", en: "NetBSD OS" } },
+  { value: "solaris", label: "Solaris", icon: "☀️", description: { fa: "Oracle Solaris", en: "Oracle Solaris" } },
+  { value: "aix", label: "AIX", icon: "🖥️", description: { fa: "IBM AIX", en: "IBM AIX" } },
+  { value: "hpux", label: "HP-UX", icon: "💻", description: { fa: "HP-UX", en: "HP-UX" } },
+  { value: "zos", label: "z/OS", icon: "💾", description: { fa: "IBM z/OS", en: "IBM z/OS" } },
+  { value: "android", label: "Android", icon: "🤖", description: { fa: "سیستم عامل Android", en: "Android OS" } },
+  { value: "ios", label: "iOS", icon: "📱", description: { fa: "سیستم عامل iOS", en: "iOS" } },
+  { value: "chromeos", label: "ChromeOS", icon: "🌐", description: { fa: "Chrome OS", en: "Chrome OS" } }
 ];
 
 const OUTPUT_TYPES = [
-  { value: "tool", label: "Tool (Full)", icon: "🛠️", tips: {
-    fa: "دستور کامل + توضیح + هشدار + جایگزین",
-    en: "Full command + explanation + warnings + alternatives"
-  }},
-  { value: "command", label: "Command Only", icon: "💻", tips: {
-    fa: "فقط دستور خالص بدون توضیح اضافه",
-    en: "Only the command without extra explanation"
-  }},
-  { value: "python", label: "Python Script", icon: "🐍", tips: {
-    fa: "اسکریپت پایتون برای اتوماسیون",
-    en: "Python script for automation"
-  }},
-];
-
-const KNOWLEDGE_LEVELS = [
-  { value: "beginner", label: "Beginner", tips: {
-    fa: "توضیحات کامل و گام به گام",
-    en: "Full step-by-step explanations"
-  }},
-  { value: "intermediate", label: "Intermediate", tips: {
-    fa: "توضیحات متوسط - مناسب کاربران با تجربه",
-    en: "Moderate explanations - for experienced users"
-  }},
-  { value: "expert", label: "Expert", tips: {
-    fa: "دستورات مختصر و پیشرفته",
-    en: "Concise advanced commands"
-  }},
+  { 
+    value: "tool", 
+    label: { fa: "ابزار کامل", en: "Full Tool" },
+    icon: "🛠️",
+    description: { 
+      fa: "دستور + توضیح + هشدار", 
+      en: "Command + Explanation + Warnings" 
+    }
+  },
+  { 
+    value: "command", 
+    label: { fa: "فقط دستور", en: "Command Only" },
+    icon: "💻",
+    description: { 
+      fa: "دستور اجرایی خالص", 
+      en: "Pure executable command" 
+    }
+  },
+  { 
+    value: "python", 
+    label: { fa: "اسکریپت پایتون", en: "Python Script" },
+    icon: "🐍",
+    description: { 
+      fa: "اسکریپت پایتون قابل اجرا", 
+      en: "Executable Python script" 
+    }
+  }
 ];
 
 export default function GeneratorPage() {
-  const { t, lang } = useLanguage();
+  const { lang } = useLanguage();
   
-  // حالت‌ها
-  const [platform, setPlatform] = useState("linux");
-  const [outputType, setOutputType] = useState("tool");
-  const [knowledgeLevel, setKnowledgeLevel] = useState("intermediate");
-  const [input, setInput] = useState("");
-  const [output, setOutput] = useState({ markdown: "", tool: null });
+  // State management با persistence
+  const [platform, setPlatform] = usePersistState("platform", "linux");
+  const [otherOS, setOtherOS] = usePersistState("other_os", "freebsd");
+  const [outputType, setOutputType] = usePersistState("output_type", "tool");
+  const [knowledgeLevel, setKnowledgeLevel] = usePersistState("knowledge_level", "intermediate");
+  const [input, setInput] = usePersistState("input", "");
+  const [output, setOutput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [swapLayout, setSwapLayout] = useState(false);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showAdvanced, setShowAdvanced] = usePersistState("show_advanced", false);
+  const [advancedSettings, setAdvancedSettings] = usePersistComplexState("advanced_settings", {});
   
-  // توابع
+  // محاسبه پلتفرم نهایی (اگر other انتخاب شده، otherOS استفاده شود)
+  const finalPlatform = platform === "other" ? `other:${otherOS}` : platform;
+  
+  // Platform description
+  const platformDescriptions = useMemo(() => ({
+    linux: {
+      fa: "توزیع‌های لینوکس (Ubuntu, Debian, CentOS, ...)",
+      en: "Linux distributions (Ubuntu, Debian, CentOS, ...)"
+    },
+    windows: {
+      fa: "ویندوز ۱۰/۱۱، ویندوز سرور",
+      en: "Windows 10/11, Windows Server"
+    },
+    mac: {
+      fa: "سیستم عامل مک (macOS)",
+      en: "Apple macOS"
+    },
+    network: {
+      fa: "تجهیزات شبکه (روتر، سوئیچ، فایروال)",
+      en: "Network equipment (routers, switches, firewalls)"
+    },
+    other: {
+      fa: "سیستم‌عامل‌های دیگر پشتیبانی شده",
+      en: "Other supported operating systems"
+    }
+  }), []);
+  
+  // Generate function
   const generate = async () => {
     if (!input.trim()) {
-      setError(lang === "fa" ? "لطفا درخواست خود را وارد کنید" : "Please enter your request");
+      setError(lang === "fa" ? "⚠️ لطفا درخواست خود را وارد کنید" : "⚠️ Please enter your request");
       return;
     }
     
     setLoading(true);
     setError("");
-    setOutput({ markdown: "", tool: null });
+    setOutput("");
     
     try {
       const payload = {
@@ -90,337 +117,385 @@ export default function GeneratorPage() {
         user_request: input.trim(),
         outputType,
         knowledgeLevel,
-        platform,
-        os: platform,
-        cli: platform === "windows" ? "powershell" : "bash",
-}
+        platform: finalPlatform,
+        advanced: advancedSettings,
+        timestamp: new Date().toISOString()
+      };
       
       const result = await callCCG(payload);
-      setOutput(result);
+      setOutput(result?.markdown || result?.result || "");
     } catch (err) {
-      setError(err.message || (lang === "fa" ? "خطا در ارتباط با سرور" : "Server connection error"));
+      setError(err.message || (lang === "fa" ? "❌ خطا در ارتباط با سرور" : "❌ Server connection error"));
     } finally {
       setLoading(false);
     }
-}
-  
-  const explain = async () => {
-    if (!input.trim()) {
-      setError(lang === "fa" ? "لطفا دستور یا خطا را وارد کنید" : "Please enter command or error");
-      return;
-    }
-    
-    setLoading(true);
-    setError("");
-    setOutput({ markdown: "", tool: null });
-    
-    try {
-      const payload = {
-        mode: "explain",
-        lang,
-        user_request: input.trim(),
-        targetCommand: input.trim(),
-        knowledgeLevel,
-}
-      
-      const result = await callCCG(payload);
-      setOutput(result);
-    } catch (err) {
-      setError(err.message || (lang === "fa" ? "خطا در توضیح دستور" : "Command explanation error"));
-    } finally {
-      setLoading(false);
-    }
-}
+  };
   
   const copyToClipboard = (text) => {
+    if (!text) return;
     navigator.clipboard.writeText(text).then(() => {
-      alert(lang === "fa" ? "کپی شد!" : "Copied!");
+      alert(lang === "fa" ? "✅ کپی شد!" : "✅ Copied!");
     });
-}
+  };
   
   const clearAll = () => {
     setInput("");
-    setOutput({ markdown: "", tool: null });
+    setOutput("");
     setError("");
-}
+  };
+  
+  const getPlatformColor = (plat) => {
+    const colors = {
+      linux: "from-orange-500 to-red-500",
+      windows: "from-blue-500 to-cyan-500",
+      mac: "from-gray-400 to-gray-600",
+      network: "from-green-500 to-emerald-600",
+      other: "from-purple-500 to-pink-500"
+    };
+    return colors[plat] || "from-blue-500 to-purple-600";
+  };
+  
+  // رندر دکمه‌های پلتفرم (شامل other)
+  const renderPlatformButtons = () => {
+    const allPlatforms = [...PLATFORMS, { value: "other", label: "Other OS", icon: "🔧", shortLabel: { fa: "سایر", en: "Other" } }];
+    
+    return (
+      <div className="grid grid-cols-5 gap-2 mb-3">
+        {allPlatforms.map(p => (
+          <button
+            key={p.value}
+            onClick={() => setPlatform(p.value)}
+            className={`
+              flex flex-col items-center p-2 rounded-lg transition-all
+              ${platform === p.value 
+                ? `bg-gradient-to-b ${getPlatformColor(p.value)} text-white shadow` 
+                : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
+              }
+            `}
+            title={p.label}
+          >
+            <span className="text-lg">{p.icon}</span>
+            <span className="text-xs mt-1">
+              {typeof p.shortLabel === 'object' ? p.shortLabel[lang] || p.shortLabel.en : p.shortLabel}
+            </span>
+          </button>
+        ))}
+      </div>
+    );
+  };
+  
+  // رندر انتخاب Other OS
+  const renderOtherOSSelector = () => {
+    if (platform !== "other") return null;
+    
+    return (
+      <div className="mt-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-gray-800 dark:to-gray-900 rounded-lg">
+        <h3 className="text-sm font-medium mb-2">
+          {lang === "fa" ? "🔧 انتخاب سیستم عامل دیگر" : "🔧 Select Other OS"}
+        </h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+          {SUPPORTED_OTHER_OS.map(os => (
+            <button
+              key={os.value}
+              onClick={() => setOtherOS(os.value)}
+              className={`
+                flex flex-col items-center p-2 rounded transition text-center
+                ${otherOS === os.value
+                  ? 'bg-gradient-to-b from-purple-500 to-pink-500 text-white shadow'
+                  : 'bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700'
+                }
+              `}
+              title={typeof os.description === 'object' ? os.description[lang] || os.description.en : os.description}
+            >
+              <span className="text-lg mb-1">{os.icon}</span>
+              <span className="text-xs">{os.label}</span>
+            </button>
+          ))}
+        </div>
+        <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+          {lang === "fa" 
+            ? "سیستم عامل خود را از لیست پشتیبانی شده انتخاب کنید"
+            : "Select your OS from supported list"}
+        </div>
+      </div>
+    );
+  };
   
   return (
-    <div className="space-y-6">
-      {/* نوار ابزار بالا */}
+    <div className="space-y-4 md:space-y-6">
+      {/* Feedback Button */}
+      <div className="ccg-container">
+        <FeedbackButton />
+      </div>
+      
+      {/* Platform Selection */}
       <div className="ccg-container">
         <div className="ccg-card p-4">
-          <div className="flex flex-wrap items-center gap-3">
-            {/* پلتفرم */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">{t("platform") || "Platform"}</span>
-              <select
-                value={platform}
-                onChange={(e) => setPlatform(e.target.value)}
-                className="ccg-select text-sm"
-              >
-                {PLATFORM_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-              <Tooltip text={PLATFORM_OPTIONS.find(p => p.value === platform)?.tips[lang] || ""}>
-                <button className="ccg-btn-ghost p-1 text-xs">ℹ️</button>
-              </Tooltip>
-            </div>
-            
-            {/* نوع خروجی */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">{t("outputType") || "Output"}</span>
-              <select
-                value={outputType}
-                onChange={(e) => setOutputType(e.target.value)}
-                className="ccg-select text-sm"
-              >
-                {OUTPUT_TYPES.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.icon} {opt.label}
-                  </option>
-                ))}
-              </select>
-              <Tooltip text={OUTPUT_TYPES.find(o => o.value === outputType)?.tips[lang] || ""}>
-                <button className="ccg-btn-ghost p-1 text-xs">ℹ️</button>
-              </Tooltip>
-            </div>
-            
-            {/* سطح دانش */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">{t("knowledge") || "Level"}</span>
-              <select
-                value={knowledgeLevel}
-                onChange={(e) => setKnowledgeLevel(e.target.value)}
-                className="ccg-select text-sm"
-              >
-                {KNOWLEDGE_LEVELS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-              <Tooltip text={KNOWLEDGE_LEVELS.find(k => k.value === knowledgeLevel)?.tips[lang] || ""}>
-                <button className="ccg-btn-ghost p-1 text-xs">ℹ️</button>
-              </Tooltip>
-            </div>
-            
-            {/* دکمه‌های اکشن */}
-            <div className="flex items-center gap-2 ml-auto">
-              <button
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                className="ccg-btn px-3 py-1.5 text-sm"
-              >
-                {showAdvanced ? "▼ Advanced" : "▶ Advanced"}
-              </button>
-              <button
-                onClick={() => setSwapLayout(!swapLayout)}
-                className="ccg-btn px-3 py-1.5 text-sm"
-              >
-                ↔ {t("swapIO") || "Swap"}
-              </button>
+          <h2 className="font-bold text-base mb-3">
+            {lang === "fa" ? "🎯 پلتفرم هدف" : "🎯 Target Platform"}
+          </h2>
+          
+          {renderPlatformButtons()}
+          {renderOtherOSSelector()}
+          
+          <div className="mt-3 p-2 bg-gray-50 dark:bg-gray-800/50 rounded">
+            <div className="text-xs">
+              <span className="font-medium">
+                {platform === "other" 
+                  ? SUPPORTED_OTHER_OS.find(os => os.value === otherOS)?.label || "Other OS"
+                  : platformDescriptions[platform]?.[lang] || platformDescriptions[platform]?.en
+                }
+              </span>
+              <span className="mr-2 text-gray-500">
+                {platform === "other" && (
+                  <> • {SUPPORTED_OTHER_OS.find(os => os.value === otherOS)?.description?.[lang]}</>
+                )}
+              </span>
             </div>
           </div>
-          
-          {/* تنظیمات پیشرفته */}
-          {showAdvanced && (
-            <div className="mt-4 pt-4 border-t border-[var(--border)]">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div>
-                  <label className="text-xs text-[var(--muted)]">Shell</label>
-                  <select className="ccg-select text-sm w-full">
-                    <option>bash</option>
-                    <option>zsh</option>
-                    <option>powershell</option>
-                    <option>cmd</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-[var(--muted)]">Version</label>
-                  <input type="text" className="ccg-input text-sm w-full" placeholder="Optional" />
-                </div>
-                <div>
-                  <label className="text-xs text-[var(--muted)]">Network Vendor</label>
-                  <select className="ccg-select text-sm w-full">
-                    <option>Cisco</option>
-                    <option>MikroTik</option>
-                    <option>Fortinet</option>
-                    <option>Juniper</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-[var(--muted)]">Device Type</label>
-                  <select className="ccg-select text-sm w-full">
-                    <option>Router</option>
-                    <option>Switch</option>
-                    <option>Firewall</option>
-                    <option>AP</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </div>
       
-      {/* شبکه اصلی */}
+      {/* Advanced Settings Toggle */}
       <div className="ccg-container">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* ستون چپ - ورودی */}
-          <div className={`ccg-card p-5 ${swapLayout ? "order-2" : "order-1"}`}>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="font-semibold text-lg">{t("inputs") || "Input"}</h2>
+        <button
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="w-full ccg-card p-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className={`w-6 h-6 rounded flex items-center justify-center ${showAdvanced ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                <span className="text-white text-sm">⚙️</span>
+              </div>
+              <div>
+                <div className="text-sm font-medium text-left">
+                  {lang === "fa" ? "تنظیمات پیشرفته" : "Advanced Settings"}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 text-left">
+                  {showAdvanced 
+                    ? (lang === "fa" ? "برای مخفی کردن کلیک کنید" : "Click to hide")
+                    : (lang === "fa" ? "برای تنظیمات دقیق‌تر کلیک کنید" : "Click for detailed settings")
+                  }
+                </div>
+              </div>
+            </div>
+            <span className="text-sm">{showAdvanced ? "▲" : "▼"}</span>
+          </div>
+        </button>
+        
+        {/* Advanced Settings Content */}
+        {showAdvanced && (
+          <div className="mt-3 animate-fadeIn">
+            <div className="ccg-card p-4">
+              <AdvancedSettings 
+                platform={platform === "other" ? "other" : platform}
+                settings={advancedSettings}
+                onChange={setAdvancedSettings}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* Main Input/Output Grid */}
+      <div className="ccg-container">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
+          {/* Input Column */}
+          <div className="ccg-card p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+              <h2 className="font-bold text-base">
+                {lang === "fa" ? "📝 درخواست شما" : "📝 Your Request"}
+              </h2>
               <button
                 onClick={clearAll}
-                className="ccg-btn-ghost text-sm px-3 py-1"
+                className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-800 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition"
               >
-                🗑️ Clear
+                🗑️ {lang === "fa" ? "پاک کردن" : "Clear"}
               </button>
             </div>
             
+            {/* Output Type Selection */}
+            <div className="mb-3">
+              <label className="block text-xs font-medium mb-2">
+                {lang === "fa" ? "نوع خروجی" : "Output Type"}
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {OUTPUT_TYPES.map(type => (
+                  <button
+                    key={type.value}
+                    onClick={() => setOutputType(type.value)}
+                    className={`
+                      flex flex-col items-center p-2 rounded transition text-center
+                      ${outputType === type.value
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'
+                      }
+                    `}
+                    title={typeof type.description === 'object' 
+                      ? type.description[lang] || type.description.en
+                      : type.description
+                    }
+                  >
+                    <span className="text-base">{type.icon}</span>
+                    <span className="text-xs mt-1">
+                      {typeof type.label === 'object' 
+                        ? type.label[lang] || type.label.en
+                        : type.label
+                      }
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* Knowledge Level */}
+            <div className="mb-3">
+              <label className="block text-xs font-medium mb-2">
+                {lang === "fa" ? "سطح دانش" : "Knowledge Level"}
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => setKnowledgeLevel("beginner")}
+                  className={`p-2 rounded text-xs ${knowledgeLevel === "beginner" ? "bg-green-500 text-white" : "bg-gray-100 dark:bg-gray-800"}`}
+                >
+                  👶 {lang === "fa" ? "مبتدی" : "Beginner"}
+                </button>
+                <button
+                  onClick={() => setKnowledgeLevel("intermediate")}
+                  className={`p-2 rounded text-xs ${knowledgeLevel === "intermediate" ? "bg-blue-500 text-white" : "bg-gray-100 dark:bg-gray-800"}`}
+                >
+                  👨‍💻 {lang === "fa" ? "متوسط" : "Intermediate"}
+                </button>
+                <button
+                  onClick={() => setKnowledgeLevel("expert")}
+                  className={`p-2 rounded text-xs ${knowledgeLevel === "expert" ? "bg-purple-500 text-white" : "bg-gray-100 dark:bg-gray-800"}`}
+                >
+                  🧠 {lang === "fa" ? "حرفه‌ای" : "Expert"}
+                </button>
+              </div>
+            </div>
+            
+            {/* Textarea */}
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={t("placeholderReq") || "Describe what you want to do..."}
-              className="ccg-textarea w-full h-64 resize-none p-4 text-sm"
-              rows={8}
+              placeholder={lang === "fa" 
+                ? "مثال: چگونه فضای دیسک روی سرور لینوکس را بررسی و پاکسازی کنم؟"
+                : "Example: How to check and clean disk space on Linux server?"}
+              className="w-full h-40 p-3 text-sm border border-gray-300 dark:border-gray-700 rounded-lg resize-none focus:ring-1 focus:ring-blue-500"
+              rows={4}
             />
             
+            {/* Error Display */}
             {error && (
-              <div className="mt-3 ccg-error p-3">
-                <div className="font-medium">⚠️ {lang === "fa" ? "خطا" : "Error"}</div>
-                <div className="text-sm mt-1">{error}</div>
+              <div className="mt-3 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded animate-fadeIn">
+                <div className="text-xs font-medium text-red-700 dark:text-red-300">{error}</div>
               </div>
             )}
             
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <button
-                onClick={generate}
-                disabled={loading || !input.trim()}
-                className="ccg-btn-primary py-3 flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    {lang === "fa" ? "در حال تولید..." : "Generating..."}
-                  </>
-                ) : (
-                  <>
-                    🚀 {t("generate") || "Generate"}
-                  </>
-                )}
-              </button>
-              
-              <button
-                onClick={explain}
-                disabled={loading || !input.trim()}
-                className="ccg-btn py-3 flex items-center justify-center gap-2"
-              >
-                📖 {lang === "fa" ? "توضیح دستور" : "Explain Command"}
-              </button>
-            </div>
-            
-            <div className="mt-4 text-xs text-[var(--muted)]">
-              {lang === "fa" 
-                ? "💡 نکته: برای بهترین نتایج، درخواست خود را به طور کامل توضیح دهید" 
-                : "💡 Tip: Describe your request in detail for best results"}
-            </div>
+            {/* Generate Button */}
+            <button
+              onClick={generate}
+              disabled={loading || !input.trim()}
+              className={`
+                mt-4 w-full py-3 rounded-lg font-medium text-sm transition
+                ${loading || !input.trim()
+                  ? 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed'
+                  : `bg-gradient-to-r ${getPlatformColor(platform)} text-white hover:opacity-90`
+                }
+              `}
+            >
+              {loading ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  <span>{lang === "fa" ? "در حال تولید..." : "Generating..."}</span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-base">🚀</span>
+                  <span>{lang === "fa" ? "تولید دستور" : "Generate Command"}</span>
+                </div>
+              )}
+            </button>
           </div>
           
-          {/* ستون راست - خروجی */}
-          <div className={`ccg-card p-5 ${swapLayout ? "order-1" : "order-2"}`}>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="font-semibold text-lg">{t("output") || "Output"}</h2>
-              {output.markdown && (
+          {/* Output Column */}
+          <div className="ccg-card p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+              <h2 className="font-bold text-base">
+                {lang === "fa" ? "✨ نتیجه" : "✨ Result"}
+              </h2>
+              {output && (
                 <button
-                  onClick={() => copyToClipboard(output.markdown)}
-                  className="ccg-btn-ghost text-sm px-3 py-1"
+                  onClick={() => copyToClipboard(output)}
+                  className="px-3 py-1 text-sm bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded hover:opacity-90 transition flex items-center gap-1"
                 >
-                  📋 Copy
+                  <span>📋</span>
+                  <span>{lang === "fa" ? "کپی" : "Copy"}</span>
                 </button>
               )}
             </div>
             
-            {output.tool ? (
-              <div className="space-y-4">
-                {/* دستور اصلی */}
-                <div className="bg-gray-900 rounded-lg overflow-hidden">
-                  <div className="flex justify-between items-center px-4 py-2 bg-gray-800">
-                    <div className="text-xs text-gray-300 font-mono">Command</div>
-                    <button
-                      onClick={() => copyToClipboard(output.tool.primary?.command || output.markdown)}
-                      className="text-xs text-gray-300 hover:text-white px-2 py-1"
-                    >
-                      📋 Copy
-                    </button>
-                  </div>
-                  <pre className="p-4 text-sm text-gray-100 font-mono overflow-x-auto">
-                    {output.tool.primary?.command || output.markdown}
-                  </pre>
-                </div>
+            {output ? (
+              <div className="space-y-3 animate-fadeIn">
+                <CodeBlock 
+                  code={output} 
+                  language={outputType === "python" ? "python" : "bash"}
+                  showCopy={false}
+                  maxHeight="300px"
+                />
                 
-                {/* توضیحات */}
-                {output.tool.explanation && (
-                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-                    <div className="text-sm font-medium mb-2">💡 Explanation</div>
-                    <div className="text-sm">{output.tool.explanation}</div>
+                {/* Additional Info */}
+                <div className="p-2 bg-gray-50 dark:bg-gray-800/50 rounded">
+                  <div className="text-xs font-medium mb-1">
+                    {lang === "fa" ? "📊 اطلاعات تولید" : "📊 Generation Info"}
                   </div>
-                )}
-                
-                {/* هشدارها */}
-                {output.tool.warnings && output.tool.warnings.length > 0 && (
-                  <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">
-                    <div className="text-sm font-medium mb-2">⚠️ Warnings</div>
-                    <ul className="text-sm space-y-1">
-                      {output.tool.warnings.map((warn, i) => (
-                        <li key={i}>• {warn}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            ) : output.markdown ? (
-              outputType === "command" || outputType === "python" ? (
-                <div className="bg-gray-900 rounded-lg overflow-hidden">
-                  <div className="flex justify-between items-center px-4 py-2 bg-gray-800">
-                    <div className="text-xs text-gray-300 font-mono">
-                      {outputType === "python" ? "Python" : "Command"}
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <div className="text-gray-500 dark:text-gray-400">{lang === "fa" ? "پلتفرم" : "Platform"}</div>
+                      <div className="font-medium">
+                        {platform === "other" 
+                          ? SUPPORTED_OTHER_OS.find(os => os.value === otherOS)?.label || "Other OS"
+                          : platform
+                        }
+                      </div>
                     </div>
-                    <button
-                      onClick={() => copyToClipboard(output.markdown)}
-                      className="text-xs text-gray-300 hover:text-white px-2 py-1"
-                    >
-                      📋 Copy
-                    </button>
+                    <div>
+                      <div className="text-gray-500 dark:text-gray-400">{lang === "fa" ? "نوع خروجی" : "Output Type"}</div>
+                      <div className="font-medium">{outputType}</div>
+                    </div>
                   </div>
-                  <pre className="p-4 text-sm text-gray-100 font-mono overflow-x-auto">
-                    {output.markdown}
-                  </pre>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <SectionedMarkdown markdown={output.markdown} lang={lang} />
-                  <button
-                    onClick={() => copyToClipboard(output.markdown)}
-                    className="ccg-btn w-full py-2"
-                  >
-                    📋 Copy All Text
-                  </button>
-                </div>
-              )
+              </div>
             ) : (
-              <div className="text-center py-12 text-[var(--muted)]">
-                <div className="text-4xl mb-4">✨</div>
-                <div>{t("outputPlaceholder") || "Output will appear here"}</div>
-                <div className="text-xs mt-2">
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <div className="text-3xl mb-2">✨</div>
+                <div className="text-sm mb-1">
+                  {lang === "fa" ? "آماده برای تولید!" : "Ready to generate!"}
+                </div>
+                <div className="text-xs">
                   {lang === "fa" 
-                    ? "یک درخواست وارد کنید و دکمه Generate را بزنید" 
-                    : "Enter a request and click Generate"}
+                    ? "درخواست خود را بنویسید و دکمه تولید را بزنید"
+                    : "Write your request and click Generate"
+                  }
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      </div>
+      
+      {/* Status Info */}
+      <div className="ccg-container">
+        <div className="ccg-card p-3">
+          <div className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span>
+              {lang === "fa" 
+                ? "وضعیت شما ذخیره شد. بعد از ریفرش تنظیمات حفظ می‌شوند."
+                : "Your status is saved. Settings will persist after refresh."
+              }
+            </span>
           </div>
         </div>
       </div>

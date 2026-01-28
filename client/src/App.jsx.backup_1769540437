@@ -1,0 +1,62 @@
+import { useEffect, useState } from "react";
+import MainLayout from "./components/layout/MainLayout";
+import GeneratorPage from "./pages/generator/GeneratorPage";
+import ChatPage from "./pages/chat/ChatPage";
+import LandingPage from "./pages/landing/LandingPage";
+import { LanguageProvider } from "./context/LanguageContext";
+import { ThemeProvider } from "./context/ThemeContext";
+import { AuthProvider } from "./context/AuthContext";
+import { AppViewProvider } from "./hooks/useAppView";
+
+function AppContent() {
+  const [view, setView] = useState("generator");
+  
+  // هندلر برای navigation events
+  useEffect(() => {
+    const handleNavigate = (event) => {
+      const newView = event.detail;
+      if (["generator", "chat", "landing"].includes(newView)) {
+        setView(newView);
+      }
+    };
+    
+    window.addEventListener("ccg-navigate", handleNavigate);
+    
+    return () => {
+      window.removeEventListener("ccg-navigate", handleNavigate);
+    };
+  }, []);
+  
+  const renderPage = () => {
+    switch (view) {
+      case "generator":
+        return <GeneratorPage />;
+      case "chat":
+        return <ChatPage />;
+      case "landing":
+        return <LandingPage />;
+      default:
+        return <GeneratorPage />;
+    }
+  };
+  
+  return (
+    <AppViewProvider>
+      <MainLayout>
+        {renderPage()}
+      </MainLayout>
+    </AppViewProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <LanguageProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </ThemeProvider>
+    </LanguageProvider>
+  );
+}

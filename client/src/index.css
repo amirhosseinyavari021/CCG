@@ -2,437 +2,191 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ===== CCG STABLE THEME SYSTEM ===== */
+/* Custom CSS Classes */
+.ccg-container {
+  @apply mx-auto w-full px-4 sm:px-6 lg:px-8 max-w-7xl;
+}
 
-@layer base {
-  :root {
-    --font-en: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial;
-    --font-fa: "Vazirmatn", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial;
-    
-    /* Light theme */
-    --bg: #f6f7fb;
-    --text: #0f172a;
-    --muted: #64748b;
-    --card: rgba(255, 255, 255, 0.85);
-    --card-solid: #ffffff;
-    --border: rgba(15, 23, 42, 0.12);
-    --primary: #2563eb;
-    --primary-light: rgba(37, 99, 235, 0.1);
+.ccg-card {
+  @apply bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm transition-all duration-300 hover:shadow-md;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
   }
-
-  [data-theme="dark"] {
-    --bg: #0b1020;
-    --text: #e5e7eb;
-    --muted: #94a3b8;
-    --card: rgba(15, 23, 42, 0.75);
-    --card-solid: #1a2332;
-    --border: rgba(148, 163, 184, 0.2);
-    --primary: #60a5fa;
-    --primary-light: rgba(96, 165, 250, 0.15);
-  }
-
-  html, body {
-    height: 100%;
-    margin: 0;
-    padding: 0;
-  }
-
-  html {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--font-en);
-    font-size: 16px;
-    line-height: 1.5;
-  }
-
-  html[dir="rtl"] {
-    font-family: var(--font-fa);
-  }
-
-  body {
-    min-height: 100vh;
-    background:
-      radial-gradient(1200px 700px at 30% 20%, var(--primary-light), transparent 55%),
-      radial-gradient(900px 600px at 80% 60%, var(--primary-light), transparent 60%),
-      var(--bg);
-    background-attachment: fixed;
-  }
-
-  #root {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
-
-  a {
-    color: var(--primary);
-    text-decoration: none;
-    transition: opacity 0.2s;
-  }
-
-  a:hover {
-    text-decoration: underline;
-    opacity: 0.9;
-  }
-
-  ::placeholder {
-    color: var(--muted);
-    opacity: 0.7;
-  }
-
-  * {
-    box-sizing: border-box;
-  }
-
-  /* بهبود scrollbar */
-  ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.05);
-    border-radius: 5px;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: var(--border);
-    border-radius: 5px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--primary);
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-@layer components {
-  /* Container */
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100 dark:bg-gray-900;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-400 dark:bg-gray-700 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-500 dark:bg-gray-600;
+}
+
+/* Selection */
+::selection {
+  @apply bg-blue-500/30 text-blue-900 dark:text-blue-100;
+}
+
+/* Focus Styles */
+*:focus {
+  @apply outline-none ring-2 ring-blue-500 ring-opacity-50;
+}
+
+/* ========== MOBILE OPTIMIZATIONS ========== */
+@media (max-width: 640px) {
+  /* Reduce padding on mobile */
   .ccg-container {
-    @apply mx-auto w-full px-4 sm:px-6 lg:px-8;
-    max-width: 1200px;
+    @apply px-3;
   }
-
-  /* Card */
+  
+  /* Smaller cards on mobile */
   .ccg-card {
-    background: var(--card);
-    backdrop-filter: blur(10px);
-    border: 1px solid var(--border);
-    border-radius: 1rem;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    transition: all 0.3s ease;
+    @apply rounded-lg;
   }
-
-  .ccg-card:hover {
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-    border-color: var(--primary);
+  
+  /* Touch-friendly buttons */
+  button, 
+  .ccg-btn,
+  [role="button"] {
+    @apply min-h-[44px] min-w-[44px];
   }
-
-  /* Inputs */
-  .ccg-input, .ccg-select, .ccg-textarea {
-    background: var(--card-solid);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 0.75rem;
-    padding: 0.75rem 1rem;
-    font-size: 0.95rem;
-    transition: all 0.2s;
-    width: 100%;
+  
+  /* Larger touch targets for form elements */
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    @apply text-base; /* Prevents zoom on iOS */
   }
-
-  .ccg-input:focus, .ccg-select:focus, .ccg-textarea:focus {
-    outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px var(--primary-light);
+  
+  /* Adjust text sizes for mobile */
+  h1 {
+    @apply text-2xl;
   }
-
-  .ccg-textarea {
-    min-height: 120px;
-    resize: vertical;
-    line-height: 1.6;
+  
+  h2 {
+    @apply text-xl;
   }
-
-  /* Buttons */
-  .ccg-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--card-solid);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 0.75rem;
-    padding: 0.75rem 1.5rem;
-    font-size: 0.95rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-    gap: 0.5rem;
+  
+  h3 {
+    @apply text-lg;
   }
-
-  .ccg-btn:hover {
-    background: var(--primary-light);
-    border-color: var(--primary);
-    transform: translateY(-1px);
+  
+  /* Stack grids on mobile */
+  .grid {
+    @apply grid-cols-1;
   }
-
-  .ccg-btn:active {
-    transform: translateY(0);
+  
+  /* Reduce gaps */
+  .gap-6 {
+    @apply gap-4;
   }
-
-  .ccg-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
+  
+  .gap-4 {
+    @apply gap-3;
   }
-
-  .ccg-btn-primary {
-    background: linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 80%, black));
-    border: none;
-    color: white;
-    font-weight: 600;
-    box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+  
+  /* Adjust padding */
+  .p-6 {
+    @apply p-4;
   }
-
-  .ccg-btn-primary:hover {
-    background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 90%, white), var(--primary));
-    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
-    transform: translateY(-2px);
+  
+  .p-5 {
+    @apply p-3;
   }
-
-  .ccg-btn-ghost {
-    background: transparent;
-    border: 1px solid transparent;
+  
+  /* Smaller textareas on mobile */
+  textarea {
+    @apply h-40;
   }
-
-  .ccg-btn-ghost:hover {
-    background: var(--primary-light);
-    border-color: var(--border);
+  
+  /* Hide some elements on mobile */
+  .mobile-hidden {
+    @apply hidden;
   }
-
-  /* Layout utilities */
-  .ccg-grid {
-    display: grid;
-    gap: 1.5rem;
+  
+  /* Show mobile-only elements */
+  .mobile-only {
+    @apply block;
   }
+}
 
-  .ccg-flex {
-    display: flex;
+/* ========== TABLET OPTIMIZATIONS ========== */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .ccg-container {
+    @apply px-5;
   }
-
-  .ccg-flex-center {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  
+  .grid-cols-2 {
+    @apply grid-cols-1;
   }
-
-  .ccg-flex-between {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+  
+  .lg\:grid-cols-2 {
+    @apply grid-cols-1;
   }
+}
 
-  /* Typography */
-  .ccg-heading-1 {
-    font-size: 2rem;
-    font-weight: 700;
-    line-height: 1.2;
-    margin-bottom: 1rem;
+/* ========== TOUCH DEVICE SPECIFIC ========== */
+@media (hover: none) and (pointer: coarse) {
+  /* Increase touch targets */
+  button, a, input, select, textarea {
+    @apply min-h-[48px];
   }
-
-  .ccg-heading-2 {
-    font-size: 1.5rem;
-    font-weight: 600;
-    line-height: 1.3;
-    margin-bottom: 0.75rem;
+  
+  /* Remove hover effects on touch devices */
+  .hover\:bg-gray-100:hover,
+  .hover\:bg-gray-200:hover,
+  .hover\:bg-blue-100:hover {
+    @apply bg-transparent;
   }
-
-  .ccg-heading-3 {
-    font-size: 1.25rem;
-    font-weight: 600;
-    line-height: 1.4;
-    margin-bottom: 0.5rem;
+  
+  /* Active states for touch */
+  button:active,
+  a:active {
+    @apply opacity-70;
   }
+}
 
-  .ccg-text-sm {
-    font-size: 0.875rem;
-    line-height: 1.5;
+/* ========== DARK MODE MOBILE ========== */
+@media (max-width: 640px) and (prefers-color-scheme: dark) {
+  .ccg-card {
+    @apply bg-gray-900;
   }
-
-  .ccg-text-base {
-    font-size: 1rem;
-    line-height: 1.6;
+  
+  body {
+    @apply bg-gray-950;
   }
+}
 
-  .ccg-text-lg {
-    font-size: 1.125rem;
-    line-height: 1.6;
+/* ========== PRINT STYLES ========== */
+@media print {
+  .no-print {
+    @apply hidden;
   }
-
-  /* Code blocks */
-  .ccg-code-block {
-    background: rgba(2, 6, 23, 0.95);
-    border: 1px solid rgba(148, 163, 184, 0.2);
-    border-radius: 0.75rem;
-    overflow: hidden;
-    margin: 1rem 0;
-  }
-
-  .ccg-code-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem 1rem;
-    background: rgba(2, 6, 23, 0.8);
-    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
-  }
-
-  .ccg-code-title {
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #94a3b8;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .ccg-code-content {
-    padding: 1rem;
-    overflow-x: auto;
-  }
-
-  .ccg-code-content pre {
-    margin: 0;
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
-    font-size: 0.875rem;
-    line-height: 1.6;
-    color: #e2e8f0;
-  }
-
-  /* Markdown */
-  .ccg-markdown {
-    line-height: 1.7;
-  }
-
-  .ccg-markdown.rtl {
-    direction: rtl;
-    text-align: right;
-  }
-
-  .ccg-markdown.ltr {
-    direction: ltr;
-    text-align: left;
-  }
-
-  .ccg-markdown h1, .ccg-markdown h2, .ccg-markdown h3 {
-    margin-top: 1.5em;
-    margin-bottom: 0.75em;
-    font-weight: 600;
-    color: var(--text);
-  }
-
-  .ccg-markdown p {
-    margin-bottom: 1em;
-  }
-
-  .ccg-markdown ul, .ccg-markdown ol {
-    margin-bottom: 1em;
-    padding-left: 1.5em;
-  }
-
-  .ccg-markdown.rtl ul, .ccg-markdown.rtl ol {
-    padding-left: 0;
-    padding-right: 1.5em;
-  }
-
-  .ccg-markdown code {
-    background: var(--primary-light);
-    color: var(--primary);
-    padding: 0.2em 0.4em;
-    border-radius: 0.25em;
-    font-size: 0.9em;
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  }
-
-  .ccg-markdown pre {
-    margin: 1em 0;
-  }
-
-  /* Error states */
-  .ccg-error {
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    border-radius: 0.75rem;
-    padding: 1rem;
-    color: #ef4444;
-  }
-
-  .ccg-success {
-    background: rgba(34, 197, 94, 0.1);
-    border: 1px solid rgba(34, 197, 94, 0.3);
-    border-radius: 0.75rem;
-    padding: 1rem;
-    color: #22c55e;
-  }
-
-  /* Loading */
-  .ccg-loading {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--muted);
-  }
-
-  .ccg-loading-spinner {
-    width: 1rem;
-    height: 1rem;
-    border: 2px solid var(--border);
-    border-top-color: var(--primary);
-    border-radius: 50%;
-    animation: ccg-spin 1s linear infinite;
-  }
-
-  @keyframes ccg-spin {
-    to { transform: rotate(360deg); }
-  }
-
-  /* Tooltip */
-  .ccg-tooltip {
-    position: relative;
-    display: inline-block;
-  }
-
-  .ccg-tooltip .ccg-tooltip-text {
-    visibility: hidden;
-    position: absolute;
-    z-index: 1000;
-    background: var(--card-solid);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.875rem;
-    white-space: nowrap;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-
-  .ccg-tooltip:hover .ccg-tooltip-text {
-    visibility: visible;
-    opacity: 1;
-  }
-
-  /* Responsive utilities */
-  @media (max-width: 640px) {
-    .ccg-container {
-      padding-left: 1rem;
-      padding-right: 1rem;
-    }
-    
-    .ccg-card {
-      padding: 1rem;
-    }
-    
-    .ccg-btn {
-      padding: 0.625rem 1.25rem;
-    }
+  
+  .ccg-card {
+    @apply border shadow-none;
   }
 }

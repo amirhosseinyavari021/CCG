@@ -1,0 +1,703 @@
+import { useState, useEffect } from "react";
+import { useLanguage } from "../../context/LanguageContext";
+import { callCCG } from "../../services/aiService";
+import SectionedMarkdown from "../../components/ui/SectionedMarkdown";
+import CodeBlock from "../../components/ui/CodeBlock";
+import Tooltip from "../../components/ui/Tooltip";
+
+// --- Configuration ---
+const PLATFORM_CONFIG = {
+  linux: {
+    label: "Linux",
+    icon: "🐧",
+    defaultShell: "bash",
+    advanced: {
+      shells: [
+        { value: "bash", label: "bash" },
+        { value: "zsh", label: "zsh" },
+        { value: "sh", label: "sh" }
+      ],
+      distributions: [
+        { value: "ubuntu", label: "Ubuntu", versions: ["24.04", "22.04", "20.04", "18.04"] },
+        { value: "debian", label: "Debian", versions: ["12", "11", "10"] },
+        { value: "centos", label: "CentOS", versions: ["Stream 9", "Stream 8", "7"] },
+        { value: "fedora", label: "Fedora", versions: ["40", "39", "38"] },
+        { value: "arch", label: "Arch Linux", versions: ["Latest"] },
+        { value: "other", label: "Other" }
+      ]
+    },
+    tips: {
+      fa: "توزیع‌های لینوکس: Ubuntu, Debian, CentOS, Fedora, Arch",
+      en: "Linux distributions: Ubuntu, Debian, CentOS, Fedora, Arch"
+    }
+  },
+  windows: {
+    label: "Windows",
+    icon: "🪟",
+    defaultShell: "cmd",
+    advanced: {
+      shells: [
+        { value: "cmd", label: "CMD" },
+        { value: "powershell", label: "PowerShell" }
+      ],
+      versions: [
+        { value: "11", label: "11" },
+        { value: "10", label: "10" },
+        { value: "server", label: "Server" },
+        { value: "other", label: "Other" }
+      ]
+    },
+    tips: {
+      fa: "نسخه‌های ویندوز: 11, 10, Server",
+      en: "Windows versions: 11, 10, Server"
+    }
+  },
+  mac: {
+    label: "macOS",
+    icon: "🍎",
+    defaultShell: "bash",
+    advanced: {
+      shells: [
+        { value: "bash", label: "bash" },
+        { value: "zsh", label: "zsh" }
+      ],
+      versions: [
+        { value: "sonoma", label: "Sonoma (14)" },
+        { value: "ventura", label: "Ventura (13)" },
+        { value: "monterey", label: "Monterey (12)" },
+        { value: "other", label: "Other" }
+      ]
+    },
+    tips: {
+      fa: "نسخه‌های macOS: Sonoma, Ventura, Monterey",
+      en: "macOS versions: Sonoma, Ventura, Monterey"
+    }
+  },
+  network: {
+    label: "Network",
+    icon: "🌐",
+    defaultShell: "cli",
+    advanced: {
+      vendors: [
+        { value: "cisco", label: "Cisco" },
+        { value: "mikrotik", label: "MikroTik" },
+        { value: "juniper", label: "Juniper" },
+        { value: "fortinet", label: "Fortinet" },
+        { value: "hp", label: "HP" },
+        { value: "arista", label: "Arista" },
+        { value: "other", label: "Other" }
+      ],
+      deviceTypes: [
+        { value: "router", label: "Router" },
+        { value: "switch", label: "Switch" },
+        { value: "firewall", label: "Firewall" },
+        { value: "wireless_ap", label: "Wireless AP" },
+        { value: "load_balancer", label: "Load Balancer" },
+        { value: "other", label: "Other" }
+      ]
+    },
+    tips: {
+      fa: "برندها و نوع دستگاه شبکه",
+      en: "Network vendors and device types"
+    }
+  },
+  other: {
+    label: "Other",
+    icon: "⚙️",
+    defaultShell: "bash", // Default arbitrary choice
+    advanced: {},
+    tips: {
+      fa: "سایر پلتفرم‌ها",
+      en: "Other platforms"
+    }
+  }
+};
+
+const OUTPUT_TYPE_OPTIONS = [
+  { value: "tool", label: "Tool", icon: "🛠️" },
+  { value: "command", label: "Command", icon: "⌨️" },
+  { value: "python", label: "Python", icon: "🐍" }
+];
+
+const VERBOSITY_OPTIONS = [
+  { value: "brief", label: "Brief" },
+  { value: "normal", label: "Normal" },
+  { value: "detailed", label: "Detailed" }
+];
+
+const CUSTOM_ALLOWLIST = {
+  platform: ["linux", "windows", "mac", "network", "other"],
+  cli: ["bash", "zsh", "sh", "cmd", "powershell", "cli"], // Add more as needed
+  // Add other allowed fields here
+};
+
+export default function GeneratorPage() {
+  const { t, lang, dir } = useLanguage();
+  const [request, setRequest] = useState("");
+  const [response, setResponse] = useState(null);
+  const [error, setError] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  // State for main controls
+  const [platform, setPlatform] = useState("linux");
+  const [outputType, setOutputType] = useState("tool");
+  const [verbosity, setVerbosity] = useState("normal");
+
+  // State for Advanced settings
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [cli, setCli] = useState(PLATFORM_CONFIG.linux.defaultShell); // Initialize based on default platform
+  const [distro, setDistro] = useState("");
+  const [distroVersion, setDistroVersion] = useState("");
+  const [winVersion, setWinVersion] = useState("");
+  const [macVersion, setMacVersion] = useState("");
+  const [netVendor, setNetVendor] = useState("");
+  const [netDeviceType, setNetDeviceType] = useState("");
+
+  // State for Custom settings
+  const [customMode, setCustomMode] = useState(false);
+  const [customFields, setCustomFields] = useState({});
+
+  // State for persistence
+  const [persisted, setPersisted] = useState(false);
+
+  // Load state from URL on mount
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const savedPlatform = urlParams.get('platform');
+    const savedOutputType = urlParams.get('outputType');
+    const savedVerbosity = urlParams.get('verbosity');
+    const savedAdvanced = urlParams.get('advanced') === 'true';
+    const savedCustom = urlParams.get('custom') === 'true';
+
+    if (savedPlatform && PLATFORM_CONFIG[savedPlatform]) {
+      setPlatform(savedPlatform);
+      setAdvancedOpen(savedAdvanced);
+      setCustomMode(savedCustom);
+      setOutputType(savedOutputType || 'tool');
+      setVerbosity(savedVerbosity || 'normal');
+
+      // Initialize CLI based on loaded platform
+      setCli(PLATFORM_CONFIG[savedPlatform].defaultShell);
+
+      // Load specific advanced values if they exist
+      if (savedPlatform === 'linux') {
+        setDistro(urlParams.get('distro') || '');
+        setDistroVersion(urlParams.get('distroVersion') || '');
+      }
+      if (savedPlatform === 'windows') {
+        setWinVersion(urlParams.get('winVersion') || '');
+      }
+      if (savedPlatform === 'mac') {
+        setMacVersion(urlParams.get('macVersion') || '');
+      }
+      if (savedPlatform === 'network') {
+        setNetVendor(urlParams.get('netVendor') || '');
+        setNetDeviceType(urlParams.get('netDeviceType') || '');
+      }
+    }
+    setPersisted(true); // Indicate loading is done
+  }, []);
+
+  // Update CLI when platform changes
+  useEffect(() => {
+    if (persisted) { // Only update after initial load
+      setCli(PLATFORM_CONFIG[platform]?.defaultShell || 'bash');
+    }
+  }, [platform, persisted]);
+
+  // Sync state to URL
+  useEffect(() => {
+    if (!persisted) return; // Don't sync until initial load is complete
+
+    const params = new URLSearchParams();
+    params.set('platform', platform);
+    params.set('outputType', outputType);
+    params.set('verbosity', verbosity);
+    params.set('advanced', advancedOpen);
+    params.set('custom', customMode);
+
+    if (advancedOpen) {
+      if (platform === 'linux') {
+        if (distro) params.set('distro', distro);
+        if (distroVersion) params.set('distroVersion', distroVersion);
+      }
+      if (platform === 'windows') {
+        if (winVersion) params.set('winVersion', winVersion);
+      }
+      if (platform === 'mac') {
+        if (macVersion) params.set('macVersion', macVersion);
+      }
+      if (platform === 'network') {
+        if (netVendor) params.set('netVendor', netVendor);
+        if (netDeviceType) params.set('netDeviceType', netDeviceType);
+      }
+    }
+
+    window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+  }, [platform, outputType, verbosity, advancedOpen, customMode, distro, distroVersion, winVersion, macVersion, netVendor, netDeviceType, persisted]);
+
+  const handleGenerate = async () => {
+    if (!request.trim()) {
+      setError(t("Please enter a request"));
+      return;
+    }
+
+    if (customMode) {
+      // Validate custom fields against allowlist
+      const invalidFields = Object.keys(customFields).filter(key => !CUSTOM_ALLOWLIST.hasOwnProperty(key));
+      if (invalidFields.length > 0) {
+          setError(t("Invalid custom field(s): ") + invalidFields.join(", "));
+          return;
+      }
+      // Validate values within fields if possible
+      for (let [key, value] of Object.entries(customFields)) {
+          if (CUSTOM_ALLOWLIST[key] && !CUSTOM_ALLOWLIST[key].includes(value)) {
+              // Corrected line: Construct string outside t()
+              const errorMessage = t("Invalid value for custom field") + ` "${key}": ${value}`;
+              setError(errorMessage);
+              return;
+          }
+      }
+    }
+
+    setError(null);
+    setIsGenerating(true);
+    setResponse(null);
+
+    try {
+      const payload = { mode: "generate", prompt: request, platform, outputType, verbosity };
+
+      if (customMode) {
+        Object.assign(payload, customFields);
+      } else {
+        // Send advanced settings based on platform only if not in custom mode
+        payload.cli = cli;
+
+        if (advancedOpen) {
+          if (platform === 'linux' && (distro || distroVersion)) {
+            if (distro) payload.distro = distro;
+            if (distroVersion) payload.distroVersion = distroVersion;
+          }
+          if (platform === 'windows' && winVersion) {
+            payload.winVersion = winVersion;
+          }
+          if (platform === 'mac' && macVersion) {
+            payload.macVersion = macVersion;
+          }
+          if (platform === 'network' && (netVendor || netDeviceType)) {
+            if (netVendor) payload.netVendor = netVendor;
+            if (netDeviceType) payload.netDeviceType = netDeviceType;
+          }
+        }
+      }
+
+      const result = await callCCG(payload);
+      if (result.ok) {
+        setResponse(result.output); // This should be markdown
+        if (result.tool) {
+          console.log("Generated Tool Object:", result.tool); // Debug log
+        }
+      } else {
+        setError(result.error || t("An error occurred"));
+      }
+    } catch (err) {
+      setError(err.message || t("An unexpected error occurred"));
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleExplain = async () => {
+    if (!request.trim()) {
+      setError(t("Please enter a command to explain"));
+      return;
+    }
+
+    setError(null);
+    setIsGenerating(true);
+    setResponse(null);
+
+    try {
+      const result = await callCCG({ mode: "explain", targetCommand: request, verbosity });
+      if (result.ok) {
+        setResponse(result.output);
+      } else {
+        setError(result.error || t("An error occurred explaining the command"));
+      }
+    } catch (err) {
+      setError(err.message || t("An unexpected error occurred"));
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const clearAll = () => {
+    setRequest("");
+    setResponse(null);
+    setError(null);
+    setDistro("");
+    setDistroVersion("");
+    setWinVersion("");
+    setMacVersion("");
+    setNetVendor("");
+    setNetDeviceType("");
+    setCustomFields({});
+  };
+
+  const toggleAdvanced = () => {
+    setAdvancedOpen(!advancedOpen);
+    if (advancedOpen) {
+      // Reset advanced-specific states when closing
+      setDistro("");
+      setDistroVersion("");
+      setWinVersion("");
+      setMacVersion("");
+      setNetVendor("");
+      setNetDeviceType("");
+    }
+  };
+
+  const getPlatformSpecificAdvancedControls = () => {
+    if (!advancedOpen || customMode) return null;
+
+    switch (platform) {
+      case 'linux':
+        return (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">{t("Distribution")}</label>
+                <select
+                  value={distro}
+                  onChange={(e) => setDistro(e.target.value)}
+                  className="w-full p-2 border rounded bg-white dark:bg-gray-700 text-black dark:text-white"
+                >
+                  <option value="">{t("Select Distribution")}</option>
+                  {PLATFORM_CONFIG.linux.advanced.distributions.map((d) => (
+                    <option key={d.value} value={d.value}>{d.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">{t("Version")}</label>
+                <select
+                  value={distroVersion}
+                  onChange={(e) => setDistroVersion(e.target.value)}
+                  className="w-full p-2 border rounded bg-white dark:bg-gray-700 text-black dark:text-white"
+                  disabled={!distro}
+                >
+                  <option value="">{t("Select Version")}</option>
+                  {distro && PLATFORM_CONFIG.linux.advanced.distributions.find(d => d.value === distro)?.versions.map(v => (
+                    <option key={v} value={v}>{v}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        );
+      case 'windows':
+        return (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">{t("Version")}</label>
+              <select
+                value={winVersion}
+                onChange={(e) => setWinVersion(e.target.value)}
+                className="w-full p-2 border rounded bg-white dark:bg-gray-700 text-black dark:text-white"
+              >
+                <option value="">{t("Select Version")}</option>
+                {PLATFORM_CONFIG.windows.advanced.versions.map(v => (
+                  <option key={v.value} value={v.value}>{v.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        );
+      case 'mac':
+        return (
+          <div className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">{t("Version")}</label>
+              <select
+                value={macVersion}
+                onChange={(e) => setMacVersion(e.target.value)}
+                className="w-full p-2 border rounded bg-white dark:bg-gray-700 text-black dark:text-white"
+              >
+                <option value="">{t("Select Version")}</option>
+                {PLATFORM_CONFIG.mac.advanced.versions.map(v => (
+                  <option key={v.value} value={v.value}>{v.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        );
+      case 'network':
+        return (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">{t("Vendor")}</label>
+                <select
+                  value={netVendor}
+                  onChange={(e) => setNetVendor(e.target.value)}
+                  className="w-full p-2 border rounded bg-white dark:bg-gray-700 text-black dark:text-white"
+                >
+                  <option value="">{t("Select Vendor")}</option>
+                  {PLATFORM_CONFIG.network.advanced.vendors.map(v => (
+                    <option key={v.value} value={v.value}>{v.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">{t("Device Type")}</label>
+                <select
+                  value={netDeviceType}
+                  onChange={(e) => setNetDeviceType(e.target.value)}
+                  className="w-full p-2 border rounded bg-white dark:bg-gray-700 text-black dark:text-white"
+                >
+                  <option value="">{t("Select Type")}</option>
+                  {PLATFORM_CONFIG.network.advanced.deviceTypes.map(dt => (
+                    <option key={dt.value} value={dt.value}>{dt.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const renderOutput = () => {
+    if (!response) return null;
+
+    // The response from the backend is always a markdown string.
+    // The frontend will render it appropriately based on outputType.
+    // For 'tool' type, ideally, a dedicated component would handle the structured data (result.tool),
+    // but the backend sends the formatted markdown string via result.output.
+    // So, we render the markdown string.
+    // A more robust way would be to send both output (for display) and tool (for structure) and decide here.
+    // Assuming the backend handles formatting the 'tool' output correctly into markdown.
+
+    if (outputType === 'command') {
+      // For command type, the output should ideally be just the command.
+      // The backend should format result.output accordingly.
+      // We'll render it as a simple code block.
+      return <CodeBlock code={response} language={cli === 'powershell' ? 'powershell' : cli} />;
+    }
+    if (outputType === 'python') {
+      // For python type, the output should be python code.
+      return <CodeBlock code={response} language="python" />;
+    }
+    // For 'tool' or any other type, render as markdown
+    return <SectionedMarkdown content={response} />;
+
+    // Note: If the backend sends both result.output (markdown) and result.tool (object),
+    // and you want to render the structured tool object differently, you'd need to pass
+    // the tool object separately from the callCCG result and handle it here.
+    // e.g., if setResponse was called with result.tool instead of result.output for 'tool' type.
+    // But per contract, result.output is the primary display string.
+  };
+
+
+  if (!persisted) {
+    // Optional: Show a loading spinner while initial state is being loaded
+    return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div></div>;
+  }
+
+  return (
+    <div className={`flex flex-col lg:flex-row gap-6 p-4 max-w-7xl mx-auto ${dir === 'rtl' ? 'rtl-direction' : ''}`}>
+      {/* Left Panel - Input & Controls */}
+      <div className="lg:w-1/2 space-y-4">
+        <h1 className="text-2xl font-bold">{t("Cando Command Generator")}</h1>
+
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4">
+          <div className="flex flex-wrap gap-2 mb-3">
+            <button
+              onClick={() => setOutputType('tool')}
+              className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                outputType === 'tool'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
+              }`}
+            >
+              🛠️ {t("Tool")}
+            </button>
+            <Tooltip content={t("Shows command, explanation, warnings, and alternatives")} position="top">
+              <span className="cursor-help">ⓘ</span>
+            </Tooltip>
+            <button
+              onClick={() => setOutputType('command')}
+              className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                outputType === 'command'
+                  ? 'bg-green-500 text-white'
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
+              }`}
+            >
+              ⌨️ {t("Command")}
+            </button>
+            <button
+              onClick={() => setOutputType('python')}
+              className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
+                outputType === 'python'
+                  ? 'bg-purple-500 text-white'
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
+              }`}
+            >
+              🐍 {t("Python")}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="block text-sm font-medium mb-1">{t("Platform")}</label>
+              <div className="flex">
+                {Object.entries(PLATFORM_CONFIG).map(([key, config]) => (
+                  <button
+                    key={key}
+                    onClick={() => setPlatform(key)}
+                    className={`flex-1 p-2 rounded-l ${
+                      platform === key
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600'
+                    } ${config.icon ? 'pr-1' : ''}`}
+                  >
+                    {config.icon} {config.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">{t("Verbosity")}</label>
+              <select
+                value={verbosity}
+                onChange={(e) => setVerbosity(e.target.value)}
+                className="w-full p-2 border rounded bg-white dark:bg-gray-700 text-black dark:text-white"
+              >
+                {VERBOSITY_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{t(opt.label)}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="mb-3">
+            <textarea
+              value={request}
+              onChange={(e) => setRequest(e.target.value)}
+              placeholder={t("Enter your request (e.g., shutdown system, check disk space, ping google.com)")}
+              rows="4"
+              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-black dark:text-white"
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              className="flex-1 min-w-[100px] px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isGenerating ? t("Generating...") : t("Generate")}
+            </button>
+            <button
+              onClick={handleExplain}
+              disabled={isGenerating}
+              className="flex-1 min-w-[100px] px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isGenerating ? t("Explaining...") : t("Explain Command")}
+            </button>
+            <button
+              onClick={clearAll}
+              className="flex-1 min-w-[100px] px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              {t("Clear")}
+            </button>
+            <button
+              onClick={toggleAdvanced}
+              className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors"
+            >
+              {advancedOpen ? t("Hide Advanced") : t("Advanced Options")}
+            </button>
+          </div>
+
+          {advancedOpen && (
+            <div className="mt-4 p-3 bg-gray-100 dark:bg-gray-700 rounded-lg border border-gray-300 dark:border-gray-600">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">{t("Shell/CLI")}</label>
+                  <select
+                    value={cli}
+                    onChange={(e) => setCli(e.target.value)}
+                    className="w-full p-2 border rounded bg-white dark:bg-gray-700 text-black dark:text-white"
+                  >
+                    {PLATFORM_CONFIG[platform]?.advanced?.shells?.map(s => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    )) || <option value={PLATFORM_CONFIG[platform]?.defaultShell || 'bash'}>{t("Default for platform")}</option>}
+                  </select>
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={customMode}
+                      onChange={(e) => setCustomMode(e.target.checked)}
+                      className="mr-2"
+                    />
+                    <span>{t("Custom Mode")}</span>
+                  </label>
+                </div>
+              </div>
+
+              {!customMode ? (
+                getPlatformSpecificAdvancedControls()
+              ) : (
+                <div className="mt-3">
+                  <h3 className="font-medium mb-2">{t("Custom Fields (JSON)")}</h3>
+                  <textarea
+                    value={JSON.stringify(customFields, null, 2)}
+                    onChange={(e) => {
+                      try {
+                        setCustomFields(JSON.parse(e.target.value));
+                        setError(null); // Clear previous validation errors on successful parse
+                      } catch (e) {
+                        // Optionally show parse error
+                        // setError("Invalid JSON in Custom Fields");
+                      }
+                    }}
+                    rows="4"
+                    className="w-full p-2 border rounded bg-white dark:bg-gray-700 text-black dark:text-white font-mono text-xs"
+                    placeholder='{ "customField1": "value1", "customField2": "value2" }'
+                  />
+                  <p className="text-xs text-gray-500 mt-1">{t("Warning: Invalid fields will cause errors.")}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {error && (
+            <div className="mt-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-lg">
+              {error}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Right Panel - Output */}
+      <div className="lg:w-1/2">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 h-full">
+          <h2 className="text-xl font-semibold mb-3">{t("Output")}</h2>
+          {response ? (
+            <div className="max-h-[calc(100vh-200px)] overflow-y-auto p-2 bg-gray-50 dark:bg-gray-700 rounded border">
+              {renderOutput()}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-64 text-gray-500 dark:text-gray-400 border-2 border-dashed rounded-lg">
+              {t("Results will appear here...")}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
