@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLanguage } from "../context/LanguageContext";
+import { useLanguage } from "../../context/LanguageContext";   // ← اینجا رو درست کن (../../ به جای ../)
 
 const FEEDBACK_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfkigw8FoqPI2KpIg7Xhy_3CqXAovCVwuPXQGCeKnVaV1PLAg/viewform?usp=header";
 
@@ -8,10 +8,7 @@ export default function FeedbackButton() {
   const [showPopup, setShowPopup] = useState(false);
 
   const handleFeedbackClick = () => {
-    // باز کردن فرم در پنجره جدید
     window.open(FEEDBACK_FORM_URL, '_blank', 'noopener,noreferrer');
-    
-    // نمایش پیام تشکر
     setShowPopup(true);
     setTimeout(() => setShowPopup(false), 3000);
   };
@@ -32,7 +29,7 @@ export default function FeedbackButton() {
                 {lang === "fa" ? "💌 بازخورد خود را ارسال کنید" : "💌 Send Your Feedback"}
               </div>
               <div className="text-xs text-gray-600 dark:text-gray-400">
-                {lang === "fa" 
+                {lang === "fa"
                   ? "نظرات، پیشنهادات و گزارش مشکلات را با ما در میان بگذارید"
                   : "Share your comments, suggestions and bug reports with us"
                 }
@@ -47,7 +44,6 @@ export default function FeedbackButton() {
         </div>
       </button>
 
-      {/* Popup بعد از کلیک */}
       {showPopup && (
         <div className="fixed top-4 right-4 z-50 animate-fadeIn">
           <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white px-4 py-3 rounded-lg shadow-lg">
@@ -58,7 +54,7 @@ export default function FeedbackButton() {
                   {lang === "fa" ? "سپاس از شما!" : "Thank You!"}
                 </div>
                 <div className="text-sm opacity-90">
-                  {lang === "fa" 
+                  {lang === "fa"
                     ? "بازخورد شما برای بهبود CCG بسیار ارزشمند است"
                     : "Your feedback is valuable for improving CCG"
                   }

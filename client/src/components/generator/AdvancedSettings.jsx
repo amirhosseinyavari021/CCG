@@ -44,7 +44,6 @@ const PLATFORM_ADVANCED_CONFIG = {
       }
     ]
   },
-  
   windows: {
     title: { fa: "تنظیمات پیشرفته ویندوز", en: "Windows Advanced Settings" },
     fields: [
@@ -86,7 +85,6 @@ const PLATFORM_ADVANCED_CONFIG = {
       }
     ]
   },
-  
   mac: {
     title: { fa: "تنظیمات پیشرفته macOS", en: "macOS Advanced Settings" },
     fields: [
@@ -126,7 +124,6 @@ const PLATFORM_ADVANCED_CONFIG = {
       }
     ]
   },
-  
   network: {
     title: { fa: "تنظیمات پیشرفته شبکه", en: "Network Advanced Settings" },
     fields: [
@@ -185,7 +182,6 @@ const PLATFORM_ADVANCED_CONFIG = {
       }
     ]
   },
-  
   other: {
     title: { fa: "تنظیمات پیشرفته سیستم‌عامل دیگر", en: "Other OS Advanced Settings" },
     fields: [
@@ -255,31 +251,33 @@ const PLATFORM_ADVANCED_CONFIG = {
         defaultValue: false
       }
     ]
-  },
+  }
 };
 
 export default function AdvancedSettings({ platform, settings, onChange }) {
   const { lang } = useLanguage();
   const config = PLATFORM_ADVANCED_CONFIG[platform] || PLATFORM_ADVANCED_CONFIG.linux;
-  
+
   const handleChange = (fieldName, value) => {
     onChange({
       ...settings,
       [fieldName]: value
     });
   };
-  
+
   const shouldShowField = (field) => {
     if (!field.showWhen) return true;
     return settings[field.showWhen.field] === field.showWhen.value;
   };
-  
+
   const renderField = (field) => {
     if (!shouldShowField(field)) return null;
-    
+
     const label = typeof field.label === 'object' ? field.label[lang] || field.label.en : field.label;
-    const placeholder = field.placeholder ? (typeof field.placeholder === 'object' ? field.placeholder[lang] || field.placeholder.en : field.placeholder) : '';
-    
+    const placeholder = field.placeholder 
+      ? (typeof field.placeholder === 'object' ? field.placeholder[lang] || field.placeholder.en : field.placeholder) 
+      : '';
+
     switch (field.type) {
       case 'select':
         return (
@@ -301,7 +299,7 @@ export default function AdvancedSettings({ platform, settings, onChange }) {
             </select>
           </div>
         );
-        
+
       case 'text':
         return (
           <div key={field.name} className="space-y-1">
@@ -327,7 +325,7 @@ export default function AdvancedSettings({ platform, settings, onChange }) {
             )}
           </div>
         );
-        
+
       case 'version_input':
         return (
           <div key={field.name} className="space-y-1">
@@ -363,7 +361,7 @@ export default function AdvancedSettings({ platform, settings, onChange }) {
             </div>
           </div>
         );
-        
+
       case 'checkbox':
         return (
           <div key={field.name} className="flex items-center">
@@ -379,29 +377,28 @@ export default function AdvancedSettings({ platform, settings, onChange }) {
             </label>
           </div>
         );
-        
+
       default:
         return null;
     }
   };
-  
+
   return (
     <div className="space-y-4">
       <h3 className="font-semibold text-base">
         {typeof config.title === 'object' ? config.title[lang] || config.title.en : config.title}
       </h3>
-      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {config.fields.map(renderField)}
       </div>
-      
+
       {/* Platform-specific tips */}
       <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
         <div className="text-xs text-blue-700 dark:text-blue-300">
           💡 {getPlatformTip(platform, lang)}
         </div>
       </div>
-      
+
       {/* Current settings summary */}
       {Object.keys(settings).length > 0 && (
         <div className="p-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
@@ -441,77 +438,11 @@ function getPlatformTip(platform, lang) {
     network: {
       fa: "سازنده، مدل و ورژن دقیق دستگاه شبکه را وارد کنید. همیشه قبل از تغییرات backup بگیرید.",
       en: "Enter exact network device vendor, model and version. Always backup before changes."
-    },
-  other: {
-    title: { fa: "تنظیمات پیشرفته سیستم‌عامل دیگر", en: "Other OS Advanced Settings" },
-    fields: [
-      {
-        type: "select",
-        name: "os_type",
-        label: { fa: "نوع سیستم عامل", en: "OS Type" },
-        options: [
-          { value: "freebsd", label: "FreeBSD" },
-          { value: "openbsd", label: "OpenBSD" },
-          { value: "netbsd", label: "NetBSD" },
-          { value: "solaris", label: "Solaris" },
-          { value: "aix", label: "AIX" },
-          { value: "hpux", label: "HP-UX" },
-          { value: "zos", label: "z/OS" },
-          { value: "android", label: "Android" },
-          { value: "ios", label: "iOS" },
-          { value: "chromeos", label: "ChromeOS" }
-        ]
-      },
-      {
-        type: "version_input",
-        name: "os_version",
-        label: { fa: "ورژن", en: "Version" },
-        placeholder: { fa: "مثال: 13.2-RELEASE, 11.4, 15", en: "e.g., 13.2-RELEASE, 11.4, 15" },
-        suggestions: ["latest", "stable", "lts"]
-      },
-      {
-        type: "select",
-        name: "shell",
-        label: { fa: "شل/CLI", en: "Shell/CLI" },
-        options: [
-          { value: "bash", label: "bash" },
-          { value: "sh", label: "sh" },
-          { value: "tcsh", label: "tcsh" },
-          { value: "ksh", label: "ksh" },
-          { value: "zsh", label: "zsh" },
-          { value: "adb", label: "ADB (Android)" },
-          { value: "custom", label: "Custom Shell" }
-        ]
-      },
-      {
-        type: "text",
-        name: "custom_shell",
-        label: { fa: "شل سفارشی", en: "Custom Shell" },
-        placeholder: { fa: "اگر Custom انتخاب کردید", en: "If you selected Custom" },
-        showWhen: { field: "shell", value: "custom" }
-      },
-      {
-        type: "select",
-        name: "architecture",
-        label: { fa: "معماری", en: "Architecture" },
-        options: [
-          { value: "x86_64", label: "x86_64" },
-          { value: "arm64", label: "ARM64" },
-          { value: "aarch64", label: "AArch64" },
-          { value: "i386", label: "i386" },
-          { value: "amd64", label: "AMD64" },
-          { value: "ppc64le", label: "PPC64LE" },
-          { value: "s390x", label: "S390x" }
-        ]
-      },
-      {
-        type: "checkbox",
-        name: "root_required",
-        label: { fa: "نیاز به دسترسی root", en: "Root access required" },
-        defaultValue: false
-      }
-    ]
-  },
-  
-  return tips[platform]?.[lang] || tips[platform]?.en || '';
+    }
+    // اگر برای other هم tip می‌خوای، اینجا اضافه کن
+    // other: { fa: "...", en: "..." }
+  };
+
+  const platformTips = tips[platform] || {};
+  return platformTips[lang] || platformTips.en || '';
 }
