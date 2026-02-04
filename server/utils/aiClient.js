@@ -1,269 +1,229 @@
-// server/utils/aiClient.js
-import dotenv from "dotenv";
+// server/utils/aiClient.js - FIXED VERSION
+import axios from 'axios';
+import dotenv from 'dotenv';
 
 dotenv.config();
 
-// ----------------------
-// OpenAI Responses API
-// ----------------------
-const OPENAI_URL = "https://api.openai.com/v1/responses";
+const OPENAI_API_URL = process.env.OPENAI_API_URL || 'https://api.openai.com/v1';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const AI_MODEL = process.env.AI_PRIMARY_MODEL || 'gpt-3.5-turbo';
+const TIMEOUT = 30000; // 30 seconds
 
-// Model + Stored Prompt
-const MODEL = process.env.OPENAI_MODEL || "gpt-4.1";
-const PROMPT_ID = process.env.PROMPT_ID || "";
-const PROMPT_VERSION = process.env.PROMPT_VERSION || "";
-
-// Safety timeout to avoid hanging forever
-const CCG_OPENAI_TIMEOUT_MS = Number(process.env.CCG_OPENAI_TIMEOUT_MS || 25000);
-
-/**
- * IMPORTANT:
- * gpt-4.1 currently supports ONLY text.verbosity="medium"
- * So we hard-force it to avoid: Unsupported value 'high' ...
- */
-const TEXT_BLOCK = {
-  format: { type: "text" },
-  verbosity: "medium",
-};
-
-// ----------------------
-// Helpers
-// ----------------------
-function asString(x, fallback = "") {
-  try {
-    return String(x);
-  } catch {
-    return fallback;
-  }
-}
+console.log('[AICLIENT] ✅ Loaded with config:', {
+    url: OPENAI_API_URL,
+    model: AI_MODEL,
+    hasKey: !!OPENAI_API_KEY,
+    keyLength: OPENAI_API_KEY ? OPENAI_API_KEY.length : 0,
+    timeout: TIMEOUT
+});
 
 /**
- * Normalize vars for stored prompt.
- * Stored prompt expects fixed keys.
+ * نرمالایز کردن ورودی‌ها برای OpenAI
  */
-function normalizeVars(payload) {
-  const b =
-    payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
-
-  // user_request / userRequest / prompt / text / message / input / query ...
-  const ur =
-    b.user_request ??
-    b.userRequest ??
-    b.prompt ??
-    b.text ??
-    b.message ??
-    b.input ??
-    b.query ??
-    "";
-
-  // Stored prompt expects these keys (keep mode internally even if UI removes it)
-  return {
-    mode: asString(b.mode ?? b.action ?? b.type ?? "generate") || "generate",
-    cli: asString(b.cli ?? b.shell ?? b.terminal ?? "bash") || "bash",
-    os: asString(b.os ?? b.platform ?? "linux") || "linux",
-    lang: asString(b.lang ?? b.language ?? "fa") || "fa",
-    error_message: asString(b.error_message ?? b.errorMessage ?? b.err ?? ""),
-
-    input_a: asString(
-      b.input_a ??
-        b.inputA ??
-        b.a ??
-        b.input1 ??
-        b.codeA ??
-        b.code_a ??
-        b.left ??
-        ""
-    ),
-    input_b: asString(
-      b.input_b ??
-        b.inputB ??
-        b.b ??
-        b.input2 ??
-        b.codeB ??
-        b.code_b ??
-        b.right ??
-        ""
-    ),
-
-    user_request: asString(ur ?? "").trim(),
-  
-    // extra context (safe; may be used by fallback prompt or future prompt versions)
-    outputType: asString(b.outputType ?? b.output_type ?? ""),
-    modeStyle: asString(b.modeStyle ?? b.mode_style ?? ""),
-    vendor: asString(b.vendor ?? ""),
-    deviceType: asString(b.deviceType ?? b.device_type ?? ""),
-    force_raw: asString(b.force_raw ?? b.forceRaw ?? ""),
-};
-}
-
-/**
- * Extract assistant text from OpenAI Responses API payload.
- */
-export function extractText(data) {
-  // Responses API output format
-  if (Array.isArray(data?.output)) {
-    let acc = "";
-    for (const item of data.output) {
-      if (!item) continue;
-
-      // Common: { type:"message", content:[{type:"output_text",text:"..."}], role:"assistant" }
-      if (item?.type === "message" && Array.isArray(item.content)) {
-        for (const c of item.content) {
-          const t =
-            c?.text ??
-            c?.value ??
-            c?.content ??
-            c?.output_text ??
-            c?.outputText ??
-            "";
-          if (typeof t === "string" && t.trim()) acc += (acc ? "\n" : "") + t.trim();
-          if (c?.type === "output_text" && typeof c?.text === "string" && c.text.trim()) {
-            // (Handled above, but kept for clarity)
-          }
-        }
-        continue;
-      }
-
-      // Some shapes have item.content directly
-      if (Array.isArray(item?.content)) {
-        for (const c of item.content) {
-          const t = c?.text ?? c?.value ?? "";
-          if (typeof t === "string" && t.trim()) acc += (acc ? "\n" : "") + t.trim();
-        }
-      }
-    }
-    return acc.trim();
-  }
-
-  // Legacy fallbacks (just in case)
-  const text =
-    data?.output_text ??
-    data?.text ??
-    data?.message ??
-    data?.content ??
-    data?.choices?.[0]?.message?.content ??
-    "";
-
-  return typeof text === "string" ? text.trim() : "";
-}
-
-/**
- * Call OpenAI Responses API with timeout (AbortController).
- * Throws on non-2xx or AbortError.
- */
-export async function callOpenAI({ apiKey, body }) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), CCG_OPENAI_TIMEOUT_MS);
-
-  try {
-    const resp = await fetch(OPENAI_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-
-    const data = await resp.json().catch(() => ({}));
-
-    if (!resp.ok) {
-      const msg =
-        data?.error?.message ||
-        data?.message ||
-        `OpenAI error ${resp.status}`;
-      throw new Error(msg);
-    }
-
-    return data;
-  } catch (err) {
-    if (err?.name === "AbortError") {
-      throw new Error("OpenAI request timed out");
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-/**
- * runAI({ variables, fallbackPrompt, temperature })
- * - tries Stored Prompt first
- * - if fails, falls back to raw input prompt
- */
-export async function runAI({ variables, fallbackPrompt, temperature = 0.35 }) {
-  const apiKey = process.env.OPENAI_API_KEY || "";
-  if (!apiKey) {
-    return { ok: false, output: "", error: "Missing OPENAI_API_KEY" };
-  }
-
-  const v = normalizeVars(variables);
-
-  
-
-  const forceRaw = String(v.force_raw || "").trim() === "1";
-  const mode = String(v.mode || "").toLowerCase();
-  const skipStored = forceRaw || mode === "generate" || mode === "chat";
-// If user_request is empty, don't call OpenAI
-  if (!v.user_request) {
-    return { ok: false, output: "", error: "Empty user_request" };
-  }
-
-  // ----------------------
-    if (!skipStored) {
-  // 1) Stored Prompt attempt
-  // ----------------------
-  if (PROMPT_ID) {
-    try {
-      const body = {
-        model: MODEL,
-        prompt: {
-          id: PROMPT_ID,
-          ...(PROMPT_VERSION ? { version: PROMPT_VERSION } : {}),
-        },
-        input: v,
-        temperature,
-        text: TEXT_BLOCK,
-        store: true,
-      };
-
-      const data = await callOpenAI({ apiKey, body });
-      const out = extractText(data);
-      if (out) return { ok: true, output: out, error: "" };
-
-      // If no usable text, treat as failure and fallback
-      throw new Error("Stored prompt returned empty output");
-    } catch (e) {
-      const msg = e?.message ? e.message : String(e);
-      // fall through to fallback
-      // (we keep going)
-      // eslint-disable-next-line no-console
-      console.error(`[AI] stored-prompt failed: ${msg}`);
-    }
-  }
-
-  // ----------------------
-    }
-
-  // 2) Fallback raw prompt
-  // ----------------------
-  try {
-    const rawInput = String(fallbackPrompt || v.user_request || "").trim();
-
-    const body = {
-      model: MODEL,
-      input: rawInput,
-      temperature,
-      text: TEXT_BLOCK,
-      store: false,
+function normalizeForOpenAI(payload) {
+    const base = {
+        mode: payload.mode || 'generate',
+        lang: payload.lang || 'fa',
+        user_request: payload.user_request || payload.userRequest || '',
+        os: payload.os || 'linux',
+        cli: payload.cli || 'bash',
+        outputType: payload.outputType || 'markdown',
+        knowledgeLevel: payload.knowledgeLevel || 'intermediate',
+        vendor: payload.vendor || '',
+        deviceType: payload.deviceType || ''
     };
+    
+    // ساخت محتوای مناسب برای OpenAI
+    let content = `Language: ${base.lang}\n`;
+    content += `Request: ${base.user_request}\n`;
+    content += `Operating System: ${base.os}\n`;
+    content += `Shell/CLI: ${base.cli}\n`;
+    
+    if (base.vendor) content += `Vendor: ${base.vendor}\n`;
+    if (base.deviceType) content += `Device Type: ${base.deviceType}\n`;
+    if (base.knowledgeLevel) content += `Knowledge Level: ${base.knowledgeLevel}\n`;
+    if (base.mode) content += `Mode: ${base.mode}\n`;
+    
+    return { base, content };
+}
 
-    const data = await callOpenAI({ apiKey, body });
-    const out = extractText(data);
-    return { ok: true, output: out || "", error: "" };
-  } catch (e) {
-    const msg = e?.message ? e.message : String(e);
-    return { ok: false, output: "", error: msg };
-  }
+/**
+ * اصلی‌ترین تابع برای فراخوانی OpenAI
+ */
+export async function runAI(payload) {
+    console.log('[AICLIENT] 🚀 runAI called');
+    console.log('[AICLIENT] Payload:', JSON.stringify(payload).substring(0, 300));
+    
+    if (!OPENAI_API_KEY) {
+        console.error('[AICLIENT] ❌ No OpenAI API key configured');
+        throw new Error('OpenAI API key not configured');
+    }
+    
+    // نرمالایز کردن
+    const { base, content } = normalizeForOpenAI(payload);
+    
+    try {
+        const endpoint = `${OPENAI_API_URL}/chat/completions`;
+        
+        const requestData = {
+            model: AI_MODEL,
+            messages: [
+                {
+                    role: 'system',
+                    content: `You are CCG (Cando Command Generator), an expert system administrator and DevOps engineer.
+Generate commands, scripts, or explanations based on user requests.
+Consider the target OS (${base.os}), shell (${base.cli}), and user's knowledge level (${base.knowledgeLevel}).
+Provide responses in ${base.lang === 'fa' ? 'Persian (Farsi)' : 'English'}.
+Format output in markdown with clear sections.`
+                },
+                {
+                    role: 'user',
+                    content: content
+                }
+            ],
+            max_tokens: 2000,
+            temperature: 0.7,
+            top_p: 0.9,
+            frequency_penalty: 0,
+            presence_penalty: 0
+        };
+        
+        console.log('[AICLIENT] 📤 Sending to OpenAI:', endpoint);
+        console.log('[AICLIENT] Request model:', AI_MODEL);
+        console.log('[AICLIENT] Request content (first 500 chars):', content.substring(0, 500));
+        
+        const startTime = Date.now();
+        
+        const response = await axios.post(endpoint, requestData, {
+            headers: {
+                'Authorization': `Bearer ${OPENAI_API_KEY}`,
+                'Content-Type': 'application/json',
+                'OpenAI-Organization': process.env.OPENAI_ORGANIZATION || '',
+            },
+            timeout: TIMEOUT
+        });
+        
+        const duration = Date.now() - startTime;
+        console.log(`[AICLIENT] ✅ Response received in ${duration}ms`);
+        console.log('[AICLIENT] Response status:', response.status);
+        
+        if (response.data && response.data.choices && response.data.choices[0]) {
+            const aiResponse = response.data.choices[0].message.content;
+            console.log('[AICLIENT] AI Response length:', aiResponse.length, 'chars');
+            console.log('[AICLIENT] AI Response (first 300 chars):', aiResponse.substring(0, 300));
+            
+            // پردازش پاسخ
+            return {
+                markdown: aiResponse,
+                tool: {
+                    primary: {
+                        command: extractCommand(aiResponse),
+                        description: "Generated by OpenAI"
+                    },
+                    explanation: "Generated by AI",
+                    warnings: [],
+                    alternatives: []
+                },
+                raw: {
+                    model: response.data.model,
+                    usage: response.data.usage,
+                    finish_reason: response.data.choices[0].finish_reason
+                }
+            };
+        } else {
+            console.error('[AICLIENT] ❌ Unexpected response format:', response.data);
+            throw new Error('Unexpected response format from OpenAI');
+        }
+        
+    } catch (error) {
+        console.error('[AICLIENT] ❌ Error calling OpenAI:', error.message);
+        
+        // لاگ خطای مفصل
+        if (error.response) {
+            console.error('[AICLIENT] Response status:', error.response.status);
+            console.error('[AICLIENT] Response data:', JSON.stringify(error.response.data));
+            
+            const errorMsg = error.response.data?.error?.message || error.response.statusText;
+            
+            // خطاهای رایج
+            if (error.response.status === 401) {
+                throw new Error('OpenAI API key is invalid or expired');
+            } else if (error.response.status === 429) {
+                throw new Error('OpenAI rate limit exceeded. Please try again later.');
+            } else if (error.response.status === 403) {
+                throw new Error('OpenAI access forbidden. Check API key permissions.');
+            } else {
+                throw new Error(`OpenAI API error (${error.response.status}): ${errorMsg}`);
+            }
+        } else if (error.request) {
+            console.error('[AICLIENT] No response received');
+            throw new Error('No response from OpenAI API. Network or timeout issue.');
+        } else {
+            console.error('[AICLIENT] Request setup error:', error.message);
+            throw new Error(`Failed to call OpenAI: ${error.message}`);
+        }
+    }
+}
+
+/**
+ * استخراج دستور از پاسخ AI
+ */
+function extractCommand(text) {
+    if (!text) return '';
+    
+    // جستجوی کد بلاک
+    const codeBlockMatch = text.match(/```(?:bash|sh|zsh|powershell|cmd)?\n([\s\S]*?)\n```/);
+    if (codeBlockMatch) {
+        return codeBlockMatch[1].trim();
+    }
+    
+    // جستجوی inline code
+    const inlineCodeMatch = text.match(/`([^`\n]+)`/);
+    if (inlineCodeMatch) {
+        return inlineCodeMatch[1].trim();
+    }
+    
+    // اولین خط غیرخالی
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+    return lines[0] || '';
+}
+
+/**
+ * تست اتصال به OpenAI
+ */
+export async function testConnection() {
+    console.log('[AICLIENT] 🔍 Testing OpenAI connection...');
+    
+    if (!OPENAI_API_KEY) {
+        console.error('[AICLIENT] ❌ No API key configured');
+        return { ok: false, error: 'No API key' };
+    }
+    
+    try {
+        const response = await axios.get(`${OPENAI_API_URL}/models`, {
+            headers: {
+                'Authorization': `Bearer ${OPENAI_API_KEY}`,
+                'Content-Type': 'application/json',
+            },
+            timeout: 10000
+        });
+        
+        const models = response.data.data.map(m => m.id).slice(0, 5);
+        console.log('[AICLIENT] ✅ Connection successful! Available models:', models);
+        
+        return { 
+            ok: true, 
+            models: models,
+            hasGpt4: models.some(m => m.includes('gpt-4')),
+            hasGpt35: models.some(m => m.includes('gpt-3.5'))
+        };
+    } catch (error) {
+        console.error('[AICLIENT] ❌ Connection test failed:', error.message);
+        return { 
+            ok: false, 
+            error: error.message,
+            status: error.response?.status,
+            data: error.response?.data 
+        };
+    }
 }
