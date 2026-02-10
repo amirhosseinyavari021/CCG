@@ -1,0 +1,322 @@
+// server/utils/outputFormatter.js
+// هدف: هر خروجی AI (چه JSON چه Markdown آزاد) را به Tool Contract استاندارد تبدیل کند.
+// - tool mode: Command + Explanation + Warnings + Alternatives
+// - command mode: فقط Command اصلی + تا 3 جایگزین
+// - python mode: فقط اسکریپت
+//
+// نکته: چون مدل ممکن است "چتی" جواب بدهد، ما sanitize و section-extract انجام می‌دهیم.
+
+function fenceLangFromCli(cli = "bash", outputType = "tool") {
+  const c = String(cli || "").toLowerCase().trim();
+  if (outputType === "python") return "python";
+  if (c.includes("powershell")) return "powershell";
+  if (c === "cmd") return "bat";
+  if (c === "network") return "";
+  return "bash";
+}
+
+function tryParseJSONMaybe(text) {
+  const s = String(text || "").trim();
+  if (!s) return null;
+  if (!(s.startsWith("{") && s.endsWith("}"))) return null;
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeToolObj(tool) {
+  const t = tool && typeof tool === "object" ? tool : {};
+  const primary = t.primary && typeof t.primary === "object" ? t.primary : {};
+  const alternatives = Array.isArray(t.alternatives) ? t.alternatives : [];
+  const warnings = Array.isArray(t.warnings) ? t.warnings : [];
+  return {
+    primary: {
+      title: String(primary.title || "Command"),
+      lang: String(primary.lang || "bash"),
+      command: String(primary.command || "").trim(),
+    },
+    explanation: String(t.explanation || "").trim(),
+    warnings: warnings.map((w) => String(w)).filter(Boolean),
+    alternatives: alternatives
+      .map((a) => ({
+        title: String(a?.title || "Alternative"),
+        lang: String(a?.lang || primary.lang || "bash"),
+        command: String(a?.command || "").trim(),
+      }))
+      .filter((a) => a.command),
+  };
+}
+
+function sanitizeMarkdown(md) {
+  let s = String(md || "");
+
+  // حذف line های chatty آخر
+  s = s.replace(/(\*\*|__)?\s*(اگر|در صورت|هر)\s+.*(سوال|پرسش).*(دارید|داشتی|بپرس).*$/gmi, "");
+  s = s.replace(/^\s*(if\s+you\s+have\s+any\s+questions|ask\s+me\s+anything|feel\s+free\s+to\s+ask).*$\n?/gmi, "");
+
+  // حذف HR های زیاد که UI رو شلوغ می‌کنه
+  s = s.replace(/^\s*---\s*$/gmi, "");
+
+  // trim اضافی
+  s = s.replace(/\n{3,}/g, "\n\n").trim();
+  return s;
+}
+
+function extractCodeBlocks(md) {
+  // returns array of { lang, code, startIndex }
+  const s = String(md || "");
+  const blocks = [];
+  const re = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
+  let m;
+  while ((m = re.exec(s))) {
+    blocks.push({
+      lang: (m[1] || "").trim(),
+      code: (m[2] || "").trim(),
+      startIndex: m.index,
+    });
+  }
+  return blocks;
+}
+
+function headingKey(title) {
+  const t = String(title || "").trim().toLowerCase();
+  const norm = t.replace(/\u200c/g, "").replace(/\s+/g, " ");
+
+  if (
+    norm.includes("warning") ||
+    norm.includes("warnings") ||
+    norm.includes("هشدار") ||
+    norm.includes("امنیت") ||
+    norm.includes("security")
+  )
+    return "warnings";
+
+  if (
+    norm.includes("alternative") ||
+    norm.includes("alternatives") ||
+    norm.includes("جایگزین") ||
+    norm.includes("دستور جایگزین") ||
+    norm.includes("گزینه های دیگر")
+  )
+    return "alternatives";
+
+  if (
+    norm.includes("command") ||
+    norm.includes("commands") ||
+    norm.includes("دستور") ||
+    norm.includes("کامند") ||
+    norm.includes("cli")
+  )
+    return "command";
+
+  if (norm.includes("explanation") || norm.includes("توضیح") || norm.includes("شرح") || norm.includes("explain"))
+    return "explanation";
+
+  return "other";
+}
+
+function splitByHeadings(md) {
+  // splits on ## or ### headings; keeps title + body
+  const s = String(md || "");
+  const lines = s.split(/\r?\n/);
+  const sections = [];
+  let cur = { title: "", body: "" };
+
+  const push = () => {
+    const body = (cur.body || "").trim();
+    const title = (cur.title || "").trim();
+    if (title || body) sections.push({ title, body });
+    cur = { title: "", body: "" };
+  };
+
+  for (const line of lines) {
+    const m = line.match(/^\s{0,3}#{2,3}\s+(.*)$/); // ## or ###
+    if (m) {
+      push();
+      cur.title = (m[1] || "").trim();
+      cur.body = "";
+      continue;
+    }
+    cur.body += line + "\n";
+  }
+  push();
+  return sections;
+}
+
+function markdownToTool(md, cli, outputType) {
+  const cleaned = sanitizeMarkdown(md);
+  const blocks = extractCodeBlocks(cleaned);
+  const sections = splitByHeadings(cleaned);
+
+  // 1) command primary:
+  //   a) if there is a "command" section -> first code block inside it
+  //   b) else -> first code block in entire markdown
+  let primaryCmd = "";
+  let primaryLang = fenceLangFromCli(cli, outputType) || "bash";
+
+  const cmdSection = sections.find((s) => headingKey(s.title) === "command");
+  if (cmdSection) {
+    const localBlocks = extractCodeBlocks(cmdSection.body);
+    if (localBlocks.length) {
+      primaryCmd = localBlocks[0].code;
+      primaryLang = localBlocks[0].lang || primaryLang;
+    }
+  }
+  if (!primaryCmd && blocks.length) {
+    primaryCmd = blocks[0].code;
+    primaryLang = blocks[0].lang || primaryLang;
+  }
+
+  // 2) alternatives:
+  // - from alternatives section code blocks
+  // - otherwise: remaining code blocks after first (up to 3)
+  let alternatives = [];
+  const altSection = sections.find((s) => headingKey(s.title) === "alternatives");
+  if (altSection) {
+    const localBlocks = extractCodeBlocks(altSection.body);
+    alternatives = localBlocks.map((b, idx) => ({
+      title: idx === 0 ? "Alternative" : `Alternative ${idx + 1}`,
+      lang: b.lang || primaryLang,
+      command: b.code,
+    }));
+  } else if (blocks.length > 1) {
+    alternatives = blocks.slice(1, 4).map((b, idx) => ({
+      title: idx === 0 ? "Alternative" : `Alternative ${idx + 1}`,
+      lang: b.lang || primaryLang,
+      command: b.code,
+    }));
+  }
+
+  // 3) warnings:
+  let warnings = [];
+  const warnSection = sections.find((s) => headingKey(s.title) === "warnings");
+  if (warnSection) {
+    const wl = warnSection.body
+      .split(/\r?\n/)
+      .map((x) => x.trim())
+      .filter(Boolean)
+      .filter((x) => !x.startsWith("```"));
+    // bullet lines preferred
+    warnings = wl
+      .map((x) => x.replace(/^-+\s*/, "").trim())
+      .filter((x) => x.length >= 3)
+      .slice(0, 10);
+  } else {
+    // heuristic: any line containing هشدار/warning in text
+    const wl = cleaned
+      .split(/\r?\n/)
+      .map((x) => x.trim())
+      .filter(Boolean)
+      .filter((x) => /هشدار|warning|امنیت|security/i.test(x));
+    warnings = wl.slice(0, 10);
+  }
+
+  // 4) explanation:
+  // take content excluding code blocks and excluding warnings/alternatives sections
+  let explanation = "";
+  const expSection = sections.find((s) => headingKey(s.title) === "explanation");
+  if (expSection) {
+    explanation = expSection.body.trim();
+  } else {
+    // default: take "other" sections + plain text from command section without code
+    const candidates = sections.filter((s) => {
+      const k = headingKey(s.title);
+      return k === "other" || k === "explanation";
+    });
+    explanation = candidates.map((s) => s.body.trim()).filter(Boolean).join("\n\n").trim();
+  }
+
+  // cleanup explanation: remove code fences remnants
+  explanation = explanation.replace(/```[\s\S]*?```/g, "").replace(/\n{3,}/g, "\n\n").trim();
+
+  // Build tool object
+  const tool = {
+    primary: { title: "Command", lang: primaryLang || "bash", command: String(primaryCmd || "").trim() },
+    explanation: explanation || "",
+    warnings,
+    alternatives: alternatives.filter((a) => a.command).slice(0, 3),
+  };
+
+  return normalizeToolObj(tool);
+}
+
+function toolToMarkdown(tool, cli, outputType) {
+  const t = normalizeToolObj(tool);
+  const lang = fenceLangFromCli(cli, outputType);
+
+  const out = String(outputType || "tool").toLowerCase();
+
+  // ✅ COMMAND-ONLY: primary + up to 3 alternatives, no other text
+  if (out === "command") {
+    const alts = (t.alternatives || []).slice(0, 3);
+    const mdParts = [];
+
+    mdParts.push(`## Command\n\`\`\`${lang}\n${t.primary.command}\n\`\`\``);
+
+    if (alts.length) {
+      mdParts.push(`## Alternatives`);
+      for (const a of alts) mdParts.push(`\`\`\`${lang}\n${a.command}\n\`\`\``);
+    }
+
+    return mdParts.join("\n\n");
+  }
+
+  // ✅ PYTHON: only python script (no extra)
+  if (out === "python") {
+    return `\`\`\`python\n${t.primary.command}\n\`\`\``;
+  }
+
+  // ✅ TOOL: full structured markdown
+  const warnings = t.warnings.length ? t.warnings.map((w) => `- ${w}`).join("\n") : "- None";
+  const alts = t.alternatives.length
+    ? t.alternatives.map((a) => `\`\`\`${lang}\n${a.command}\n\`\`\``).join("\n\n")
+    : "None";
+
+  return [
+    `## Command\n\`\`\`${lang}\n${t.primary.command}\n\`\`\``,
+    `## Explanation\n${t.explanation ? t.explanation : "- None"}`,
+    `## Warnings\n${warnings}`,
+    `## Alternatives\n${alts}`,
+  ].join("\n\n");
+}
+
+export function formatToolResponse({ rawText = "", text = "", cli = "bash", outputType = "tool" } = {}) {
+  const raw = sanitizeMarkdown(String(rawText || text || "").trim());
+  const parsed = tryParseJSONMaybe(raw);
+
+  // Case 1: JSON tool contract
+  if (parsed) {
+    const toolObj = parsed.tool && typeof parsed.tool === "object" ? parsed.tool : parsed;
+    const tool = normalizeToolObj(toolObj);
+
+    // Ensure command-only behavior
+    if (String(outputType).toLowerCase() === "command") {
+      tool.explanation = "";
+      tool.warnings = [];
+      tool.alternatives = (tool.alternatives || []).slice(0, 3);
+    }
+
+    const markdown = toolToMarkdown(tool, cli, outputType);
+    return { tool, markdown };
+  }
+
+  // Case 2: markdown free-form -> extract tool
+  const tool = markdownToTool(raw, cli, outputType);
+
+  // enforce command-only
+  if (String(outputType).toLowerCase() === "command") {
+    tool.explanation = "";
+    tool.warnings = [];
+    tool.alternatives = (tool.alternatives || []).slice(0, 3);
+  }
+
+  const markdown = toolToMarkdown(tool, cli, outputType);
+  return { tool, markdown };
+}
+
+export function formatOutput(args = {}) {
+  const { tool, markdown } = formatToolResponse(args);
+  return { tool, markdown };
+}

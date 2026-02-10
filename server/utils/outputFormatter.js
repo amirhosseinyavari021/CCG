@@ -1,158 +1,116 @@
 // server/utils/outputFormatter.js
-// ✅ Hardened formatter: if AI returns tool JSON as raw text, we parse it and generate stable markdown + tool object.
-// ESM exports: formatToolResponse + formatOutput(alias)
+// Converts strict JSON output to a stable tool object + markdown fallback
 
-function fenceLangFromCli(cli = "bash", outputType = "tool") {
-  const c = String(cli || "").toLowerCase();
-  const ot = String(outputType || "").toLowerCase();
-  if (ot === "python") return "python";
-  if (c.includes("powershell") || c === "pwsh" || c === "powershell") return "powershell";
-  if (c.includes("cmd") || c === "cmd") return "cmd";
-  return "bash";
+function safeJsonParse(text) {
+  try {
+    const t = String(text || "").trim();
+    if (!t) return null;
+    // If model returned extra whitespace, still ok. But MUST be pure JSON per prompt.
+    return JSON.parse(t);
+  } catch {
+    return null;
+  }
 }
 
-function tryParseJSONMaybe(text) {
-  const t = String(text || "").trim();
-  if (!t) return null;
-  if (!(t.startsWith("{") && t.endsWith("}"))) return null;
-  try { return JSON.parse(t); } catch { return null; }
+function asArr(v) {
+  if (!v) return [];
+  if (Array.isArray(v)) return v.filter(Boolean).map(String);
+  return [String(v)];
 }
 
-function splitFirstCodeBlock(text) {
-  const t = String(text ?? "").trim();
-  const m = t.match(/```[^\n]*\n([\s\S]*?)```/);
-  if (!m) return { codeRaw: "", rest: t };
-  return { codeRaw: String(m[1] ?? "").trim(), rest: t.replace(m[0], "").trim() };
-}
+function normalizeTool(obj, cliFallback = "bash") {
+  const o = obj && typeof obj === "object" ? obj : {};
+  const platform = String(o.platform || "").trim() || "";
+  const cli = String(o.cli || "").trim() || cliFallback;
 
-function looksLikeCommand(line) {
-  const s = String(line || "").trim();
-  if (!s) return false;
-  if (s.length > 240) return false;
-  if (/[.،؛!?]$/.test(s)) return false;
-  return true;
-}
+  const pythonScript = o.pythonScript === true;
 
-function normalizeToolObj(tool) {
-  const t = (tool && typeof tool === "object") ? tool : {};
-  const primary = (t.primary && typeof t.primary === "object") ? t.primary : {};
-  const command = String(primary.command || "").trim();
-  const lang = String(primary.lang || "").trim();
-  const explanation = String(t.explanation || "").trim();
-
-  const warnings = Array.isArray(t.warnings)
-    ? t.warnings.map(x => String(x || "").trim()).filter(Boolean)
-    : [];
-
-  const alternatives = Array.isArray(t.alternatives)
-    ? t.alternatives.map(a => ({
-        command: String(a?.command || "").trim(),
-        note: String(a?.note || "").trim(),
-      })).filter(a => a.command)
-    : [];
-
-  return {
-    primary: { command, lang },
-    explanation,
-    warnings,
-    alternatives,
+  const tool = {
+    mode: "generator",
+    platform,
+    cli,
+    pythonScript,
+    title: String(o.title || "").trim(),
+    primary_command: pythonScript ? "" : String(o.primary_command || "").trim(),
+    alternatives: pythonScript ? [] : asArr(o.alternatives),
+    python_script: pythonScript ? String(o.python_script || "").trim() : "",
+    explanation: asArr(o.explanation),
+    warnings: asArr(o.warnings),
+    notes: asArr(o.notes),
   };
-}
 
-function toolToMarkdown(tool, cli, outputType, forcedCommand) {
-  const fenceLang = fenceLangFromCli(cli, outputType);
-  const primaryCmd = String(forcedCommand || tool?.primary?.command || "").trim() || 'echo "No command produced"';
-  const primaryLang = String(tool?.primary?.lang || fenceLang).trim() || fenceLang;
-
-  // command mode: ONLY primary command
-  const ot = String(outputType || "").toLowerCase();
-  if (ot === "command") {
-    return `\`\`\`${primaryLang}\n${primaryCmd}\n\`\`\``;
-  }
-
-  const parts = [];
-  parts.push(`\`\`\`${primaryLang}\n${primaryCmd}\n\`\`\``);
-
-  const exp = String(tool?.explanation || "").trim();
-  if (exp) parts.push(`## توضیح\n${exp}`);
-
-  const warnings = Array.isArray(tool?.warnings) ? tool.warnings : [];
-  if (warnings.length) {
-    parts.push(`## هشدارها\n${warnings.map(w => `- ${w}`).join("\n")}`);
-  }
-
-  const alts = Array.isArray(tool?.alternatives) ? tool.alternatives : [];
-  if (alts.length) {
-    const blocks = alts.map(a => {
-      const note = String(a?.note || "").trim();
-      const cmd = String(a?.command || "").trim();
-      const head = note ? `- ${note}\n\n` : "";
-      return `${head}\`\`\`${primaryLang}\n${cmd}\n\`\`\``;
-    }).join("\n\n");
-    parts.push(`## جایگزین‌ها\n${blocks}`);
-  }
-
-  return parts.join("\n\n");
-}
-
-export function formatToolResponse({
-  rawText = "",
-  text = "",
-  cli = "bash",
-  outputType = "tool",
-  forcedCommand = "",
-} = {}) {
-  const input = String(rawText || text || "").trim();
-
-  // 1) If raw text is JSON => parse as tool first
-  const parsed = tryParseJSONMaybe(input);
-  if (parsed) {
-    // accept {tool:{...}, markdown:"..."} OR direct tool object {primary,...}
-    const maybeTool = (parsed.tool && typeof parsed.tool === "object") ? parsed.tool : parsed;
-    const tool0 = normalizeToolObj(maybeTool);
-
-    // enforce forced command (explain mode)
-    if (forcedCommand) tool0.primary.command = String(forcedCommand).trim();
-
-    // if tool json had no command, fallback
-    if (!tool0.primary.command) {
-      tool0.primary.command = 'echo "No command produced"';
+  // Hard guarantees:
+  // - Exactly one primary command in CLI mode
+  // - At least 3 alternatives if present in CLI mode (UI expects it)
+  if (!pythonScript) {
+    // remove duplicates
+    const seen = new Set();
+    const primary = tool.primary_command;
+    const alts = [];
+    for (const a of tool.alternatives) {
+      const x = String(a || "").trim();
+      if (!x) continue;
+      if (x === primary) continue;
+      if (seen.has(x)) continue;
+      seen.add(x);
+      alts.push(x);
     }
-
-    // if tool json had no lang, infer
-    if (!tool0.primary.lang) tool0.primary.lang = fenceLangFromCli(cli, outputType);
-
-    const markdown = toolToMarkdown(tool0, cli, outputType, forcedCommand);
-    return { ok: true, tool: tool0, markdown, output: markdown };
+    tool.alternatives = alts;
   }
 
-  // 2) Otherwise: try to infer from code block or first command-like line
-  const { codeRaw, rest } = splitFirstCodeBlock(input);
-
-  let cmd = "";
-  if (codeRaw) cmd = codeRaw.split("\n").map(l => l.trim()).filter(Boolean).join("\n").trim();
-
-  if (!cmd) {
-    // fallback: first line that looks like a command
-    const line = input.split("\n").map(x => x.trim()).find(looksLikeCommand);
-    if (line) cmd = line;
-  }
-
-  if (!cmd) cmd = 'echo "No command produced"';
-
-  const tool = normalizeToolObj({
-    primary: { command: cmd, lang: fenceLangFromCli(cli, outputType) },
-    explanation: rest || "",
-    warnings: [],
-    alternatives: [],
-  });
-
-  if (forcedCommand) tool.primary.command = String(forcedCommand).trim();
-
-  const markdown = toolToMarkdown(tool, cli, outputType, forcedCommand);
-  return { ok: true, tool, markdown, output: markdown };
+  return tool;
 }
 
-export function formatOutput(args = {}) {
-  return formatToolResponse(args);
+function toolToMarkdown(tool) {
+  // Markdown fallback for old pages (generator UI should render ToolResult)
+  const t = tool || {};
+  const lines = [];
+
+  if (t.title) lines.push(`# ${t.title}`, "");
+
+  if (t.pythonScript) {
+    lines.push(`## Python Script`, "", "```python", t.python_script || "", "```", "");
+  } else {
+    lines.push(`## Command`, "", "```" + (t.cli || "bash"), t.primary_command || "", "```", "");
+    if (t.alternatives?.length) {
+      lines.push(`## Alternatives`, "");
+      for (const a of t.alternatives) {
+        lines.push("```" + (t.cli || "bash"), a, "```", "");
+      }
+    }
+  }
+
+  if (t.explanation?.length) {
+    lines.push(`## Explanation`, "");
+    for (const x of t.explanation) lines.push(`- ${x}`);
+    lines.push("");
+  }
+
+  if (t.warnings?.length) {
+    lines.push(`## Warnings`, "");
+    for (const x of t.warnings) lines.push(`- ${x}`);
+    lines.push("");
+  }
+
+  if (t.notes?.length) {
+    lines.push(`## Notes`, "");
+    for (const x of t.notes) lines.push(`- ${x}`);
+    lines.push("");
+  }
+
+  return lines.join("\n").trim();
+}
+
+export function formatOutput({ text, cli = "bash" }) {
+  const raw = String(text || "").trim();
+
+  const parsed = safeJsonParse(raw);
+  if (parsed) {
+    const tool = normalizeTool(parsed, cli);
+    const markdown = toolToMarkdown(tool);
+    return { tool, markdown };
+  }
+
+  // If model violated contract (shouldn’t happen), return raw in markdown
+  return { tool: null, markdown: raw };
 }

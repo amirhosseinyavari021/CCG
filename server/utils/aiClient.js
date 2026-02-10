@@ -1,229 +1,37 @@
-// server/utils/aiClient.js - FIXED VERSION
-import axios from 'axios';
-import dotenv from 'dotenv';
+// server/utils/aiClient.js
+import { callOpenAICompat } from "./openaiCompat.js";
+import { buildGeneratorPrompt } from "./promptBuilder.js";
 
-dotenv.config();
-
-const OPENAI_API_URL = process.env.OPENAI_API_URL || 'https://api.openai.com/v1';
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const AI_MODEL = process.env.AI_PRIMARY_MODEL || 'gpt-3.5-turbo';
-const TIMEOUT = 30000; // 30 seconds
-
-console.log('[AICLIENT] ✅ Loaded with config:', {
-    url: OPENAI_API_URL,
-    model: AI_MODEL,
-    hasKey: !!OPENAI_API_KEY,
-    keyLength: OPENAI_API_KEY ? OPENAI_API_KEY.length : 0,
-    timeout: TIMEOUT
-});
-
-/**
- * نرمالایز کردن ورودی‌ها برای OpenAI
- */
-function normalizeForOpenAI(payload) {
-    const base = {
-        mode: payload.mode || 'generate',
-        lang: payload.lang || 'fa',
-        user_request: payload.user_request || payload.userRequest || '',
-        os: payload.os || 'linux',
-        cli: payload.cli || 'bash',
-        outputType: payload.outputType || 'markdown',
-        knowledgeLevel: payload.knowledgeLevel || 'intermediate',
-        vendor: payload.vendor || '',
-        deviceType: payload.deviceType || ''
-    };
-    
-    // ساخت محتوای مناسب برای OpenAI
-    let content = `Language: ${base.lang}\n`;
-    content += `Request: ${base.user_request}\n`;
-    content += `Operating System: ${base.os}\n`;
-    content += `Shell/CLI: ${base.cli}\n`;
-    
-    if (base.vendor) content += `Vendor: ${base.vendor}\n`;
-    if (base.deviceType) content += `Device Type: ${base.deviceType}\n`;
-    if (base.knowledgeLevel) content += `Knowledge Level: ${base.knowledgeLevel}\n`;
-    if (base.mode) content += `Mode: ${base.mode}\n`;
-    
-    return { base, content };
+function s(v) {
+  return v === null || v === undefined ? "" : String(v);
+}
+function bool(v) {
+  return v === true || v === "true" || v === 1 || v === "1";
 }
 
-/**
- * اصلی‌ترین تابع برای فراخوانی OpenAI
- */
-export async function runAI(payload) {
-    console.log('[AICLIENT] 🚀 runAI called');
-    console.log('[AICLIENT] Payload:', JSON.stringify(payload).substring(0, 300));
-    
-    if (!OPENAI_API_KEY) {
-        console.error('[AICLIENT] ❌ No OpenAI API key configured');
-        throw new Error('OpenAI API key not configured');
-    }
-    
-    // نرمالایز کردن
-    const { base, content } = normalizeForOpenAI(payload);
-    
-    try {
-        const endpoint = `${OPENAI_API_URL}/chat/completions`;
-        
-        const requestData = {
-            model: AI_MODEL,
-            messages: [
-                {
-                    role: 'system',
-                    content: `You are CCG (Cando Command Generator), an expert system administrator and DevOps engineer.
-Generate commands, scripts, or explanations based on user requests.
-Consider the target OS (${base.os}), shell (${base.cli}), and user's knowledge level (${base.knowledgeLevel}).
-Provide responses in ${base.lang === 'fa' ? 'Persian (Farsi)' : 'English'}.
-Format output in markdown with clear sections.`
-                },
-                {
-                    role: 'user',
-                    content: content
-                }
-            ],
-            max_tokens: 2000,
-            temperature: 0.7,
-            top_p: 0.9,
-            frequency_penalty: 0,
-            presence_penalty: 0
-        };
-        
-        console.log('[AICLIENT] 📤 Sending to OpenAI:', endpoint);
-        console.log('[AICLIENT] Request model:', AI_MODEL);
-        console.log('[AICLIENT] Request content (first 500 chars):', content.substring(0, 500));
-        
-        const startTime = Date.now();
-        
-        const response = await axios.post(endpoint, requestData, {
-            headers: {
-                'Authorization': `Bearer ${OPENAI_API_KEY}`,
-                'Content-Type': 'application/json',
-                'OpenAI-Organization': process.env.OPENAI_ORGANIZATION || '',
-            },
-            timeout: TIMEOUT
-        });
-        
-        const duration = Date.now() - startTime;
-        console.log(`[AICLIENT] ✅ Response received in ${duration}ms`);
-        console.log('[AICLIENT] Response status:', response.status);
-        
-        if (response.data && response.data.choices && response.data.choices[0]) {
-            const aiResponse = response.data.choices[0].message.content;
-            console.log('[AICLIENT] AI Response length:', aiResponse.length, 'chars');
-            console.log('[AICLIENT] AI Response (first 300 chars):', aiResponse.substring(0, 300));
-            
-            // پردازش پاسخ
-            return {
-                markdown: aiResponse,
-                tool: {
-                    primary: {
-                        command: extractCommand(aiResponse),
-                        description: "Generated by OpenAI"
-                    },
-                    explanation: "Generated by AI",
-                    warnings: [],
-                    alternatives: []
-                },
-                raw: {
-                    model: response.data.model,
-                    usage: response.data.usage,
-                    finish_reason: response.data.choices[0].finish_reason
-                }
-            };
-        } else {
-            console.error('[AICLIENT] ❌ Unexpected response format:', response.data);
-            throw new Error('Unexpected response format from OpenAI');
-        }
-        
-    } catch (error) {
-        console.error('[AICLIENT] ❌ Error calling OpenAI:', error.message);
-        
-        // لاگ خطای مفصل
-        if (error.response) {
-            console.error('[AICLIENT] Response status:', error.response.status);
-            console.error('[AICLIENT] Response data:', JSON.stringify(error.response.data));
-            
-            const errorMsg = error.response.data?.error?.message || error.response.statusText;
-            
-            // خطاهای رایج
-            if (error.response.status === 401) {
-                throw new Error('OpenAI API key is invalid or expired');
-            } else if (error.response.status === 429) {
-                throw new Error('OpenAI rate limit exceeded. Please try again later.');
-            } else if (error.response.status === 403) {
-                throw new Error('OpenAI access forbidden. Check API key permissions.');
-            } else {
-                throw new Error(`OpenAI API error (${error.response.status}): ${errorMsg}`);
-            }
-        } else if (error.request) {
-            console.error('[AICLIENT] No response received');
-            throw new Error('No response from OpenAI API. Network or timeout issue.');
-        } else {
-            console.error('[AICLIENT] Request setup error:', error.message);
-            throw new Error(`Failed to call OpenAI: ${error.message}`);
-        }
-    }
-}
+export async function runAI(vars) {
+  const mode = s(vars.mode || "generate").toLowerCase();
 
-/**
- * استخراج دستور از پاسخ AI
- */
-function extractCommand(text) {
-    if (!text) return '';
-    
-    // جستجوی کد بلاک
-    const codeBlockMatch = text.match(/```(?:bash|sh|zsh|powershell|cmd)?\n([\s\S]*?)\n```/);
-    if (codeBlockMatch) {
-        return codeBlockMatch[1].trim();
-    }
-    
-    // جستجوی inline code
-    const inlineCodeMatch = text.match(/`([^`\n]+)`/);
-    if (inlineCodeMatch) {
-        return inlineCodeMatch[1].trim();
-    }
-    
-    // اولین خط غیرخالی
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-    return lines[0] || '';
-}
+  // For generator mode: always use our strict JSON prompt.
+  // (We keep other modes intact if you later extend.)
+  const isGenerator = mode === "generate" || mode === "generator";
 
-/**
- * تست اتصال به OpenAI
- */
-export async function testConnection() {
-    console.log('[AICLIENT] 🔍 Testing OpenAI connection...');
-    
-    if (!OPENAI_API_KEY) {
-        console.error('[AICLIENT] ❌ No API key configured');
-        return { ok: false, error: 'No API key' };
-    }
-    
-    try {
-        const response = await axios.get(`${OPENAI_API_URL}/models`, {
-            headers: {
-                'Authorization': `Bearer ${OPENAI_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            timeout: 10000
-        });
-        
-        const models = response.data.data.map(m => m.id).slice(0, 5);
-        console.log('[AICLIENT] ✅ Connection successful! Available models:', models);
-        
-        return { 
-            ok: true, 
-            models: models,
-            hasGpt4: models.some(m => m.includes('gpt-4')),
-            hasGpt35: models.some(m => m.includes('gpt-3.5'))
-        };
-    } catch (error) {
-        console.error('[AICLIENT] ❌ Connection test failed:', error.message);
-        return { 
-            ok: false, 
-            error: error.message,
-            status: error.response?.status,
-            data: error.response?.data 
-        };
-    }
+  const prompt =
+    s(vars.prompt).trim() ||
+    (isGenerator
+      ? buildGeneratorPrompt(vars)
+      : // fallback: treat as generator anyway (safe default for CCG route)
+        buildGeneratorPrompt(vars));
+
+  // Single-shot request
+  const res = await callOpenAICompat({
+    prompt,
+    // Optional hints if your compat layer supports it:
+    // temperature: 0.2,
+  });
+
+  return {
+    output: s(res?.output || res?.text || res?.result || ""),
+    raw: res,
+  };
 }
