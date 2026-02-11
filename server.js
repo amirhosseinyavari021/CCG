@@ -2,6 +2,7 @@
  * server.js (CCG_STABLE_V3.2.0)
  * نسخه پایدار با لاگینگ کامل و مدیریت خطا
  */
+import "dotenv/config";
 import express from "express";
 import ccgRoutes from "./server/routes/ccgRoutes.js";
 import domainGuard from "./server/middleware/domainGuard.js";

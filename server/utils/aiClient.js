@@ -1,37 +1,40 @@
-// server/utils/aiClient.js
+// /home/cando/CCG/server/utils/aiClient.js
 import { callOpenAICompat } from "./openaiCompat.js";
 import { buildGeneratorPrompt } from "./promptBuilder.js";
 
 function s(v) {
   return v === null || v === undefined ? "" : String(v);
 }
-function bool(v) {
-  return v === true || v === "true" || v === 1 || v === "1";
-}
 
-export async function runAI(vars) {
-  const mode = s(vars.mode || "generate").toLowerCase();
+export async function runAI(vars = {}) {
+  // IMPORTANT:
+  // ccgRoutes passes { variables, fallbackPrompt, temperature, ... }
+  // We must merge vars.variables into the working context.
+  const base = (vars && typeof vars === "object" ? vars : {});
+  const v = (base.variables && typeof base.variables === "object") ? base.variables : {};
+  const ctx = { ...v, ...base };
 
-  // For generator mode: always use our strict JSON prompt.
-  // (We keep other modes intact if you later extend.)
+  const mode = s(ctx.mode || "generate").toLowerCase();
   const isGenerator = mode === "generate" || mode === "generator";
 
   const prompt =
-    s(vars.prompt).trim() ||
-    (isGenerator
-      ? buildGeneratorPrompt(vars)
-      : // fallback: treat as generator anyway (safe default for CCG route)
-        buildGeneratorPrompt(vars));
+    s(ctx.prompt).trim() ||
+    (isGenerator ? buildGeneratorPrompt(ctx) : buildGeneratorPrompt(ctx));
 
-  // Single-shot request
-  const res = await callOpenAICompat({
-    prompt,
-    // Optional hints if your compat layer supports it:
-    // temperature: 0.2,
-  });
+  try {
+    const res = await callOpenAICompat({
+      prompt,
+      model: ctx.model || process.env.AI_PRIMARY_MODEL,
+      temperature: typeof ctx.temperature === "number" ? ctx.temperature : 0.25,
+    });
 
-  return {
-    output: s(res?.output || res?.text || res?.result || ""),
-    raw: res,
-  };
+    if (res?.error) return { error: res.error, output: "" };
+
+    return {
+      output: s(res?.output || res?.text || res?.result || ""),
+      raw: res,
+    };
+  } catch (e) {
+    return { error: e?.message ? e.message : String(e), output: "" };
+  }
 }

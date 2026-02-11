@@ -1,82 +1,93 @@
-// server/utils/promptBuilder.js
-// Generator-only strict JSON prompt builder (English prompts for best model adherence)
+// /home/cando/CCG/server/utils/promptBuilder.js
 
 function s(v) {
   return v === null || v === undefined ? "" : String(v);
 }
-
 function bool(v) {
   return v === true || v === "true" || v === 1 || v === "1";
 }
 
-export function buildGeneratorPrompt(vars) {
-  const lang = s(vars.lang || "fa").toLowerCase();
-  const platform = s(vars.os || vars.platform || "linux");
-  const cli = s(vars.cli || "bash");
-  const vendor = s(vars.vendor || "");
-  const deviceType = s(vars.deviceType || "");
-  const userRequest = s(vars.user_request || vars.userRequest || "");
+export function buildGeneratorPrompt(vars = {}) {
+  const lang = s(vars.lang || "fa").toLowerCase() === "en" ? "en" : "fa";
+  const cli = s(vars.cli || "bash").toLowerCase();
+  const platform = s(vars.platform || vars.os || "linux").toLowerCase();
 
-  const moreDetails = bool(vars.moreDetails);
-  const moreCommands = bool(vars.moreCommands);
-  const pythonScript = bool(vars.pythonScript);
+  const userReq = s(vars.user_request || vars.userRequest || vars.prompt || "").trim();
 
-  const altCount = moreCommands ? 5 : 3;
+  const pythonMode = bool(vars.pythonScript) || s(vars.outputType).toLowerCase() === "python";
+  const moreDetails = pythonMode ? false : bool(vars.moreDetails);
+  const moreCommands = pythonMode ? false : bool(vars.moreCommands);
 
-  // Keep the UI language, but keep instructions in English for the model
-  const outputLanguageHint =
-    lang === "fa"
-      ? "Write user-facing text fields (title/explanation/warnings/notes) in Persian (Farsi)."
-      : "Write user-facing text fields (title/explanation/warnings/notes) in English.";
+  const altCount = moreCommands ? 5 : 2;
 
-  const deviceContext =
-    platform === "network"
-      ? `Network context: vendor="${vendor}", deviceType="${deviceType}". Use the correct network CLI syntax for that vendor/OS.`
-      : `OS context: platform="${platform}", cli="${cli}". Use the correct commands for that platform and shell.`;
+  // متن راهنما بر اساس زبان
+  const L = {
+    fa: {
+      sys: "تو یک ابزار تولید دستور برای CLI و DevOps هستی. خروجی باید فقط JSON معتبر باشد.",
+      onlyJson: "فقط JSON بده. هیچ متن اضافی، هیچ Markdown، هیچ توضیح بیرون از JSON.",
+      keys:
+        "کلیدها دقیقاً همین‌ها باشند: mode, language, cli, command, explanation, warning, alternatives, details, pythonScript, pythonNotes",
+      cliMode: `اگر حالت CLI است:
+- mode = "cli"
+- command: فقط یک دستور اصلی (یک خط)
+- explanation: توضیح کوتاه و کاربردی
+- warning: اگر ریسک/نیاز sudo/دسترسی وجود دارد، هشدار کوتاه بده (اگر نیست رشته خالی)
+- alternatives: ${altCount} دستور جایگزین مرتبط با command (هرکدام یک خط)
+- details: اگر moreDetails=true، 4 تا 8 نکته (آرایه)، وگرنه 2 تا 4 نکته`,
+      pyMode:
+        'اگر حالت پایتون است:\n- mode="python"\n- pythonScript: اسکریپت کامل و قابل اجرا\n- pythonNotes: چند خط توضیح درباره اجرا\n- سایر فیلدها می‌توانند خالی باشند',
+      langRule:
+        'language دقیقاً باید "fa" یا "en" باشد و تمام explanation/warning/details/pythonNotes در همان زبان نوشته شود.',
+    },
+    en: {
+      sys: "You are a CLI/DevOps command generator. Output must be ONLY valid JSON.",
+      onlyJson: "Return ONLY JSON. No markdown. No extra text.",
+      keys:
+        "Keys must be exactly: mode, language, cli, command, explanation, warning, alternatives, details, pythonScript, pythonNotes",
+      cliMode: `If CLI mode:
+- mode="cli"
+- command: one main command (single line)
+- explanation: short practical explanation
+- warning: short warning if sudo/risk applies, else empty string
+- alternatives: ${altCount} relevant alternative commands (single line each)
+- details: if moreDetails=true provide 4-8 bullets, else 2-4 bullets`,
+      pyMode:
+        'If python mode:\n- mode="python"\n- pythonScript: complete runnable script\n- pythonNotes: short run instructions\n- other fields may be empty',
+      langRule:
+        'language must be exactly "fa" or "en" and all text fields must match that language.',
+    },
+  }[lang];
 
-  // IMPORTANT: strict JSON only. No markdown. No extra commentary.
-  // Also: avoid chatty phrases.
-  return `
-You are CCG Generator. This is NOT a chat. Return ONLY a single JSON object. No markdown. No code fences. No extra text.
+  const contract = {
+    mode: pythonMode ? "python" : "cli",
+    language: lang,
+    cli: pythonMode ? "python" : cli,
+    command: "",
+    explanation: "",
+    warning: "",
+    alternatives: [],
+    details: [],
+    pythonScript: "",
+    pythonNotes: "",
+  };
 
-${outputLanguageHint}
-Do NOT add chatty phrases like "Ask if you have more questions".
-
-${deviceContext}
-
-User request:
-"${userRequest}"
-
-Rules:
-- Output MUST be valid JSON (double quotes, no trailing commas).
-- If pythonScript=true: generate a Python script instead of CLI commands.
-- Otherwise: generate CLI output:
-  - primary_command: exactly ONE main command (string). It must be the best recommended command.
-  - alternatives: an array of exactly ${altCount} alternative commands (strings). Do NOT repeat primary_command.
-- Always include:
-  - title (string)
-  - explanation (array of strings)  ${moreDetails ? "Detailed and helpful." : "Short and practical."}
-  - warnings (array of strings)     ${moreDetails ? "Include important safety/impact warnings." : "Only the key warning(s)."}
-  - notes (array of strings)        ${moreDetails ? "Include tips, prerequisites, and context." : "Optional short notes."}
-- For network platform: commands must match the vendor/deviceType. Prefer safe 'show' commands if request is read-only.
-- Never include more than one primary command.
-- Do not include markdown headings or bullet characters. Use arrays of strings instead.
-
-JSON schema (MUST follow exactly):
-{
-  "mode": "generator",
-  "platform": "${platform}",
-  "cli": "${cli}",
-  "pythonScript": ${pythonScript ? "true" : "false"},
-  "title": "string",
-  "primary_command": "string (empty if pythonScript=true)",
-  "alternatives": ["string", ...],
-  "python_script": "string (empty if pythonScript=false)",
-  "explanation": ["string", ...],
-  "warnings": ["string", ...],
-  "notes": ["string", ...]
-}
-
-Now produce the JSON object.
-`.trim();
+  return [
+    L.sys,
+    L.onlyJson,
+    L.keys,
+    L.langRule,
+    "",
+    pythonMode ? L.pyMode : L.cliMode,
+    "",
+    `platform: ${platform}`,
+    `cli: ${cli}`,
+    `moreDetails: ${moreDetails ? "true" : "false"}`,
+    `moreCommands: ${moreCommands ? "true" : "false"}`,
+    "",
+    "User request:",
+    userReq ? userReq : "(empty)",
+    "",
+    "Return JSON with this shape:",
+    JSON.stringify(contract, null, 2),
+  ].join("\n");
 }

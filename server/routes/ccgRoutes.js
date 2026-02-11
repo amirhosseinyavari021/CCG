@@ -1,4 +1,4 @@
-// server/routes/ccgRoutes.js
+// /home/cando/CCG/server/routes/ccgRoutes.js
 import express from "express";
 import { runAI } from "../utils/aiClient.js";
 import { formatOutput } from "../utils/outputFormatter.js";
@@ -6,9 +6,6 @@ import { toPromptVariables, buildFallbackPrompt } from "../utils/promptTransform
 
 const router = express.Router();
 
-/**
- * Lightweight health
- */
 router.get("/health", (req, res) => {
   res.json({ ok: true, service: "ccg", ts: Date.now() });
 });
@@ -58,11 +55,19 @@ router.post("/", async (req, res) => {
     const userRequest = pickUserRequest(body);
 
     if (!userRequest) {
-      return res.status(400).json({ ok: false, error: "user_request is required", requestId: rid });
+      return res.status(200).json({
+        ok: false,
+        error: "user_request is required",
+        output: "",
+        markdown: "",
+        tool: null,
+        commands: [],
+        moreCommands: [],
+        pythonScript: "",
+        requestId: rid,
+        ms: Date.now() - t0,
+      });
     }
-
-    // ✅ generator-only (chat uses chatRoutes)
-    const modeStyle = "generator";
 
     const platform = String(body.platform || body.os || "linux").toLowerCase();
     const cli = String(body.cli || body.shell || "bash").toLowerCase();
@@ -71,32 +76,30 @@ router.post("/", async (req, res) => {
     const moreCommands = Boolean(body.moreCommands);
     const pythonScript = Boolean(body.pythonScript);
 
+    const lang = String(body.lang || "fa").toLowerCase() === "en" ? "en" : "fa";
+
     const advancedEnabled = Boolean(body.advancedEnabled);
     const advanced = advancedEnabled ? compactAdvanced(body.advanced) : null;
 
-    // ✅ variables for stored prompt + fallback prompt
     const variables = toPromptVariables({
       mode: "generate",
-      modeStyle,
-      lang: body.lang || "fa",
+      modeStyle: "generator",
+      lang,
       platform,
       os: platform,
       cli: pythonScript ? "python" : cli,
       user_request: userRequest,
 
-      // keep (internal contract)
       outputType: pythonScript ? "python" : "tool",
       knowledgeLevel: "intermediate",
 
-      // new generator knobs
       moreDetails,
       moreCommands,
 
-      // advanced only if explicitly enabled
       advanced: advanced || undefined,
+      pythonScript,
     });
 
-    // ✅ Always provide strict fallback prompt (JSON tool contract)
     const fallbackPrompt = buildFallbackPrompt(variables);
 
     const ai = await runAI({
@@ -106,45 +109,57 @@ router.post("/", async (req, res) => {
     });
 
     if (ai?.error) {
-      // IMPORTANT: avoid 502 by returning JSON even if upstream fails
       return res.status(200).json({
         ok: false,
         error: ai.error,
         output: "",
         markdown: "",
         tool: null,
+        commands: [],
+        moreCommands: [],
+        pythonScript: "",
         requestId: rid,
+        ms: Date.now() - t0,
+        lang,
+        flags: { moreDetails, moreCommands, pythonScript },
       });
     }
 
     const raw = String(ai?.output || "").trim();
 
-    // ✅ Convert raw/JSON into stable tool+markdown for UI cards
-    const formatted = formatOutput({
-      text: raw,
-      rawText: raw,
-      cli: variables.cli || cli,
-      outputType: variables.outputType || "tool",
+    // ✅ خروجی استاندارد برای UI
+    const formatted = formatOutput(raw, {
+      cli,
+      lang,
+      wantMoreCommands: moreCommands ? 5 : 2,
     });
 
     return res.status(200).json({
       ok: true,
       output: formatted.markdown || "",
       markdown: formatted.markdown || "",
-      tool: formatted.tool || null,
+      tool: null,
+
+      commands: formatted.commands || [],
+      moreCommands: formatted.moreCommands || [],
+      pythonScript: formatted.pythonScript || "",
+
       requestId: rid,
       ms: Date.now() - t0,
+      lang,
+      flags: { moreDetails, moreCommands, pythonScript },
     });
   } catch (e) {
     const msg = e?.message ? e.message : String(e);
-
-    // ✅ never let nginx show 502 HTML; return JSON
     return res.status(200).json({
       ok: false,
       error: msg,
       output: "",
       markdown: "",
       tool: null,
+      commands: [],
+      moreCommands: [],
+      pythonScript: "",
       requestId: rid,
       ms: Date.now() - t0,
     });
