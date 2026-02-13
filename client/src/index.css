@@ -1,192 +1,178 @@
+/* =========================
+   CCG PRO UI ADDONS
+   - glass
+   - split pane
+   - dark mobile fix
+========================= */
+
+.ccg-noselect {
+  user-select: none;
+}
+
+/* Glass effect */
+.ccg-glass {
+  @apply bg-white/70 dark:bg-black/35 border border-gray-200/60 dark:border-white/10 shadow-sm backdrop-blur-xl;
+}
+
+.ccg-glass-soft {
+  @apply bg-white/50 dark:bg-black/25 border border-gray-200/50 dark:border-white/10 backdrop-blur-lg;
+}
+
+.ccg-card-danger {
+  @apply border-red-400/40 dark:border-red-400/25;
+}
+
+.ccg-card-info {
+  @apply border-sky-400/30 dark:border-sky-400/20;
+}
+
+/* Segmented control */
+.ccg-seg {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(0,0,0,0.04);
+  backdrop-filter: blur(14px);
+}
+
+.dark .ccg-seg {
+  background: rgba(255,255,255,0.05);
+}
+
+.ccg-seg-item {
+  position: relative;
+  z-index: 2;
+  border-radius: 12px;
+  padding: 10px 10px;
+  text-align: left;
+  transition: transform 150ms ease, opacity 150ms ease;
+}
+
+.ccg-seg-item:hover {
+  opacity: 0.95;
+}
+
+.ccg-seg-item:active {
+  transform: scale(0.98);
+}
+
+.ccg-seg-item.is-active {
+  color: white;
+}
+
+.ccg-seg-indicator {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  height: calc(100% - 8px);
+  border-radius: 12px;
+  background: linear-gradient(90deg, rgba(34,197,94,0.95), rgba(16,185,129,0.95));
+  box-shadow: 0 10px 24px rgba(16,185,129,0.18);
+  transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  z-index: 1;
+}
+
+/* Knobs active state (green) */
+.ccg-knob-active {
+  @apply border border-emerald-400/40 dark:border-emerald-300/20;
+  background: linear-gradient(135deg, rgba(16,185,129,0.18), rgba(34,197,94,0.10));
+}
+.dark .ccg-knob-active {
+  background: linear-gradient(135deg, rgba(16,185,129,0.22), rgba(34,197,94,0.10));
+}
+
+/* Split pane */
+.ccg-split {
+  display: grid;
+  gap: 12px;
+  align-items: stretch;
+}
+
+@media (min-width: 1024px) {
+  .ccg-split {
+    grid-template-columns: var(--split) 10px calc(100% - var(--split) - 10px);
+  }
+  .ccg-split.is-rtl {
+    grid-template-columns: calc(100% - var(--split) - 10px) 10px var(--split);
+  }
+}
+
+@media (max-width: 1023px) {
+  .ccg-split {
+    grid-template-columns: 1fr;
+  }
+  .ccg-resizer {
+    display: none;
+  }
+}
+
+.ccg-resizer {
+  position: relative;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.06);
+  border: 1px solid rgba(0,0,0,0.08);
+  cursor: col-resize;
+  transition: background 150ms ease, transform 150ms ease;
+}
+
+.dark .ccg-resizer {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.ccg-resizer:hover {
+  background: rgba(34,197,94,0.15);
+}
+
+.ccg-resizer:active {
+  transform: scaleX(1.15);
+}
+
+.ccg-resizer-handle {
+  position: absolute;
+  inset: 20% 2px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.0);
+}
+
+.ccg-danger-box {
+  @apply mt-3 p-3 rounded-xl border;
+  border-color: rgba(248,113,113,0.35);
+  background: rgba(248,113,113,0.10);
+  color: rgba(127,29,29,0.95);
+}
+
+.dark .ccg-danger-box {
+  background: rgba(248,113,113,0.10);
+  color: rgba(254,202,202,0.92);
+}
+
+/* Dark mode mobile fix (stronger) */
+@media (max-width: 640px) {
+  .dark body {
+    background: #05070d !important;
+  }
+
+  .dark .ccg-card {
+    @apply bg-black/45 border-white/10;
+  }
+
+  .dark textarea,
+  .dark select,
+  .dark input {
+    @apply bg-black/45 border-white/10 text-slate-100;
+  }
+}
+
+/* Better focus */
+.ccg-resizer:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.25);
+}
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Custom CSS Classes */
-.ccg-container {
-  @apply mx-auto w-full px-4 sm:px-6 lg:px-8 max-w-7xl;
-}
-
-.ccg-card {
-  @apply bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm transition-all duration-300 hover:shadow-md;
-}
-
-/* Animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.3s ease-out;
-}
-
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  @apply bg-gray-100 dark:bg-gray-900;
-}
-
-::-webkit-scrollbar-thumb {
-  @apply bg-gray-400 dark:bg-gray-700 rounded-full;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-500 dark:bg-gray-600;
-}
-
-/* Selection */
-::selection {
-  @apply bg-blue-500/30 text-blue-900 dark:text-blue-100;
-}
-
-/* Focus Styles */
-*:focus {
-  @apply outline-none ring-2 ring-blue-500 ring-opacity-50;
-}
-
-/* ========== MOBILE OPTIMIZATIONS ========== */
-@media (max-width: 640px) {
-  /* Reduce padding on mobile */
-  .ccg-container {
-    @apply px-3;
-  }
-  
-  /* Smaller cards on mobile */
-  .ccg-card {
-    @apply rounded-lg;
-  }
-  
-  /* Touch-friendly buttons */
-  button, 
-  .ccg-btn,
-  [role="button"] {
-    @apply min-h-[44px] min-w-[44px];
-  }
-  
-  /* Larger touch targets for form elements */
-  input:not([type="checkbox"]):not([type="radio"]),
-  select,
-  textarea {
-    @apply text-base; /* Prevents zoom on iOS */
-  }
-  
-  /* Adjust text sizes for mobile */
-  h1 {
-    @apply text-2xl;
-  }
-  
-  h2 {
-    @apply text-xl;
-  }
-  
-  h3 {
-    @apply text-lg;
-  }
-  
-  /* Stack grids on mobile */
-  .grid {
-    @apply grid-cols-1;
-  }
-  
-  /* Reduce gaps */
-  .gap-6 {
-    @apply gap-4;
-  }
-  
-  .gap-4 {
-    @apply gap-3;
-  }
-  
-  /* Adjust padding */
-  .p-6 {
-    @apply p-4;
-  }
-  
-  .p-5 {
-    @apply p-3;
-  }
-  
-  /* Smaller textareas on mobile */
-  textarea {
-    @apply h-40;
-  }
-  
-  /* Hide some elements on mobile */
-  .mobile-hidden {
-    @apply hidden;
-  }
-  
-  /* Show mobile-only elements */
-  .mobile-only {
-    @apply block;
-  }
-}
-
-/* ========== TABLET OPTIMIZATIONS ========== */
-@media (min-width: 641px) and (max-width: 1024px) {
-  .ccg-container {
-    @apply px-5;
-  }
-  
-  .grid-cols-2 {
-    @apply grid-cols-1;
-  }
-  
-  .lg\:grid-cols-2 {
-    @apply grid-cols-1;
-  }
-}
-
-/* ========== TOUCH DEVICE SPECIFIC ========== */
-@media (hover: none) and (pointer: coarse) {
-  /* Increase touch targets */
-  button, a, input, select, textarea {
-    @apply min-h-[48px];
-  }
-  
-  /* Remove hover effects on touch devices */
-  .hover\:bg-gray-100:hover,
-  .hover\:bg-gray-200:hover,
-  .hover\:bg-blue-100:hover {
-    @apply bg-transparent;
-  }
-  
-  /* Active states for touch */
-  button:active,
-  a:active {
-    @apply opacity-70;
-  }
-}
-
-/* ========== DARK MODE MOBILE ========== */
-@media (max-width: 640px) and (prefers-color-scheme: dark) {
-  .ccg-card {
-    @apply bg-gray-900;
-  }
-  
-  body {
-    @apply bg-gray-950;
-  }
-}
-
-/* ========== PRINT STYLES ========== */
-@media print {
-  .no-print {
-    @apply hidden;
-  }
-  
-  .ccg-card {
-    @apply border shadow-none;
-  }
-}

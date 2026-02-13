@@ -32,7 +32,7 @@ export default function MainLayout({ children }) {
     <div className="min-h-screen flex flex-col" dir={lang === "fa" ? "rtl" : "ltr"}>
       <Header />
       
-      <main className="flex-grow mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8 py-6 md:py-8">
+      <main className="flex-grow ccg-container py-6 md:py-8">
         <div className="animate-fadeIn">
           {children}
         </div>

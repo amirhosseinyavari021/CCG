@@ -1,10 +1,12 @@
-import { useState, useMemo } from "react";
+// /home/cando/CCG/client/src/pages/generator/GeneratorPage.jsx
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLanguage } from "../../context/LanguageContext";
 import { usePersistState, usePersistComplexState } from "../../hooks/usePersistState";
 import { callCCG } from "../../services/aiService";
 import CodeBlock from "../../components/ui/CodeBlock";
 import AdvancedSettings from "../../components/generator/AdvancedSettings";
 import FeedbackButton from "../../components/ui/FeedbackButton";
+import ToolResult from "../../components/ui/ToolResult";
 
 const PLATFORMS = [
   { value: "linux", label: "Linux", icon: "🐧", shortLabel: { fa: "لینوکس", en: "Linux" } },
@@ -25,6 +27,18 @@ const SUPPORTED_OTHER_OS = [
   { value: "android", label: "Android", icon: "🤖" },
   { value: "ios", label: "iOS", icon: "📱" },
   { value: "chromeos", label: "ChromeOS", icon: "🌐" },
+];
+
+const NETWORK_VENDORS = [
+  { value: "cisco", label: "Cisco" },
+  { value: "mikrotik", label: "MikroTik" },
+  { value: "juniper", label: "Juniper" },
+  { value: "huawei", label: "Huawei" },
+  { value: "fortinet", label: "Fortinet" },
+  { value: "paloalto", label: "Palo Alto" },
+  { value: "arista", label: "Arista" },
+  { value: "ubiquiti", label: "Ubiquiti" },
+  { value: "generic", label: "Generic" },
 ];
 
 const NETWORK_DEVICE_TYPES = [
@@ -50,87 +64,105 @@ function cliOptionsForPlatform(platform) {
   return ["bash", "zsh", "sh", "fish"];
 }
 
-function ToolCards({ tool, lang }) {
-  if (!tool) return null;
+function scriptCliForPlatform(platform) {
+  if (platform === "windows") return "powershell";
+  if (platform === "mac") return "zsh";
+  if (platform === "network") return "network";
+  return "bash";
+}
 
-  const title = tool.title || (lang === "fa" ? "خروجی" : "Output");
-  const primary = tool.primary?.command || "";
-  const primaryLabel = tool.primary?.label || (lang === "fa" ? "دستور اصلی" : "Primary");
-  const alternatives = Array.isArray(tool.alternatives) ? tool.alternatives : [];
-  const explanation = Array.isArray(tool.explanation) ? tool.explanation : [];
-  const warnings = Array.isArray(tool.warnings) ? tool.warnings : [];
-  const codeLang = tool.lang || "bash";
+/** --------- markdown helpers (build ToolResult even when backend tool=null) --------- */
+function extractSection(md, titles) {
+  const text = String(md || "");
+  if (!text.trim()) return "";
 
-  const copy = async (txt) => {
-    try {
-      await navigator.clipboard.writeText(txt || "");
-    } catch {}
+  const lines = text.split("\n");
+  const headingIdx = lines.findIndex((l) => {
+    const t = l.trim().toLowerCase();
+    return titles.some((x) => t === `### ${String(x).trim().toLowerCase()}`);
+  });
+  if (headingIdx === -1) return "";
+
+  const out = [];
+  for (let i = headingIdx + 1; i < lines.length; i++) {
+    const l = lines[i];
+    if (l.trim().startsWith("### ")) break;
+    out.push(l);
+  }
+  return out.join("\n").trim();
+}
+
+function stripCodeBlocks(md) {
+  const text = String(md || "");
+  return text.replace(/```[\s\S]*?```/g, "").trim();
+}
+
+function toBullets(text) {
+  const t = String(text || "").trim();
+  if (!t) return [];
+  return t
+    .split("\n")
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .map((x) => x.replace(/^[-*]\s+/, "").trim())
+    .map((x) => x.replace(/^>\s?/, "").trim())
+    .filter(Boolean);
+}
+
+function buildToolFromResponse(res, lang, cliGuess) {
+  const md = String(res?.markdown || res?.output || res?.result || "").trim();
+
+  const py = String(res?.pythonScript || "").trim();
+  const isPython = Boolean(py);
+
+  if (isPython) {
+    const notesRaw = extractSection(md, ["Notes", "توضیحات"]) || stripCodeBlocks(md);
+    return {
+      title: lang === "fa" ? "نتیجه" : "Result",
+      cli: "python",
+      pythonScript: true,
+      python_script: py,
+      notes: toBullets(notesRaw),
+      warnings: [],
+      explanation: [],
+      alternatives: [],
+      primary_command: "",
+    };
+  }
+
+  const primary =
+    Array.isArray(res?.commands) && res.commands.length ? String(res.commands[0] || "").trim() : "";
+
+  const alts = Array.isArray(res?.moreCommands)
+    ? res.moreCommands.map((x) => String(x || "").trim()).filter(Boolean)
+    : [];
+
+  const expRaw = extractSection(md, ["Explanation", "توضیح"]) || "";
+  const warnRaw = extractSection(md, ["Warning", "Warnings", "هشدار", "هشدارها"]) || "";
+  const notesRaw = extractSection(md, ["More Details", "توضیحات بیشتر", "📌 More Details", "📌 توضیحات بیشتر"]) || "";
+
+  const explanation = toBullets(expRaw);
+  const warnings = toBullets(warnRaw);
+  const notes = toBullets(notesRaw);
+
+  if (!explanation.length && expRaw.trim()) explanation.push(expRaw.trim());
+  if (!warnings.length && warnRaw.trim()) warnings.push(warnRaw.trim());
+
+  return {
+    title: lang === "fa" ? "نتیجه" : "Result",
+    cli: String(cliGuess || "bash").toLowerCase(),
+    pythonScript: false,
+    primary_command: primary,
+    alternatives: alts,
+    explanation,
+    warnings,
+    notes,
   };
+}
 
-  return (
-    <div className="space-y-3">
-      <div className="ccg-card p-4">
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <div className="font-bold text-sm">{title}</div>
-          <button
-            onClick={() => copy(primary)}
-            className="px-3 py-1 rounded-md text-sm bg-white/10 hover:bg-white/15 transition"
-            type="button"
-            title="Copy primary"
-          >
-            {lang === "fa" ? "کپی دستور ✅" : "Copy ✅"}
-          </button>
-        </div>
-        <div className="text-xs opacity-70 mb-2">{primaryLabel}</div>
-        <CodeBlock code={primary} language={codeLang} showCopy={false} maxHeight="180px" />
-      </div>
-
-      {alternatives.length > 0 && (
-        <div className="ccg-card p-4">
-          <div className="font-bold text-sm mb-3">{lang === "fa" ? "جایگزین‌ها" : "Alternatives"}</div>
-          <div className="space-y-2">
-            {alternatives.map((a, idx) => {
-              const cmd = a?.command || "";
-              return (
-                <div key={idx} className="rounded-xl border border-white/10 bg-black/20 overflow-hidden">
-                  <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-black/30">
-                    <div className="text-xs opacity-80">{(a?.label || "ALT").toString()}</div>
-                    <button
-                      onClick={() => copy(cmd)}
-                      className="px-3 py-1 rounded-md text-sm bg-white/10 hover:bg-white/15 transition"
-                      type="button"
-                      title="Copy"
-                    >
-                      {lang === "fa" ? "کپی" : "Copy"}
-                    </button>
-                  </div>
-                  <pre className="p-3 overflow-auto text-sm leading-6"><code>{cmd}</code></pre>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {explanation.length > 0 && (
-        <div className="ccg-card p-4">
-          <div className="font-bold text-sm mb-2">{lang === "fa" ? "توضیحات" : "Explanation"}</div>
-          <ul className="text-sm leading-7 list-disc pr-5 space-y-1">
-            {explanation.map((x, i) => <li key={i}>{String(x)}</li>)}
-          </ul>
-        </div>
-      )}
-
-      {warnings.length > 0 && (
-        <div className="ccg-card p-4 border border-red-500/30 bg-red-900/10">
-          <div className="font-bold text-sm mb-2 text-red-300">{lang === "fa" ? "هشدارها" : "Warnings"}</div>
-          <ul className="text-sm leading-7 list-disc pr-5 space-y-1 text-red-100/90">
-            {warnings.map((x, i) => <li key={i}>{String(x)}</li>)}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
+/** ------------- Split Pane helpers ------------- */
+function clamp(n, a, b) {
+  return Math.max(a, Math.min(b, n));
 }
 
 export default function GeneratorPage() {
@@ -138,19 +170,25 @@ export default function GeneratorPage() {
 
   const [platform, setPlatform] = usePersistState("platform", "linux");
   const [otherOS, setOtherOS] = usePersistState("other_os", "freebsd");
+
+  // Network defaults (moved to general settings)
+  const [netVendor, setNetVendor] = usePersistState("network_vendor", "cisco");
   const [deviceType, setDeviceType] = usePersistState("network_device_type", "router");
 
-  // General: shell always visible
+  // Output Mode
+  // command | script | python
+  const [outputMode, setOutputMode] = usePersistState("generator_output_mode", "command");
+
+  // Shell/CLI only meaningful in Command mode
   const [cli, setCli] = usePersistState("generator_cli", defaultCliForPlatform(platform));
 
-  // Output toggles (generator knobs)
+  // knobs (ONLY meaningful in Command mode per your requirement)
   const [moreDetails, setMoreDetails] = usePersistState("generator_more_details", false);
   const [moreCommands, setMoreCommands] = usePersistState("generator_more_commands", false);
-  const [pythonScript, setPythonScript] = usePersistState("generator_python_script", false);
 
   const [input, setInput] = usePersistState("input", "");
-  const [output, setOutput] = useState("");
-  const [tool, setTool] = useState(null);
+  const [output, setOutput] = useState(""); // markdown fallback
+  const [tool, setTool] = useState(null); // normalized for ToolResult
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -160,17 +198,31 @@ export default function GeneratorPage() {
   const [advancedSettings, setAdvancedSettings] = usePersistComplexState("advanced_settings", {});
 
   const finalPlatform = platform === "other" ? `other:${otherOS}` : platform;
-
   const cliOptions = useMemo(() => cliOptionsForPlatform(platform), [platform]);
 
-  // keep cli valid when platform changes
-  useMemo(() => {
-    const allowed = new Set(cliOptions);
-    if (!allowed.has(String(cli).toLowerCase())) {
-      setCli(defaultCliForPlatform(platform));
-    }
+  // Split pane (persisted)
+  const [splitPct, setSplitPct] = usePersistState("generator_split_pct", 50);
+
+  const splitWrapRef = useRef(null);
+  const draggingRef = useRef(false);
+
+  // keep CLI valid on platform changes
+  useEffect(() => {
+    const allowed = new Set(cliOptions.map((x) => String(x).toLowerCase()));
+    const cur = String(cli || "").toLowerCase();
+    if (!allowed.has(cur)) setCli(defaultCliForPlatform(platform));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platform]);
+
+  // if outputMode changes, ensure knobs make sense (NO auto-generate)
+  useEffect(() => {
+    if (outputMode !== "command") {
+      // per requirement: these knobs are command-only
+      if (moreCommands) setMoreCommands(false);
+      if (moreDetails) setMoreDetails(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outputMode]);
 
   const getPlatformColor = (plat) => {
     const colors = {
@@ -181,13 +233,6 @@ export default function GeneratorPage() {
       other: "from-purple-500 to-pink-500",
     };
     return colors[plat] || "from-blue-500 to-purple-600";
-  };
-
-  const clearAll = () => {
-    setInput("");
-    setOutput("");
-    setTool(null);
-    setError("");
   };
 
   const compactAdvanced = (obj) => {
@@ -201,51 +246,160 @@ export default function GeneratorPage() {
     return Object.keys(out).length ? out : null;
   };
 
-  const generate = async () => {
-    if (!input.trim()) {
+  const clearAll = () => {
+    setInput("");
+    setOutput("");
+    setTool(null);
+    setError("");
+  };
+
+  function computeCliForPayload({ platform, outputMode, cli }) {
+    if (outputMode === "python") return "python";
+    if (outputMode === "script") return scriptCliForPlatform(platform);
+    return String(cli || defaultCliForPlatform(platform)).toLowerCase();
+  }
+
+  async function generate() {
+    if (!String(input || "").trim()) {
       setError(lang === "fa" ? "⚠️ لطفا درخواست خود را وارد کنید" : "⚠️ Please enter your request");
       return;
     }
 
     setLoading(true);
     setError("");
-    setOutput("");
-    setTool(null);
+
+    const baseCli = computeCliForPayload({ platform, outputMode, cli });
+
+    const payload = {
+      mode: "generate",
+      modeStyle: "generator",
+      lang,
+      platform: finalPlatform,
+      cli: baseCli,
+
+      // knobs only for command mode
+      moreDetails: outputMode === "command" ? Boolean(moreDetails) : false,
+      moreCommands: outputMode === "command" ? Boolean(moreCommands) : false,
+
+      // python flag for backend
+      pythonScript: outputMode === "python",
+
+      // network defaults (vendor + device type)
+      vendor: platform === "network" ? netVendor : undefined,
+      deviceType: platform === "network" ? deviceType : undefined,
+
+      // advanced
+      advancedEnabled: Boolean(advancedEnabled),
+      advanced: advancedEnabled ? compactAdvanced(advancedSettings) : undefined,
+
+      user_request: String(input || "").trim(),
+      timestamp: new Date().toISOString(),
+    };
 
     try {
-      const payload = {
-        mode: "generate",
-        modeStyle: "generator",
-        lang,
-        platform: finalPlatform,
-        cli: pythonScript ? "python" : String(cli || defaultCliForPlatform(platform)).toLowerCase(),
-
-        // generator knobs
-        moreDetails: Boolean(moreDetails),
-        moreCommands: Boolean(moreCommands),
-        pythonScript: Boolean(pythonScript),
-
-        // network general
-        deviceType: platform === "network" ? deviceType : undefined,
-
-        // Advanced only if enabled
-        advancedEnabled: Boolean(advancedEnabled),
-        advanced: advancedEnabled ? compactAdvanced(advancedSettings) : undefined,
-
-        user_request: input.trim(),
-        timestamp: new Date().toISOString(),
-      };
-
       const result = await callCCG(payload);
 
-      setTool(result?.tool || null);
-      setOutput(result?.markdown || result?.output || result?.result || "");
+      const markdown = String(result?.markdown || result?.output || result?.result || "").trim();
+      setOutput(markdown);
+
+      const built = buildToolFromResponse(result, lang, payload.cli);
+      setTool(built);
     } catch (err) {
       setError(err?.message || (lang === "fa" ? "❌ خطا در ارتباط با سرور" : "❌ Server connection error"));
     } finally {
       setLoading(false);
     }
+  }
+
+  /** --------- UI: segmented control (Output Mode) --------- */
+  const outputModes = useMemo(() => {
+    return [
+      {
+        value: "command",
+        label: lang === "fa" ? "کامند" : "Command",
+        sub: lang === "fa" ? "دستور کوتاه و مستقیم" : "Direct command output",
+        icon: "⌨️",
+      },
+      {
+        value: "script",
+        label: lang === "fa" ? "اسکریپت سیستم‌عامل" : "OS Script",
+        sub: lang === "fa" ? "بر اساس پلتفرم انتخابی" : "Matches selected platform",
+        icon: "📄",
+      },
+      {
+        value: "python",
+        label: lang === "fa" ? "پایتون" : "Python",
+        sub: lang === "fa" ? "اتوماسیون با Python" : "Automation with Python",
+        icon: "🐍",
+      },
+    ];
+  }, [lang]);
+
+  const onSetOutputMode = (mode) => {
+    // IMPORTANT: no auto-generate here
+    const next = String(mode || "command");
+    setOutputMode(next);
   };
+
+  const knobActiveClass = "ccg-knob-active";
+
+  const onToggleMoreCommands = () => {
+    if (outputMode !== "command") return;
+    setMoreCommands((v) => !v);
+  };
+
+  const onToggleMoreDetails = () => {
+    if (outputMode !== "command") return;
+    setMoreDetails((v) => !v);
+  };
+
+  /** --------- split pane drag --------- */
+  const startDrag = (clientX) => {
+    const wrap = splitWrapRef.current;
+    if (!wrap) return;
+    const rect = wrap.getBoundingClientRect();
+    const x = clamp(clientX - rect.left, 0, rect.width);
+    const pct = clamp((x / rect.width) * 100, 24, 76);
+    setSplitPct(Math.round(pct));
+  };
+
+  const onMouseDownResizer = (e) => {
+    e.preventDefault();
+    draggingRef.current = true;
+    document.body.classList.add("ccg-noselect");
+  };
+
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!draggingRef.current) return;
+      startDrag(e.clientX);
+    };
+    const onUp = () => {
+      if (!draggingRef.current) return;
+      draggingRef.current = false;
+      document.body.classList.remove("ccg-noselect");
+    };
+
+    const onTouchMove = (e) => {
+      if (!draggingRef.current) return;
+      const t = e.touches?.[0];
+      if (!t) return;
+      startDrag(t.clientX);
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("touchend", onUp);
+
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [splitPct]);
 
   const renderPlatformButtons = () => (
     <div className="grid grid-cols-5 gap-2 mb-3">
@@ -255,39 +409,43 @@ export default function GeneratorPage() {
           onClick={() => setPlatform(p.value)}
           className={`
             flex flex-col items-center p-2 rounded-lg transition-all
-            ${platform === p.value
-              ? `bg-gradient-to-b ${getPlatformColor(p.value)} text-white shadow`
-              : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"}
+            ${
+              platform === p.value
+                ? `bg-gradient-to-b ${getPlatformColor(p.value)} text-white shadow`
+                : "bg-gray-100 dark:bg-gray-900/50 hover:bg-gray-200 dark:hover:bg-gray-800 border border-gray-200/70 dark:border-white/10"
+            }
           `}
           title={p.label}
+          type="button"
         >
           <span className="text-lg">{p.icon}</span>
           <span className="text-xs mt-1">
-            {typeof p.shortLabel === "object" ? (p.shortLabel[lang] || p.shortLabel.en) : p.shortLabel}
+            {typeof p.shortLabel === "object" ? p.shortLabel[lang] || p.shortLabel.en : p.shortLabel}
           </span>
         </button>
       ))}
     </div>
   );
 
+  const dirClass = lang === "fa" ? "rtl" : "ltr";
+
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className={`space-y-4 md:space-y-6 ${dirClass}`}>
       <div className="ccg-container">
         <FeedbackButton />
       </div>
 
-      {/* Platform */}
+      {/* Platform & Output Mode */}
       <div className="ccg-container">
-        <div className="ccg-card p-4">
+        <div className="ccg-card ccg-glass p-4">
           <h2 className="font-bold text-base mb-3">
             {lang === "fa" ? "🎯 پلتفرم هدف" : "🎯 Target Platform"}
           </h2>
 
           {renderPlatformButtons()}
 
-          {/* Other OS selector */}
           {platform === "other" && (
-            <div className="mt-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-gray-800 dark:to-gray-900 rounded-lg">
+            <div className="mt-3 p-3 rounded-lg ccg-glass-soft">
               <div className="text-sm font-medium mb-2">
                 {lang === "fa" ? "🔧 انتخاب سیستم عامل" : "🔧 Select OS"}
               </div>
@@ -298,11 +456,14 @@ export default function GeneratorPage() {
                     onClick={() => setOtherOS(os.value)}
                     className={`
                       flex flex-col items-center p-2 rounded transition text-center
-                      ${otherOS === os.value
-                        ? "bg-gradient-to-b from-purple-500 to-pink-500 text-white shadow"
-                        : "bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700"}
+                      ${
+                        otherOS === os.value
+                          ? "bg-gradient-to-b from-purple-500 to-pink-500 text-white shadow"
+                          : "ccg-glass-soft border border-gray-200/60 dark:border-white/10 hover:opacity-90"
+                      }
                     `}
                     title={os.label}
+                    type="button"
                   >
                     <span className="text-lg mb-1">{os.icon}</span>
                     <span className="text-xs">{os.label}</span>
@@ -312,76 +473,163 @@ export default function GeneratorPage() {
             </div>
           )}
 
+          {/* Output Mode selector */}
+          <div className="mt-4">
+            <div className="text-xs font-medium mb-2">{lang === "fa" ? "🧭 نوع خروجی" : "🧭 Output Mode"}</div>
+
+            <div className="ccg-seg">
+              {outputModes.map((m) => {
+                const active = outputMode === m.value;
+                return (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => onSetOutputMode(m.value)}
+                    className={`ccg-seg-item ${active ? "is-active" : ""}`}
+                    aria-pressed={active}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>{m.icon}</span>
+                      <span className="font-semibold text-sm">{m.label}</span>
+                    </div>
+                    <div className="text-[11px] opacity-80 mt-0.5">{m.sub}</div>
+                  </button>
+                );
+              })}
+              <div
+                className="ccg-seg-indicator"
+                style={{
+                  width: "calc((100% - 8px) / 3)",
+                  transform:
+                    outputMode === "command"
+                      ? "translateX(0%)"
+                      : outputMode === "script"
+                      ? "translateX(100%)"
+                      : "translateX(200%)",
+                  pointerEvents: "none", // ✅ fix click flipping
+                }}
+              />
+            </div>
+          </div>
+
           {/* General settings row */}
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* Shell/CLI always visible */}
-            <div className="ccg-card p-3">
+            <div className="ccg-card ccg-glass-soft p-3">
               <div className="text-xs font-medium mb-2">{lang === "fa" ? "Shell / CLI" : "Shell / CLI"}</div>
               <select
                 value={cli}
                 onChange={(e) => setCli(e.target.value)}
-                className="w-full p-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full p-2 text-sm border border-gray-300/70 dark:border-white/10 rounded-lg bg-white/70 dark:bg-black/30 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                disabled={outputMode !== "command"}
               >
                 {cliOptions.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
                 ))}
               </select>
-              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                {lang === "fa" ? "این انتخاب روی نوع دستور اثر می‌گذارد." : "This affects command style."}
+
+              <div className="mt-2 text-xs text-gray-600 dark:text-gray-300">
+                {outputMode === "command"
+                  ? lang === "fa"
+                    ? "این انتخاب روی نوع دستور اثر می‌گذارد."
+                    : "This affects command style."
+                  : outputMode === "script"
+                  ? lang === "fa"
+                    ? "در حالت OS Script، سیستم خودش زبان مناسب را انتخاب می‌کند."
+                    : "In OS Script mode, we pick the best script language."
+                  : lang === "fa"
+                  ? "در حالت پایتون، CLI بی‌اثر است."
+                  : "CLI is disabled in Python mode."}
               </div>
             </div>
 
-            {/* Network device type in General */}
             {platform === "network" && (
-              <div className="ccg-card p-3">
-                <div className="text-xs font-medium mb-2">{lang === "fa" ? "نوع دستگاه شبکه" : "Network Device Type"}</div>
-                <select
-                  value={deviceType}
-                  onChange={(e) => setDeviceType(e.target.value)}
-                  className="w-full p-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  {NETWORK_DEVICE_TYPES.map((d) => (
-                    <option key={d.value} value={d.value}>{d.label}</option>
-                  ))}
-                </select>
+              <div className="ccg-card ccg-glass-soft p-3">
+                <div className="text-xs font-medium mb-2">
+                  {lang === "fa" ? "تنظیمات دیفالت شبکه" : "Network Defaults"}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <div className="text-[11px] opacity-80 mb-1">{lang === "fa" ? "Vendor" : "Vendor"}</div>
+                    <select
+                      value={netVendor}
+                      onChange={(e) => setNetVendor(e.target.value)}
+                      className="w-full p-2 text-sm border border-gray-300/70 dark:border-white/10 rounded-lg bg-white/70 dark:bg-black/30 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      disabled={loading}
+                    >
+                      {NETWORK_VENDORS.map((v) => (
+                        <option key={v.value} value={v.value}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <div className="text-[11px] opacity-80 mb-1">{lang === "fa" ? "Device Type" : "Device Type"}</div>
+                    <select
+                      value={deviceType}
+                      onChange={(e) => setDeviceType(e.target.value)}
+                      className="w-full p-2 text-sm border border-gray-300/70 dark:border-white/10 rounded-lg bg-white/70 dark:bg-black/30 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      disabled={loading}
+                    >
+                      {NETWORK_DEVICE_TYPES.map((d) => (
+                        <option key={d.value} value={d.value}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mt-2 text-xs text-gray-600 dark:text-gray-300">
+                  {lang === "fa"
+                    ? "این‌ها دیفالت شبکه هستند و داخل payload ارسال می‌شوند."
+                    : "These are default network options and will be sent in payload."}
+                </div>
               </div>
             )}
           </div>
 
-          {/* Output knobs */}
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Output knobs (COMMAND ONLY) */}
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => setPythonScript(!pythonScript)}
-              className={`ccg-card p-3 text-left transition ${
-                pythonScript ? "bg-gradient-to-r from-green-500 to-emerald-600 text-white" : "hover:bg-gray-50 dark:hover:bg-gray-800"
-              }`}
-            >
-              <div className="text-sm font-medium">{lang === "fa" ? "اسکریپت پایتون" : "Python Script"}</div>
-              <div className="text-xs opacity-80">{lang === "fa" ? "به جای CLI، اسکریپت Python تولید شود." : "Generate a Python script instead of CLI."}</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setMoreCommands(!moreCommands)}
-              className={`ccg-card p-3 text-left transition ${
-                moreCommands ? "bg-gradient-to-r from-sky-500 to-cyan-600 text-white" : "hover:bg-gray-50 dark:hover:bg-gray-800"
-              }`}
+              onClick={onToggleMoreCommands}
+              className={`ccg-card ccg-glass-soft p-3 text-left transition ${
+                moreCommands ? knobActiveClass : "hover:opacity-95"
+              } ${outputMode !== "command" ? "opacity-40 cursor-not-allowed" : ""}`}
+              disabled={loading || outputMode !== "command"}
+              title={outputMode !== "command" ? (lang === "fa" ? "فقط در حالت کامند فعال است" : "Only in Command mode") : ""}
             >
               <div className="text-sm font-medium">{lang === "fa" ? "کامندهای بیشتر" : "More commands"}</div>
-              <div className="text-xs opacity-80">{lang === "fa" ? "جایگزین‌های بیشتری پیشنهاد می‌شود." : "More alternatives will be suggested."}</div>
+              <div className="text-xs opacity-80">
+                {lang === "fa" ? "جایگزین‌های بیشتری پیشنهاد می‌شود." : "More alternatives will be suggested."}
+              </div>
             </button>
 
             <button
               type="button"
-              onClick={() => setMoreDetails(!moreDetails)}
-              className={`ccg-card p-3 text-left transition ${
-                moreDetails ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white" : "hover:bg-gray-50 dark:hover:bg-gray-800"
-              }`}
+              onClick={onToggleMoreDetails}
+              className={`ccg-card ccg-glass-soft p-3 text-left transition ${
+                moreDetails ? knobActiveClass : "hover:opacity-95"
+              } ${outputMode !== "command" ? "opacity-40 cursor-not-allowed" : ""}`}
+              disabled={loading || outputMode !== "command"}
+              title={outputMode !== "command" ? (lang === "fa" ? "فقط در حالت کامند فعال است" : "Only in Command mode") : ""}
             >
               <div className="text-sm font-medium">{lang === "fa" ? "توضیح بیشتر" : "More details"}</div>
-              <div className="text-xs opacity-80">{lang === "fa" ? "توضیحات و هشدارها مفصل‌تر می‌شوند." : "Explanation and warnings become more detailed."}</div>
+              <div className="text-xs opacity-80">
+                {lang === "fa" ? "توضیحات و هشدارها مفصل‌تر می‌شوند." : "Explanation and warnings become more detailed."}
+              </div>
             </button>
+          </div>
+
+          <div className="mt-3 text-[11px] text-gray-600 dark:text-gray-300">
+            {lang === "fa"
+              ? "تولید فقط با دکمه «تولید خروجی» انجام می‌شود (تغییر گزینه‌ها تولید خودکار ندارد)."
+              : "Generation happens only via the Generate button (changing options won’t auto-generate)."}
           </div>
         </div>
       </div>
@@ -390,19 +638,23 @@ export default function GeneratorPage() {
       <div className="ccg-container">
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="w-full ccg-card p-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+          className="w-full ccg-card ccg-glass p-3 hover:opacity-95 transition"
           type="button"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className={`w-6 h-6 rounded flex items-center justify-center ${showAdvanced ? "bg-blue-500" : "bg-gray-200 dark:bg-gray-700"}`}>
+              <div
+                className={`w-6 h-6 rounded flex items-center justify-center ${
+                  showAdvanced ? "bg-blue-500" : "bg-gray-200 dark:bg-gray-700"
+                }`}
+              >
                 <span className="text-white text-sm">⚙️</span>
               </div>
               <div>
                 <div className="text-sm font-medium text-left">
                   {lang === "fa" ? "تنظیمات تخصصی" : "Advanced Settings"}
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 text-left">
+                <div className="text-xs text-gray-600 dark:text-gray-300 text-left">
                   {lang === "fa" ? "فقط در صورت فعال‌سازی اعمال می‌شود" : "Applied only when enabled"}
                 </div>
               </div>
@@ -413,9 +665,11 @@ export default function GeneratorPage() {
 
         {showAdvanced && (
           <div className="mt-3 animate-fadeIn">
-            <div className="ccg-card p-4 space-y-3">
+            <div className="ccg-card ccg-glass p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <div className="text-sm font-medium">{lang === "fa" ? "فعال‌سازی تنظیمات تخصصی" : "Enable advanced settings"}</div>
+                <div className="text-sm font-medium">
+                  {lang === "fa" ? "فعال‌سازی تنظیمات تخصصی" : "Enable advanced settings"}
+                </div>
                 <button
                   type="button"
                   onClick={() => setAdvancedEnabled(!advancedEnabled)}
@@ -423,7 +677,7 @@ export default function GeneratorPage() {
                     advancedEnabled ? "bg-green-500 text-white" : "bg-gray-100 dark:bg-gray-800"
                   }`}
                 >
-                  {advancedEnabled ? (lang === "fa" ? "فعال ✅" : "Enabled ✅") : (lang === "fa" ? "غیرفعال" : "Disabled")}
+                  {advancedEnabled ? (lang === "fa" ? "فعال ✅" : "Enabled ✅") : lang === "fa" ? "غیرفعال" : "Disabled"}
                 </button>
               </div>
 
@@ -433,7 +687,7 @@ export default function GeneratorPage() {
                 onChange={setAdvancedSettings}
               />
 
-              <div className="text-xs text-gray-500 dark:text-gray-400">
+              <div className="text-xs text-gray-600 dark:text-gray-300">
                 {lang === "fa"
                   ? "اگر فعال نباشد، این تنظیمات وارد payload نمی‌شود."
                   : "If not enabled, advanced settings are not included in payload."}
@@ -443,16 +697,20 @@ export default function GeneratorPage() {
         )}
       </div>
 
-      {/* Main grid */}
+      {/* Split pane: Input | Output */}
       <div className="ccg-container">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4">
+        <div
+          ref={splitWrapRef}
+          className={`ccg-split ${lang === "fa" ? "is-rtl" : "is-ltr"}`}
+          style={{ "--split": `${splitPct}%` }}
+        >
           {/* Input */}
-          <div className="ccg-card p-4">
+          <div className="ccg-card ccg-glass p-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
               <h2 className="font-bold text-base">{lang === "fa" ? "📝 درخواست شما" : "📝 Your Request"}</h2>
               <button
                 onClick={clearAll}
-                className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-800 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+                className="px-2 py-1 text-xs bg-gray-100/70 dark:bg-black/30 rounded hover:opacity-90 transition border border-gray-200/60 dark:border-white/10"
                 type="button"
               >
                 🗑️ {lang === "fa" ? "پاک کردن" : "Clear"}
@@ -462,27 +720,27 @@ export default function GeneratorPage() {
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={lang === "fa"
-                ? "مثال: میخوام سیستمم ۱ ساعت دیگه خاموش بشه"
-                : "Example: Shutdown the system in 1 hour"}
-              className="w-full h-40 p-3 text-sm border border-gray-300 dark:border-gray-700 rounded-lg resize-none focus:ring-1 focus:ring-blue-500"
+              placeholder={lang === "fa" ? "مثال: میخوام سیستمم ۱ ساعت دیگه خاموش بشه" : "Example: Shutdown the system in 1 hour"}
+              className="w-full h-44 p-3 text-sm border border-gray-300/70 dark:border-white/10 rounded-lg resize-none focus:ring-1 focus:ring-blue-500 bg-white/70 dark:bg-black/30"
               rows={4}
             />
 
             {error && (
-              <div className="mt-3 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded animate-fadeIn">
-                <div className="text-xs font-medium text-red-700 dark:text-red-300">{error}</div>
+              <div className="mt-3 p-2 ccg-alert-danger animate-fadeIn">
+                <div className="text-xs font-medium">{error}</div>
               </div>
             )}
 
             <button
               onClick={generate}
-              disabled={loading || !input.trim()}
+              disabled={loading || !String(input || "").trim()}
               className={`
                 mt-4 w-full py-3 rounded-lg font-medium text-sm transition
-                ${loading || !input.trim()
-                  ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed"
-                  : `bg-gradient-to-r ${getPlatformColor(platform)} text-white hover:opacity-90`}
+                ${
+                  loading || !String(input || "").trim()
+                    ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed"
+                    : `bg-gradient-to-r ${getPlatformColor(platform)} text-white hover:opacity-90`
+                }
               `}
               type="button"
             >
@@ -500,19 +758,34 @@ export default function GeneratorPage() {
             </button>
           </div>
 
+          {/* Resizer */}
+          <div
+            className="ccg-resizer"
+            role="separator"
+            aria-orientation="vertical"
+            tabIndex={0}
+            onMouseDown={onMouseDownResizer}
+            onTouchStart={() => {
+              draggingRef.current = true;
+              document.body.classList.add("ccg-noselect");
+            }}
+            title={lang === "fa" ? "کشیدن برای تغییر اندازه" : "Drag to resize"}
+          >
+            <div className="ccg-resizer-handle" />
+          </div>
+
           {/* Output */}
-          <div className="ccg-card p-4">
+          <div className="ccg-card ccg-glass p-4">
             <div className="flex items-center justify-between gap-2 mb-3">
               <h2 className="font-bold text-base">{lang === "fa" ? "✨ نتیجه" : "✨ Result"}</h2>
             </div>
 
             {tool ? (
-              <ToolCards tool={tool} lang={lang} />
+              <ToolResult tool={tool} lang={lang} />
             ) : output ? (
-              // fallback: still show markdown if tool missing
-              <CodeBlock code={output} language="markdown" showCopy={true} maxHeight="420px" />
+              <CodeBlock code={output} language="markdown" showCopy={true} maxHeight="520px" />
             ) : (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <div className="text-center py-10 text-gray-600 dark:text-gray-300">
                 <div className="text-3xl mb-2">✨</div>
                 <div className="text-sm mb-1">{lang === "fa" ? "آماده برای تولید!" : "Ready!"}</div>
                 <div className="text-xs">
@@ -526,8 +799,8 @@ export default function GeneratorPage() {
 
       {/* Persist info */}
       <div className="ccg-container">
-        <div className="ccg-card p-3">
-          <div className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-2">
+        <div className="ccg-card ccg-glass-soft p-3">
+          <div className="text-xs text-gray-700 dark:text-gray-200 flex items-center gap-2">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
             <span>
               {lang === "fa"
@@ -540,3 +813,4 @@ export default function GeneratorPage() {
     </div>
   );
 }
+
