@@ -1,4 +1,5 @@
-import React, { useMemo } from "react";
+// /home/cando/CCG/client/src/components/generator/AdvancedSettings.jsx
+import React, { useEffect, useMemo } from "react";
 import { useLanguage } from "../../context/LanguageContext";
 
 /**
@@ -6,16 +7,73 @@ import { useLanguage } from "../../context/LanguageContext";
  * - Keep structure stable: props = { platform, settings, onChange }
  * - Do NOT include "General" fields here (shell/vendor/device type, etc.)
  * - Advanced fields should only be platform-specific deep options.
+ *
+ * UX/UI Improvements:
+ * - Stronger panel styling for light mode (border/ring/shadow)
+ * - Field cards for better readability
+ * - Better hint & current settings visibility
+ *
+ * Network Improvements:
+ * - OS Type options are derived from networkVendor (NO custom OS)
+ * - Auto-fix invalid os_type when vendor changes
  */
-export default function AdvancedSettings({ platform = "linux", settings = {}, onChange }) {
+export default function AdvancedSettings({
+  platform = "linux",
+  settings = {},
+  onChange,
+  networkVendor,
+  networkDeviceType, // kept for future use (not mandatory)
+}) {
   const { lang } = useLanguage();
-
   const t = (fa, en) => (lang === "fa" ? fa : en);
+
+  const vendorKey = String(networkVendor || "").trim().toLowerCase() || "generic";
+
+  const networkOsOptions = useMemo(() => {
+    const map = {
+      cisco: [
+        { value: "ios", label: "Cisco IOS" },
+        { value: "ios_xe", label: "Cisco IOS XE" },
+        { value: "nx_os", label: "Cisco NX-OS" },
+        { value: "asa", label: "Cisco ASA" },
+      ],
+      mikrotik: [{ value: "routeros", label: "RouterOS" }],
+      juniper: [{ value: "junos", label: "JunOS" }],
+      huawei: [{ value: "vrp", label: "Huawei VRP" }],
+      fortinet: [{ value: "fortios", label: "FortiOS" }],
+      paloalto: [{ value: "panos", label: "PAN-OS" }],
+      arista: [{ value: "eos", label: "Arista EOS" }],
+      ubiquiti: [{ value: "unifi_os", label: "UniFi OS" }],
+      generic: [
+        { value: "ios", label: "Cisco IOS" },
+        { value: "ios_xe", label: "Cisco IOS XE" },
+        { value: "nx_os", label: "Cisco NX-OS" },
+        { value: "routeros", label: "RouterOS" },
+        { value: "fortios", label: "FortiOS" },
+        { value: "junos", label: "JunOS" },
+      ],
+    };
+    return map[vendorKey] || map.generic;
+  }, [vendorKey]);
+
+  // If vendor changes and current os_type becomes invalid, reset to first valid option.
+  useEffect(() => {
+    if (platform !== "network") return;
+    const current = String(settings?.os_type || "").trim();
+    const valid = new Set(networkOsOptions.map((x) => String(x.value)));
+    if (!current || !valid.has(current)) {
+      const next = networkOsOptions[0]?.value;
+      if (next && typeof onChange === "function") {
+        onChange({ ...(settings || {}), os_type: next });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platform, vendorKey]);
 
   const SCHEMA = useMemo(() => {
     return {
       linux: {
-        title: { fa: "تنظیمات پیشرفته لینوکس", en: "Linux Advanced Settings" },
+        title: { fa: "تنظیمات تخصصی لینوکس", en: "Linux Advanced Settings" },
         fields: [
           {
             type: "select",
@@ -47,7 +105,7 @@ export default function AdvancedSettings({ platform = "linux", settings = {}, on
       },
 
       windows: {
-        title: { fa: "تنظیمات پیشرفته ویندوز", en: "Windows Advanced Settings" },
+        title: { fa: "تنظیمات تخصصی ویندوز", en: "Windows Advanced Settings" },
         fields: [
           {
             type: "select",
@@ -79,7 +137,7 @@ export default function AdvancedSettings({ platform = "linux", settings = {}, on
       },
 
       mac: {
-        title: { fa: "تنظیمات پیشرفته macOS", en: "macOS Advanced Settings" },
+        title: { fa: "تنظیمات تخصصی macOS", en: "macOS Advanced Settings" },
         fields: [
           {
             type: "select",
@@ -110,23 +168,14 @@ export default function AdvancedSettings({ platform = "linux", settings = {}, on
       },
 
       network: {
-        title: { fa: "تنظیمات پیشرفته شبکه", en: "Network Advanced Settings" },
+        title: { fa: "تنظیمات تخصصی شبکه", en: "Network Advanced Settings" },
         fields: [
-          // NOTE: vendor/device_type are in General (not here).
+          // vendor/device_type remain in General (GeneratorPage)
           {
             type: "select",
             name: "os_type",
             label: { fa: "نوع سیستم عامل", en: "OS Type" },
-            options: [
-              { value: "ios", label: "Cisco IOS" },
-              { value: "ios_xe", label: "Cisco IOS XE" },
-              { value: "nx_os", label: "Cisco NX-OS" },
-              { value: "asa", label: "Cisco ASA" },
-              { value: "routeros", label: "RouterOS" },
-              { value: "fortios", label: "FortiOS" },
-              { value: "junos", label: "JunOS" },
-              { value: "custom", label: "Custom OS" },
-            ],
+            options: networkOsOptions, // ✅ vendor-based, NO custom
           },
           {
             type: "version_input",
@@ -145,7 +194,7 @@ export default function AdvancedSettings({ platform = "linux", settings = {}, on
       },
 
       other: {
-        title: { fa: "تنظیمات پیشرفته سیستم‌عامل دیگر", en: "Other OS Advanced Settings" },
+        title: { fa: "تنظیمات تخصصی سایر سیستم‌عامل‌ها", en: "Other OS Advanced Settings" },
         fields: [
           {
             type: "select",
@@ -171,7 +220,6 @@ export default function AdvancedSettings({ platform = "linux", settings = {}, on
             placeholder: { fa: "مثال: 13.2-RELEASE", en: "e.g., 13.2-RELEASE" },
             suggestions: ["latest", "stable", "lts"],
           },
-          // Shell is General; keep custom shell ONLY if user needs explicit override for niche OS:
           {
             type: "select",
             name: "shell_hint",
@@ -217,7 +265,7 @@ export default function AdvancedSettings({ platform = "linux", settings = {}, on
         ],
       },
     };
-  }, [lang]);
+  }, [lang, networkOsOptions, t]);
 
   const schema = SCHEMA[platform] || SCHEMA.linux;
 
@@ -232,68 +280,103 @@ export default function AdvancedSettings({ platform = "linux", settings = {}, on
     return (settings?.[dep] ?? "") === value;
   };
 
+  // UI helpers (stronger light-mode)
+  const Panel = ({ children }) => (
+    <div
+      className="
+        rounded-2xl border border-gray-200/80 bg-white
+        shadow-sm ring-1 ring-black/5
+        dark:border-white/10 dark:bg-white/[0.04] dark:ring-white/10
+      "
+    >
+      {children}
+    </div>
+  );
+
+  const FieldCard = ({ children }) => (
+    <div
+      className="
+        rounded-xl border border-gray-200/70 bg-gray-50/80 p-3
+        dark:border-white/10 dark:bg-white/[0.03]
+      "
+    >
+      {children}
+    </div>
+  );
+
+  const Label = ({ children }) => (
+    <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-300 mb-1">
+      {children}
+    </label>
+  );
+
+  const InputClass =
+    "w-full rounded-xl px-3 py-2 text-sm border border-gray-300/70 bg-white " +
+    "focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 " +
+    "dark:border-white/10 dark:bg-black/30";
+
+  const SelectClass = InputClass;
+
   const renderField = (field) => {
     if (!isVisible(field)) return null;
 
-    const label = typeof field.label === "object" ? (field.label[lang] || field.label.en) : field.label;
+    const label = typeof field.label === "object" ? field.label[lang] || field.label.en : field.label;
     const placeholder =
       field.placeholder
-        ? (typeof field.placeholder === "object" ? (field.placeholder[lang] || field.placeholder.en) : field.placeholder)
+        ? typeof field.placeholder === "object"
+          ? field.placeholder[lang] || field.placeholder.en
+          : field.placeholder
         : "";
 
     if (field.type === "select") {
       const v = (settings?.[field.name] ?? "").toString();
       return (
-        <div key={field.name} className="space-y-1">
-          <label className="block text-xs font-medium text-[var(--muted)]">{label}</label>
-          <select
-            value={v}
-            onChange={(e) => setField(field.name, e.target.value)}
-            className="ccg-select text-sm w-full"
-          >
+        <FieldCard key={field.name}>
+          <Label>{label}</Label>
+          <select value={v} onChange={(e) => setField(field.name, e.target.value)} className={SelectClass}>
             {(field.options || []).map((opt) => (
               <option key={`${field.name}-${opt.value}`} value={opt.value}>
                 {opt.label}
               </option>
             ))}
           </select>
-        </div>
+        </FieldCard>
       );
     }
 
     if (field.type === "text") {
       const v = (settings?.[field.name] ?? "").toString();
       return (
-        <div key={field.name} className="space-y-1">
-          <label className="block text-xs font-medium text-[var(--muted)]">{label}</label>
+        <FieldCard key={field.name}>
+          <Label>{label}</Label>
           <input
             type="text"
             value={v}
             onChange={(e) => setField(field.name, e.target.value)}
             placeholder={placeholder}
-            className="ccg-input text-sm w-full"
+            className={InputClass}
           />
-        </div>
+        </FieldCard>
       );
     }
 
     if (field.type === "version_input") {
       const v = (settings?.[field.name] ?? "").toString();
       return (
-        <div key={field.name} className="space-y-1">
-          <label className="block text-xs font-medium text-[var(--muted)]">{label}</label>
-          <div className="flex gap-2">
+        <FieldCard key={field.name}>
+          <Label>{label}</Label>
+          <div className="flex gap-2 items-center">
             <input
               type="text"
               value={v}
               onChange={(e) => setField(field.name, e.target.value)}
               placeholder={placeholder}
               list={field.suggestions?.length ? `${field.name}-suggestions` : undefined}
-              className="ccg-input text-sm flex-1"
+              className={InputClass}
             />
             {field.suggestions?.length ? (
               <select
-                className="ccg-select text-sm"
+                className={`${SelectClass} w-40`}
                 value=""
                 onChange={(e) => {
                   if (e.target.value) setField(field.name, e.target.value);
@@ -316,25 +399,27 @@ export default function AdvancedSettings({ platform = "linux", settings = {}, on
               ))}
             </datalist>
           ) : null}
-        </div>
+        </FieldCard>
       );
     }
 
     if (field.type === "checkbox") {
       const checked = settings?.[field.name] ?? field.defaultValue ?? false;
       return (
-        <div key={field.name} className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id={field.name}
-            checked={!!checked}
-            onChange={(e) => setField(field.name, e.target.checked)}
-            className="w-4 h-4 rounded"
-          />
-          <label htmlFor={field.name} className="text-xs text-[var(--text)]">
-            {label}
-          </label>
-        </div>
+        <FieldCard key={field.name}>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id={field.name}
+              checked={!!checked}
+              onChange={(e) => setField(field.name, e.target.checked)}
+              className="w-4 h-4 rounded border border-gray-300 dark:border-white/20"
+            />
+            <label htmlFor={field.name} className="text-sm text-gray-800 dark:text-gray-100">
+              {label}
+            </label>
+          </div>
+        </FieldCard>
       );
     }
 
@@ -356,8 +441,8 @@ export default function AdvancedSettings({ platform = "linux", settings = {}, on
         en: "On Apple Silicon, Rosetta might be needed for legacy tooling.",
       },
       network: {
-        fa: "نوع OS و ورژن دقیق کمک می‌کند دستورها دقیق‌تر باشند. قبل از تغییرات Backup را فراموش نکنید.",
-        en: "Exact OS/version improves accuracy. Don’t forget backup before changes.",
+        fa: "OS Type بر اساس Vendor تنظیم می‌شود. ورژن دقیق کمک می‌کند خروجی دقیق‌تر باشد.",
+        en: "OS Type is derived from Vendor. Exact version improves accuracy.",
       },
       other: {
         fa: "برای سیستم‌های کمتر رایج، نوع OS و معماری را مشخص کنید تا خروجی دقیق‌تر شود.",
@@ -367,38 +452,67 @@ export default function AdvancedSettings({ platform = "linux", settings = {}, on
     return map[platform]?.[lang] || map[platform]?.en || "";
   }, [platform, lang]);
 
+  const title = typeof schema.title === "object" ? schema.title[lang] || schema.title.en : schema.title;
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-base">{typeof schema.title === "object" ? (schema.title[lang] || schema.title.en) : schema.title}</h3>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {(schema.fields || []).map(renderField)}
-      </div>
-
-      {hint ? (
-        <div className="ccg-card p-3 bg-blue-50 dark:bg-blue-900/20">
-          <div className="text-xs text-blue-700 dark:text-blue-300">💡 {hint}</div>
-        </div>
-      ) : null}
-
-      {settings && Object.keys(settings).length ? (
-        <div className="ccg-card p-3 bg-[var(--card2)]">
-          <div className="text-xs font-medium mb-2">{t("تنظیمات فعلی:", "Current settings:")}</div>
-          <div className="text-xs text-[var(--muted)] space-y-1">
-            {Object.entries(settings)
-              .filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "")
-              .map(([k, v]) => (
-                <div key={k} className="flex gap-2">
-                  <span className="font-medium text-[var(--text)]">{k}:</span>
-                  <span>{String(v)}</span>
-                </div>
-              ))}
+    <Panel>
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-black/5 dark:border-white/10">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-base text-gray-900 dark:text-gray-100">{title}</h3>
+            {platform === "network" && networkVendor ? (
+              <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                {t("Vendor انتخاب‌شده:", "Selected vendor:")}{" "}
+                <span className="font-semibold">{String(networkVendor)}</span>
+                {networkDeviceType ? (
+                  <>
+                    {" "}
+                    · {t("Device:", "Device:")} <span className="font-semibold">{String(networkDeviceType)}</span>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
           </div>
+
+          {/* subtle badge */}
+          <span className="px-2 py-1 rounded-full text-[11px] font-semibold border border-gray-200/70 bg-gray-50 text-gray-700 dark:border-white/10 dark:bg-white/[0.05] dark:text-gray-200">
+            {t("Advanced", "Advanced")}
+          </span>
         </div>
-      ) : null}
-    </div>
+      </div>
+
+      {/* Fields */}
+      <div className="p-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{(schema.fields || []).map(renderField)}</div>
+
+        {/* Hint */}
+        {hint ? (
+          <div className="mt-4 rounded-xl border border-blue-200/70 bg-blue-50/80 p-3 text-blue-800 shadow-sm dark:border-blue-700/40 dark:bg-blue-900/20 dark:text-blue-200">
+            <div className="text-xs font-semibold mb-1">💡 {t("راهنما", "Tip")}</div>
+            <div className="text-sm">{hint}</div>
+          </div>
+        ) : null}
+
+        {/* Current settings (debug-ish) */}
+        {settings && Object.keys(settings).length ? (
+          <div className="mt-4 rounded-xl border border-gray-200/70 bg-gray-50/70 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-2">
+              {t("تنظیمات فعلی:", "Current settings:")}
+            </div>
+            <div className="text-xs text-gray-700 dark:text-gray-300 space-y-1">
+              {Object.entries(settings)
+                .filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "")
+                .map(([k, v]) => (
+                  <div key={k} className="flex gap-2">
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">{k}:</span>
+                    <span className="font-mono">{String(v)}</span>
+                  </div>
+                ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </Panel>
   );
 }
-

@@ -110,13 +110,12 @@ export default function ToolResult({ tool, lang = "fa" }) {
 
   const py = String(t.python_script || "").trim();
 
+  const hasPrimary = Boolean(primary);
+  const hasAnyMeta = explanation.length || warnings.length || notes.length;
+
   return (
     <div className={`space-y-3 ${lang === "fa" ? "rtl" : "ltr"}`}>
-      {title ? (
-        <div className="text-base font-bold text-slate-900 dark:text-slate-100">
-          {title}
-        </div>
-      ) : null}
+      {title ? <div className="text-base font-bold text-slate-900 dark:text-slate-100">{title}</div> : null}
 
       {pythonScript ? (
         <SectionCard
@@ -139,45 +138,48 @@ export default function ToolResult({ tool, lang = "fa" }) {
 
           {notes.length ? (
             <div className="mt-3">
-              <div className="text-xs font-semibold mb-2 opacity-90">
-                {lang === "fa" ? "نکات" : "Notes"}
-              </div>
-              <ul className="list-disc pr-5 space-y-1 text-sm text-slate-700 dark:text-slate-200/90">
-                {notes.map((x, i) => <li key={i}>{x}</li>)}
+              <div className="text-xs font-semibold mb-2 opacity-90">{lang === "fa" ? "نکات" : "Notes"}</div>
+              <ul className="list-disc list-inside ps-5 space-y-1 text-sm text-slate-700 dark:text-slate-200/90">
+                {notes.map((x, i) => (
+                  <li key={i}>{x}</li>
+                ))}
               </ul>
             </div>
           ) : null}
 
           {warnings.length ? (
             <div className="mt-3">
-              <div className="text-xs font-semibold mb-2 text-rose-700 dark:text-rose-200">
-                {lang === "fa" ? "هشدارها" : "Warnings"}
-              </div>
-              <ul className="list-disc pr-5 space-y-1 text-sm text-rose-700 dark:text-rose-200">
-                {warnings.map((x, i) => <li key={i}>{x}</li>)}
+              <div className="text-xs font-semibold mb-2 text-rose-700 dark:text-rose-200">{lang === "fa" ? "هشدارها" : "Warnings"}</div>
+              <ul className="list-disc list-inside ps-5 space-y-1 text-sm text-rose-700 dark:text-rose-200">
+                {warnings.map((x, i) => (
+                  <li key={i}>{x}</li>
+                ))}
               </ul>
             </div>
           ) : null}
         </SectionCard>
       ) : (
         <>
-          <SectionCard
-            title={lang === "fa" ? "کامند اصلی" : "Primary Command"}
-            icon="✅"
-            tone="base"
-            right={
-              <>
-                <Badge text={cli.toUpperCase()} />
-                <CopyMini value={primary} lang={lang} />
-              </>
-            }
-          >
-            <div className="ccg-codeblock">
-              <pre className="ccg-pre">
-                <code dir="ltr">{primary}</code>
-              </pre>
-            </div>
-          </SectionCard>
+          {/* اگر primary خالی بود، این کارت رو نمایش نمی‌دیم (برای خروجی‌های Script که ممکنه فقط توضیح/نکات داشته باشن) */}
+          {hasPrimary ? (
+            <SectionCard
+              title={lang === "fa" ? "کامند اصلی" : "Primary Command"}
+              icon="✅"
+              tone="base"
+              right={
+                <>
+                  <Badge text={cli.toUpperCase()} />
+                  <CopyMini value={primary} lang={lang} />
+                </>
+              }
+            >
+              <div className="ccg-codeblock">
+                <pre className="ccg-pre">
+                  <code dir="ltr">{primary}</code>
+                </pre>
+              </div>
+            </SectionCard>
+          ) : null}
 
           {alternatives.length ? (
             <SectionCard
@@ -192,9 +194,7 @@ export default function ToolResult({ tool, lang = "fa" }) {
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <div className="flex items-center gap-2">
                         <Badge text={cli.toUpperCase()} />
-                        <span className="text-xs opacity-80">
-                          {lang === "fa" ? "جایگزین" : "Alt"} #{idx + 1}
-                        </span>
+                        <span className="text-xs opacity-80">{lang === "fa" ? "جایگزین" : "Alt"} #{idx + 1}</span>
                       </div>
                       <CopyMini value={cmd} lang={lang} />
                     </div>
@@ -206,41 +206,38 @@ export default function ToolResult({ tool, lang = "fa" }) {
               </div>
             </SectionCard>
           ) : null}
+
+          {/* اگر primary خالی بود ولی توضیحات/نکات داشتیم، هیچ مشکلی نیست و پایین نمایش داده می‌شود */}
+          {!hasPrimary && !alternatives.length && !hasAnyMeta ? null : null}
         </>
       )}
 
       {explanation.length ? (
-        <SectionCard
-          title={lang === "fa" ? "توضیحات" : "Explanation"}
-          icon="📘"
-          tone="base"
-        >
-          <ul className="list-disc pr-5 space-y-1 text-sm text-slate-700 dark:text-slate-200/90">
-            {explanation.map((x, i) => <li key={i}>{x}</li>)}
+        <SectionCard title={lang === "fa" ? "توضیحات" : "Explanation"} icon="📘" tone="base">
+          <ul className="list-disc list-inside ps-5 space-y-1 text-sm text-slate-700 dark:text-slate-200/90">
+            {explanation.map((x, i) => (
+              <li key={i}>{x}</li>
+            ))}
           </ul>
         </SectionCard>
       ) : null}
 
       {warnings.length ? (
-        <SectionCard
-          title={lang === "fa" ? "هشدارها" : "Warnings"}
-          icon="⚠️"
-          tone="danger"
-        >
-          <ul className="list-disc pr-5 space-y-1 text-sm text-rose-700 dark:text-rose-200">
-            {warnings.map((x, i) => <li key={i}>{x}</li>)}
+        <SectionCard title={lang === "fa" ? "هشدارها" : "Warnings"} icon="⚠️" tone="danger">
+          <ul className="list-disc list-inside ps-5 space-y-1 text-sm text-rose-700 dark:text-rose-200">
+            {warnings.map((x, i) => (
+              <li key={i}>{x}</li>
+            ))}
           </ul>
         </SectionCard>
       ) : null}
 
       {notes.length ? (
-        <SectionCard
-          title={lang === "fa" ? "نکات" : "Notes"}
-          icon="💡"
-          tone="warn"
-        >
-          <ul className="list-disc pr-5 space-y-1 text-sm text-amber-800 dark:text-amber-200">
-            {notes.map((x, i) => <li key={i}>{x}</li>)}
+        <SectionCard title={lang === "fa" ? "نکات" : "Notes"} icon="💡" tone="warn">
+          <ul className="list-disc list-inside ps-5 space-y-1 text-sm text-amber-800 dark:text-amber-200">
+            {notes.map((x, i) => (
+              <li key={i}>{x}</li>
+            ))}
           </ul>
         </SectionCard>
       ) : null}

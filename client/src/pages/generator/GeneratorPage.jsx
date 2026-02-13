@@ -71,7 +71,7 @@ function scriptCliForPlatform(platform) {
   return "bash";
 }
 
-/** --------- markdown helpers (build ToolResult even when backend tool=null) --------- */
+/** --------- markdown helpers --------- */
 function extractSection(md, titles) {
   const text = String(md || "");
   if (!text.trim()) return "";
@@ -139,7 +139,8 @@ function buildToolFromResponse(res, lang, cliGuess) {
 
   const expRaw = extractSection(md, ["Explanation", "توضیح"]) || "";
   const warnRaw = extractSection(md, ["Warning", "Warnings", "هشدار", "هشدارها"]) || "";
-  const notesRaw = extractSection(md, ["More Details", "توضیحات بیشتر", "📌 More Details", "📌 توضیحات بیشتر"]) || "";
+  const notesRaw =
+    extractSection(md, ["More Details", "توضیحات بیشتر", "📌 More Details", "📌 توضیحات بیشتر"]) || "";
 
   const explanation = toBullets(expRaw);
   const warnings = toBullets(warnRaw);
@@ -171,24 +172,25 @@ export default function GeneratorPage() {
   const [platform, setPlatform] = usePersistState("platform", "linux");
   const [otherOS, setOtherOS] = usePersistState("other_os", "freebsd");
 
-  // Network defaults (moved to general settings)
+  // Network defaults (General settings)
   const [netVendor, setNetVendor] = usePersistState("network_vendor", "cisco");
   const [deviceType, setDeviceType] = usePersistState("network_device_type", "router");
 
   // Output Mode
-  // command | script | python
   const [outputMode, setOutputMode] = usePersistState("generator_output_mode", "command");
 
-  // Shell/CLI only meaningful in Command mode
+  // CLI only meaningful in Command mode
   const [cli, setCli] = usePersistState("generator_cli", defaultCliForPlatform(platform));
 
-  // knobs (ONLY meaningful in Command mode per your requirement)
+  // knobs:
+  // - moreCommands: command only
+  // - moreDetails: all modes
   const [moreDetails, setMoreDetails] = usePersistState("generator_more_details", false);
   const [moreCommands, setMoreCommands] = usePersistState("generator_more_commands", false);
 
   const [input, setInput] = usePersistState("input", "");
-  const [output, setOutput] = useState(""); // markdown fallback
-  const [tool, setTool] = useState(null); // normalized for ToolResult
+  const [output, setOutput] = useState("");
+  const [tool, setTool] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -202,9 +204,11 @@ export default function GeneratorPage() {
 
   // Split pane (persisted)
   const [splitPct, setSplitPct] = usePersistState("generator_split_pct", 50);
-
   const splitWrapRef = useRef(null);
   const draggingRef = useRef(false);
+
+  // Abort / Cancel support
+  const abortRef = useRef(null);
 
   // keep CLI valid on platform changes
   useEffect(() => {
@@ -217,10 +221,9 @@ export default function GeneratorPage() {
   // if outputMode changes, ensure knobs make sense (NO auto-generate)
   useEffect(() => {
     if (outputMode !== "command") {
-      // per requirement: these knobs are command-only
       if (moreCommands) setMoreCommands(false);
-      if (moreDetails) setMoreDetails(false);
     }
+    // moreDetails stays for all modes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [outputMode]);
 
@@ -259,16 +262,41 @@ export default function GeneratorPage() {
     return String(cli || defaultCliForPlatform(platform)).toLowerCase();
   }
 
+  // Network os fields from advanced settings (schema uses snake_case)
+  function pickNetworkOsType(s) {
+    const o = s && typeof s === "object" ? s : {};
+    return String(o.os_type || o.osType || "").trim();
+  }
+  function pickNetworkOsVersion(s) {
+    const o = s && typeof s === "object" ? s : {};
+    return String(o.os_version || o.osVersion || "").trim();
+  }
+
   async function generate() {
     if (!String(input || "").trim()) {
       setError(lang === "fa" ? "⚠️ لطفا درخواست خود را وارد کنید" : "⚠️ Please enter your request");
       return;
     }
 
+    // Cancel any in-flight request before starting new one
+    if (abortRef.current) {
+      try {
+        abortRef.current.abort();
+      } catch {
+        // ignore
+      }
+    }
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setLoading(true);
     setError("");
 
     const baseCli = computeCliForPayload({ platform, outputMode, cli });
+
+    const netOsType = platform === "network" ? pickNetworkOsType(advancedSettings) : "";
+    const netOsVersion = platform === "network" ? pickNetworkOsVersion(advancedSettings) : "";
 
     const payload = {
       mode: "generate",
@@ -277,18 +305,21 @@ export default function GeneratorPage() {
       platform: finalPlatform,
       cli: baseCli,
 
-      // knobs only for command mode
-      moreDetails: outputMode === "command" ? Boolean(moreDetails) : false,
+      // knobs
+      moreDetails: Boolean(moreDetails),
       moreCommands: outputMode === "command" ? Boolean(moreCommands) : false,
 
-      // python flag for backend
       pythonScript: outputMode === "python",
 
-      // network defaults (vendor + device type)
       vendor: platform === "network" ? netVendor : undefined,
       deviceType: platform === "network" ? deviceType : undefined,
 
-      // advanced
+      // send both conventions for compatibility
+      os_type: platform === "network" && netOsType ? netOsType : undefined,
+      os_version: platform === "network" && netOsVersion ? netOsVersion : undefined,
+      osType: platform === "network" && netOsType ? netOsType : undefined,
+      osVersion: platform === "network" && netOsVersion ? netOsVersion : undefined,
+
       advancedEnabled: Boolean(advancedEnabled),
       advanced: advancedEnabled ? compactAdvanced(advancedSettings) : undefined,
 
@@ -297,7 +328,7 @@ export default function GeneratorPage() {
     };
 
     try {
-      const result = await callCCG(payload);
+      const result = await callCCG(payload, { signal: controller.signal });
 
       const markdown = String(result?.markdown || result?.output || result?.result || "").trim();
       setOutput(markdown);
@@ -305,9 +336,26 @@ export default function GeneratorPage() {
       const built = buildToolFromResponse(result, lang, payload.cli);
       setTool(built);
     } catch (err) {
-      setError(err?.message || (lang === "fa" ? "❌ خطا در ارتباط با سرور" : "❌ Server connection error"));
+      const msg = String(err?.name || err?.message || "");
+      const isAbort = err?.name === "AbortError" || /aborted|abort/i.test(msg);
+
+      if (isAbort) {
+        setError(lang === "fa" ? "⛔ تولید لغو شد" : "⛔ Generation cancelled");
+      } else {
+        setError(err?.message || (lang === "fa" ? "❌ خطا در ارتباط با سرور" : "❌ Server connection error"));
+      }
     } finally {
+      if (abortRef.current === controller) abortRef.current = null;
       setLoading(false);
+    }
+  }
+
+  function cancelGenerate() {
+    if (!abortRef.current) return;
+    try {
+      abortRef.current.abort();
+    } catch {
+      // ignore
     }
   }
 
@@ -336,21 +384,8 @@ export default function GeneratorPage() {
   }, [lang]);
 
   const onSetOutputMode = (mode) => {
-    // IMPORTANT: no auto-generate here
     const next = String(mode || "command");
     setOutputMode(next);
-  };
-
-  const knobActiveClass = "ccg-knob-active";
-
-  const onToggleMoreCommands = () => {
-    if (outputMode !== "command") return;
-    setMoreCommands((v) => !v);
-  };
-
-  const onToggleMoreDetails = () => {
-    if (outputMode !== "command") return;
-    setMoreDetails((v) => !v);
   };
 
   /** --------- split pane drag --------- */
@@ -408,7 +443,7 @@ export default function GeneratorPage() {
           key={p.value}
           onClick={() => setPlatform(p.value)}
           className={`
-            flex flex-col items-center p-2 rounded-lg transition-all
+            flex flex-col items-center p-2 rounded-xl transition-all
             ${
               platform === p.value
                 ? `bg-gradient-to-b ${getPlatformColor(p.value)} text-white shadow`
@@ -429,6 +464,19 @@ export default function GeneratorPage() {
 
   const dirClass = lang === "fa" ? "rtl" : "ltr";
 
+  // ✅ Modern “panel-ish” card for the area you pointed at
+  const panelClass =
+    "ccg-card ccg-glass p-4 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm ring-1 ring-black/5 dark:ring-white/10";
+
+  const subCardClass =
+    "ccg-card ccg-glass-soft p-3 rounded-2xl border border-gray-200/60 dark:border-white/10 shadow-sm";
+
+  const knobBase =
+    "ccg-card ccg-glass-soft p-3 rounded-2xl border border-gray-200/60 dark:border-white/10 shadow-sm text-left transition";
+
+  const knobActive =
+    "ccg-knob-active ring-2 ring-blue-500/20 dark:ring-blue-400/20";
+
   return (
     <div className={`space-y-4 md:space-y-6 ${dirClass}`}>
       <div className="ccg-container">
@@ -437,25 +485,21 @@ export default function GeneratorPage() {
 
       {/* Platform & Output Mode */}
       <div className="ccg-container">
-        <div className="ccg-card ccg-glass p-4">
-          <h2 className="font-bold text-base mb-3">
-            {lang === "fa" ? "🎯 پلتفرم هدف" : "🎯 Target Platform"}
-          </h2>
+        <div className={panelClass}>
+          <h2 className="font-bold text-base mb-3">{lang === "fa" ? "🎯 پلتفرم هدف" : "🎯 Target Platform"}</h2>
 
           {renderPlatformButtons()}
 
           {platform === "other" && (
-            <div className="mt-3 p-3 rounded-lg ccg-glass-soft">
-              <div className="text-sm font-medium mb-2">
-                {lang === "fa" ? "🔧 انتخاب سیستم عامل" : "🔧 Select OS"}
-              </div>
+            <div className="mt-3 p-3 rounded-2xl ccg-glass-soft border border-gray-200/60 dark:border-white/10">
+              <div className="text-sm font-medium mb-2">{lang === "fa" ? "🔧 انتخاب سیستم عامل" : "🔧 Select OS"}</div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
                 {SUPPORTED_OTHER_OS.map((os) => (
                   <button
                     key={os.value}
                     onClick={() => setOtherOS(os.value)}
                     className={`
-                      flex flex-col items-center p-2 rounded transition text-center
+                      flex flex-col items-center p-2 rounded-xl transition text-center
                       ${
                         otherOS === os.value
                           ? "bg-gradient-to-b from-purple-500 to-pink-500 text-white shadow"
@@ -496,17 +540,24 @@ export default function GeneratorPage() {
                   </button>
                 );
               })}
+              {/* RTL/LTR indicator mapping */}
               <div
                 className="ccg-seg-indicator"
                 style={{
                   width: "calc((100% - 8px) / 3)",
                   transform:
-                    outputMode === "command"
+                    lang === "fa"
+                      ? outputMode === "command"
+                        ? "translateX(200%)"
+                        : outputMode === "script"
+                        ? "translateX(100%)"
+                        : "translateX(0%)"
+                      : outputMode === "command"
                       ? "translateX(0%)"
                       : outputMode === "script"
                       ? "translateX(100%)"
                       : "translateX(200%)",
-                  pointerEvents: "none", // ✅ fix click flipping
+                  pointerEvents: "none",
                 }}
               />
             </div>
@@ -514,12 +565,12 @@ export default function GeneratorPage() {
 
           {/* General settings row */}
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="ccg-card ccg-glass-soft p-3">
-              <div className="text-xs font-medium mb-2">{lang === "fa" ? "Shell / CLI" : "Shell / CLI"}</div>
+            <div className={subCardClass}>
+              <div className="text-xs font-semibold mb-2">{lang === "fa" ? "Shell / CLI" : "Shell / CLI"}</div>
               <select
                 value={cli}
                 onChange={(e) => setCli(e.target.value)}
-                className="w-full p-2 text-sm border border-gray-300/70 dark:border-white/10 rounded-lg bg-white/70 dark:bg-black/30 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full p-2.5 text-sm border border-gray-300/70 dark:border-white/10 rounded-xl bg-white/70 dark:bg-black/30 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                 disabled={outputMode !== "command"}
               >
                 {cliOptions.map((c) => (
@@ -545,10 +596,8 @@ export default function GeneratorPage() {
             </div>
 
             {platform === "network" && (
-              <div className="ccg-card ccg-glass-soft p-3">
-                <div className="text-xs font-medium mb-2">
-                  {lang === "fa" ? "تنظیمات دیفالت شبکه" : "Network Defaults"}
-                </div>
+              <div className={subCardClass}>
+                <div className="text-xs font-semibold mb-2">{lang === "fa" ? "تنظیمات دیفالت شبکه" : "Network Defaults"}</div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
@@ -556,7 +605,7 @@ export default function GeneratorPage() {
                     <select
                       value={netVendor}
                       onChange={(e) => setNetVendor(e.target.value)}
-                      className="w-full p-2 text-sm border border-gray-300/70 dark:border-white/10 rounded-lg bg-white/70 dark:bg-black/30 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-2.5 text-sm border border-gray-300/70 dark:border-white/10 rounded-xl bg-white/70 dark:bg-black/30 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                       disabled={loading}
                     >
                       {NETWORK_VENDORS.map((v) => (
@@ -572,7 +621,7 @@ export default function GeneratorPage() {
                     <select
                       value={deviceType}
                       onChange={(e) => setDeviceType(e.target.value)}
-                      className="w-full p-2 text-sm border border-gray-300/70 dark:border-white/10 rounded-lg bg-white/70 dark:bg-black/30 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-2.5 text-sm border border-gray-300/70 dark:border-white/10 rounded-xl bg-white/70 dark:bg-black/30 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                       disabled={loading}
                     >
                       {NETWORK_DEVICE_TYPES.map((d) => (
@@ -586,50 +635,50 @@ export default function GeneratorPage() {
 
                 <div className="mt-2 text-xs text-gray-600 dark:text-gray-300">
                   {lang === "fa"
-                    ? "این‌ها دیفالت شبکه هستند و داخل payload ارسال می‌شوند."
-                    : "These are default network options and will be sent in payload."}
+                    ? "Vendor و Device Type روی OS Type/Version در تنظیمات تخصصی اثر می‌گذارند."
+                    : "Vendor/Device Type also drive OS Type/Version in advanced settings."}
                 </div>
               </div>
             )}
           </div>
 
-          {/* Output knobs (COMMAND ONLY) */}
+          {/* Output knobs */}
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={onToggleMoreCommands}
-              className={`ccg-card ccg-glass-soft p-3 text-left transition ${
-                moreCommands ? knobActiveClass : "hover:opacity-95"
-              } ${outputMode !== "command" ? "opacity-40 cursor-not-allowed" : ""}`}
+              onClick={() => {
+                if (outputMode !== "command") return;
+                setMoreCommands((v) => !v);
+              }}
+              className={`${knobBase} ${moreCommands ? knobActive : "hover:opacity-95"} ${
+                outputMode !== "command" ? "opacity-40 cursor-not-allowed" : ""
+              }`}
               disabled={loading || outputMode !== "command"}
               title={outputMode !== "command" ? (lang === "fa" ? "فقط در حالت کامند فعال است" : "Only in Command mode") : ""}
             >
-              <div className="text-sm font-medium">{lang === "fa" ? "کامندهای بیشتر" : "More commands"}</div>
-              <div className="text-xs opacity-80">
-                {lang === "fa" ? "جایگزین‌های بیشتری پیشنهاد می‌شود." : "More alternatives will be suggested."}
-              </div>
+              <div className="text-sm font-semibold">{lang === "fa" ? "کامندهای بیشتر" : "More commands"}</div>
+              <div className="text-xs opacity-80">{lang === "fa" ? "جایگزین‌های بیشتری پیشنهاد می‌شود." : "More alternatives will be suggested."}</div>
             </button>
 
             <button
               type="button"
-              onClick={onToggleMoreDetails}
-              className={`ccg-card ccg-glass-soft p-3 text-left transition ${
-                moreDetails ? knobActiveClass : "hover:opacity-95"
-              } ${outputMode !== "command" ? "opacity-40 cursor-not-allowed" : ""}`}
-              disabled={loading || outputMode !== "command"}
-              title={outputMode !== "command" ? (lang === "fa" ? "فقط در حالت کامند فعال است" : "Only in Command mode") : ""}
+              onClick={() => setMoreDetails((v) => !v)}
+              className={`${knobBase} ${moreDetails ? knobActive : "hover:opacity-95"}`}
+              disabled={loading}
+              title={lang === "fa" ? "در همه حالت‌ها قابل استفاده است" : "Available in all modes"}
             >
-              <div className="text-sm font-medium">{lang === "fa" ? "توضیح بیشتر" : "More details"}</div>
-              <div className="text-xs opacity-80">
-                {lang === "fa" ? "توضیحات و هشدارها مفصل‌تر می‌شوند." : "Explanation and warnings become more detailed."}
-              </div>
+              <div className="text-sm font-semibold">{lang === "fa" ? "توضیحات بیشتر" : "More details"}</div>
+              <div className="text-xs opacity-80">{lang === "fa" ? "توضیحات و هشدارها مفصل‌تر می‌شوند." : "Explanation and warnings become more detailed."}</div>
             </button>
           </div>
 
-          <div className="mt-3 text-[11px] text-gray-600 dark:text-gray-300">
-            {lang === "fa"
-              ? "تولید فقط با دکمه «تولید خروجی» انجام می‌شود (تغییر گزینه‌ها تولید خودکار ندارد)."
-              : "Generation happens only via the Generate button (changing options won’t auto-generate)."}
+          {/* Modern info pill */}
+          <div className="mt-3 rounded-xl border border-gray-200/70 dark:border-white/10 bg-gray-50/70 dark:bg-white/[0.03] px-3 py-2">
+            <div className="text-[11px] text-gray-700 dark:text-gray-300">
+              {lang === "fa"
+                ? "تولید فقط با دکمه «تولید خروجی» انجام می‌شود (تغییر گزینه‌ها تولید خودکار ندارد)."
+                : "Generation happens only via the Generate button (changing options won’t auto-generate)."}
+            </div>
           </div>
         </div>
       </div>
@@ -638,22 +687,20 @@ export default function GeneratorPage() {
       <div className="ccg-container">
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="w-full ccg-card ccg-glass p-3 hover:opacity-95 transition"
+          className="w-full ccg-card ccg-glass p-3 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm ring-1 ring-black/5 dark:ring-white/10 hover:opacity-95 transition"
           type="button"
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div
-                className={`w-6 h-6 rounded flex items-center justify-center ${
+                className={`w-8 h-8 rounded-xl flex items-center justify-center ${
                   showAdvanced ? "bg-blue-500" : "bg-gray-200 dark:bg-gray-700"
                 }`}
               >
                 <span className="text-white text-sm">⚙️</span>
               </div>
               <div>
-                <div className="text-sm font-medium text-left">
-                  {lang === "fa" ? "تنظیمات تخصصی" : "Advanced Settings"}
-                </div>
+                <div className="text-sm font-semibold text-left">{lang === "fa" ? "تنظیمات تخصصی" : "Advanced Settings"}</div>
                 <div className="text-xs text-gray-600 dark:text-gray-300 text-left">
                   {lang === "fa" ? "فقط در صورت فعال‌سازی اعمال می‌شود" : "Applied only when enabled"}
                 </div>
@@ -665,15 +712,13 @@ export default function GeneratorPage() {
 
         {showAdvanced && (
           <div className="mt-3 animate-fadeIn">
-            <div className="ccg-card ccg-glass p-4 space-y-3">
+            <div className="ccg-card ccg-glass p-4 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm ring-1 ring-black/5 dark:ring-white/10 space-y-3">
               <div className="flex items-center justify-between">
-                <div className="text-sm font-medium">
-                  {lang === "fa" ? "فعال‌سازی تنظیمات تخصصی" : "Enable advanced settings"}
-                </div>
+                <div className="text-sm font-semibold">{lang === "fa" ? "فعال‌سازی تنظیمات تخصصی" : "Enable advanced settings"}</div>
                 <button
                   type="button"
                   onClick={() => setAdvancedEnabled(!advancedEnabled)}
-                  className={`px-3 py-1 rounded-lg text-sm transition ${
+                  className={`px-3 py-1 rounded-xl text-sm transition ${
                     advancedEnabled ? "bg-green-500 text-white" : "bg-gray-100 dark:bg-gray-800"
                   }`}
                 >
@@ -685,6 +730,8 @@ export default function GeneratorPage() {
                 platform={platform === "other" ? "other" : platform}
                 settings={advancedSettings}
                 onChange={setAdvancedSettings}
+                networkVendor={platform === "network" ? netVendor : undefined}
+                networkDeviceType={platform === "network" ? deviceType : undefined}
               />
 
               <div className="text-xs text-gray-600 dark:text-gray-300">
@@ -705,12 +752,12 @@ export default function GeneratorPage() {
           style={{ "--split": `${splitPct}%` }}
         >
           {/* Input */}
-          <div className="ccg-card ccg-glass p-4">
+          <div className="ccg-card ccg-glass p-4 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm ring-1 ring-black/5 dark:ring-white/10">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
               <h2 className="font-bold text-base">{lang === "fa" ? "📝 درخواست شما" : "📝 Your Request"}</h2>
               <button
                 onClick={clearAll}
-                className="px-2 py-1 text-xs bg-gray-100/70 dark:bg-black/30 rounded hover:opacity-90 transition border border-gray-200/60 dark:border-white/10"
+                className="px-2 py-1 text-xs bg-gray-100/70 dark:bg-black/30 rounded-xl hover:opacity-90 transition border border-gray-200/60 dark:border-white/10"
                 type="button"
               >
                 🗑️ {lang === "fa" ? "پاک کردن" : "Clear"}
@@ -721,7 +768,7 @@ export default function GeneratorPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder={lang === "fa" ? "مثال: میخوام سیستمم ۱ ساعت دیگه خاموش بشه" : "Example: Shutdown the system in 1 hour"}
-              className="w-full h-44 p-3 text-sm border border-gray-300/70 dark:border-white/10 rounded-lg resize-none focus:ring-1 focus:ring-blue-500 bg-white/70 dark:bg-black/30"
+              className="w-full h-44 p-3 text-sm border border-gray-300/70 dark:border-white/10 rounded-xl resize-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white/70 dark:bg-black/30"
               rows={4}
             />
 
@@ -731,13 +778,16 @@ export default function GeneratorPage() {
               </div>
             )}
 
+            {/* Generate / Cancel */}
             <button
-              onClick={generate}
-              disabled={loading || !String(input || "").trim()}
+              onClick={loading ? cancelGenerate : generate}
+              disabled={!loading && !String(input || "").trim()}
               className={`
-                mt-4 w-full py-3 rounded-lg font-medium text-sm transition
+                mt-4 w-full py-3 rounded-2xl font-semibold text-sm transition
                 ${
-                  loading || !String(input || "").trim()
+                  loading
+                    ? "bg-rose-600 text-white hover:opacity-90"
+                    : !String(input || "").trim()
                     ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed"
                     : `bg-gradient-to-r ${getPlatformColor(platform)} text-white hover:opacity-90`
                 }
@@ -747,7 +797,7 @@ export default function GeneratorPage() {
               {loading ? (
                 <div className="flex items-center justify-center gap-2">
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  <span>{lang === "fa" ? "در حال تولید..." : "Generating..."}</span>
+                  <span>{lang === "fa" ? "لغو تولید" : "Cancel"}</span>
                 </div>
               ) : (
                 <div className="flex items-center justify-center gap-2">
@@ -756,6 +806,12 @@ export default function GeneratorPage() {
                 </div>
               )}
             </button>
+
+            {loading ? (
+              <div className="mt-2 text-[11px] text-gray-600 dark:text-gray-300">
+                {lang === "fa" ? "برای لغو، دوباره روی دکمه کلیک کنید." : "Click again to cancel the request."}
+              </div>
+            ) : null}
           </div>
 
           {/* Resizer */}
@@ -775,7 +831,7 @@ export default function GeneratorPage() {
           </div>
 
           {/* Output */}
-          <div className="ccg-card ccg-glass p-4">
+          <div className="ccg-card ccg-glass p-4 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm ring-1 ring-black/5 dark:ring-white/10">
             <div className="flex items-center justify-between gap-2 mb-3">
               <h2 className="font-bold text-base">{lang === "fa" ? "✨ نتیجه" : "✨ Result"}</h2>
             </div>
@@ -788,9 +844,7 @@ export default function GeneratorPage() {
               <div className="text-center py-10 text-gray-600 dark:text-gray-300">
                 <div className="text-3xl mb-2">✨</div>
                 <div className="text-sm mb-1">{lang === "fa" ? "آماده برای تولید!" : "Ready!"}</div>
-                <div className="text-xs">
-                  {lang === "fa" ? "درخواست خود را بنویسید و تولید را بزنید" : "Write a request and click Generate"}
-                </div>
+                <div className="text-xs">{lang === "fa" ? "درخواست خود را بنویسید و تولید را بزنید" : "Write a request and click Generate"}</div>
               </div>
             )}
           </div>
@@ -799,7 +853,7 @@ export default function GeneratorPage() {
 
       {/* Persist info */}
       <div className="ccg-container">
-        <div className="ccg-card ccg-glass-soft p-3">
+        <div className="ccg-card ccg-glass-soft p-3 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm">
           <div className="text-xs text-gray-700 dark:text-gray-200 flex items-center gap-2">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
             <span>
@@ -813,4 +867,3 @@ export default function GeneratorPage() {
     </div>
   );
 }
-
