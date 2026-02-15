@@ -166,25 +166,209 @@ function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
 
+/** --------- Client-side Precheck (anti token-waste) --------- */
+const PRECHECK = {
+  minChars: 8,
+  minWords: 2,
+};
+
+function normalizeSpaces(s) {
+  return String(s || "").replace(/\s+/g, " ").trim();
+}
+
+function countWords(s) {
+  const t = normalizeSpaces(s);
+  if (!t) return 0;
+  return t.split(" ").filter(Boolean).length;
+}
+
+function isMostlyPunctOrEmoji(s) {
+  const t = String(s || "").trim();
+  if (!t) return true;
+  // keep letters/digits from many languages
+  const keep = t.replace(/[^\p{L}\p{N}]+/gu, "");
+  return keep.length === 0;
+}
+
+function isRepeatedCharGibberish(s) {
+  const t = normalizeSpaces(s);
+  if (!t) return true;
+  // detect long runs like "aaaaaa" or "؟؟؟؟؟؟" or "111111"
+  const compact = t.replace(/\s+/g, "");
+  if (compact.length < 8) return false;
+  return /(.)\1{5,}/u.test(compact);
+}
+
+function buildClientInputError({ lang, code, message, hint, fields }) {
+  return {
+    code,
+    message,
+    hint,
+    fields: fields || null,
+    source: "client",
+    lang,
+  };
+}
+
+function precheckUserRequest(raw, lang) {
+  const text = normalizeSpaces(raw);
+
+  if (!text) {
+    return buildClientInputError({
+      lang,
+      code: "INVALID_INPUT_EMPTY",
+      message: lang === "fa" ? "⚠️ لطفا درخواست خود را وارد کنید" : "⚠️ Please enter your request",
+      hint:
+        lang === "fa"
+          ? "مثال: «سیستم را ۱ ساعت دیگر ریستارت کن» یا «روی لینوکس سرویس nginx را ریستارت کن»"
+          : "Example: “Restart the system in 1 hour” or “Restart nginx on Linux”",
+    });
+  }
+
+  if (text.length < PRECHECK.minChars) {
+    return buildClientInputError({
+      lang,
+      code: "INVALID_INPUT_TOO_SHORT",
+      message: lang === "fa" ? "⚠️ درخواست خیلی کوتاه است" : "⚠️ Your request is too short",
+      hint:
+        lang === "fa"
+          ? `حداقل ${PRECHECK.minWords} کلمه بنویس و هدف را مشخص کن. مثال: «سیستم را ۱ ساعت دیگر ریستارت کن».`
+          : `Write at least ${PRECHECK.minWords} words and add context. Example: “Restart the system in 1 hour”.`,
+      fields: { ...PRECHECK },
+    });
+  }
+
+  const words = countWords(text);
+  if (words < PRECHECK.minWords) {
+    return buildClientInputError({
+      lang,
+      code: "INVALID_INPUT_MISSING_CONTEXT",
+      message: lang === "fa" ? "⚠️ درخواست ناقص است" : "⚠️ Request needs more context",
+      hint:
+        lang === "fa"
+          ? "فقط یک کلمه کافی نیست. بگو روی چه سیستمی، چه کاری و با چه شرطی. مثال: «روی ویندوز سیستم را همین الان ریستارت کن»."
+          : "One word isn’t enough. Specify platform, action, and condition. Example: “Restart Windows now.”",
+      fields: { ...PRECHECK },
+    });
+  }
+
+  if (isMostlyPunctOrEmoji(text)) {
+    return buildClientInputError({
+      lang,
+      code: "INVALID_INPUT_GIBBERISH",
+      message: lang === "fa" ? "⚠️ متن نامفهوم است" : "⚠️ The text looks unclear",
+      hint:
+        lang === "fa"
+          ? "لطفاً با کلمات واضح بنویس: چه کاری انجام شود؟ روی کدام سیستم؟"
+          : "Please write a clear request: what action, on which system?",
+    });
+  }
+
+  if (isRepeatedCharGibberish(text)) {
+    return buildClientInputError({
+      lang,
+      code: "INVALID_INPUT_GIBBERISH",
+      message: lang === "fa" ? "⚠️ متن شبیه ورودی نامعتبر است" : "⚠️ Input seems invalid",
+      hint:
+        lang === "fa"
+          ? "به‌نظر می‌رسد متن شامل تکرار زیاد کاراکترهاست. لطفاً درخواست را واضح‌تر بنویس."
+          : "It looks like repeated characters. Please write a clearer request.",
+    });
+  }
+
+  return null;
+}
+
+function formatApiErrorForUI(err, lang) {
+  // err from aiService includes: name, message, status, data
+  const isAbort = err?.name === "AbortError" || /aborted|abort/i.test(String(err?.message || ""));
+  if (isAbort) {
+    return {
+      code: "REQUEST_ABORTED",
+      message: lang === "fa" ? "⛔ تولید لغو شد" : "⛔ Generation cancelled",
+      hint: lang === "fa" ? "اگر لازم بود، دوباره تلاش کن." : "You can try again anytime.",
+      source: "client",
+      status: 0,
+    };
+  }
+
+  const status = Number(err?.status || err?.response?.status || 0) || 0;
+  const data = err?.data;
+
+  // If backend returns structured error
+  const apiErr = data && typeof data === "object" ? data.error || data.err || null : null;
+  if (apiErr && typeof apiErr === "object") {
+    return {
+      code: String(apiErr.code || "API_ERROR"),
+      message: String(apiErr.userMessage || apiErr.message || err?.message || "Error"),
+      hint: String(apiErr.hint || ""),
+      fields: apiErr.fields || null,
+      source: "api",
+      status,
+    };
+  }
+
+  // Common status mapping
+  if (status === 400) {
+    return {
+      code: "BAD_REQUEST",
+      message: lang === "fa" ? "⚠️ درخواست نامعتبر است" : "⚠️ Invalid request",
+      hint:
+        lang === "fa"
+          ? "لطفاً درخواست را واضح‌تر بنویس و جزئیات لازم را اضافه کن."
+          : "Please rewrite with clearer details.",
+      source: "api",
+      status,
+    };
+  }
+
+  if (status === 429) {
+    return {
+      code: "RATE_LIMITED",
+      message: lang === "fa" ? "⏳ تعداد درخواست‌ها زیاد است" : "⏳ Too many requests",
+      hint:
+        lang === "fa"
+          ? "کمی صبر کن و دوباره تلاش کن. (بعداً اینجا پیشنهاد ارتقا پلن هم می‌آید.)"
+          : "Please wait and try again. (Upgrade CTA can be added here later.)",
+      source: "api",
+      status,
+    };
+  }
+
+  if (status === 401 || status === 403) {
+    return {
+      code: "FORBIDDEN",
+      message: lang === "fa" ? "🚫 دسترسی غیرمجاز" : "🚫 Access denied",
+      hint: lang === "fa" ? "اگر وارد حساب هستی، دوباره تلاش کن." : "If you’re signed in, try again.",
+      source: "api",
+      status,
+    };
+  }
+
+  return {
+    code: "SERVER_ERROR",
+    message: err?.message || (lang === "fa" ? "❌ خطا در ارتباط با سرور" : "❌ Server connection error"),
+    hint:
+      lang === "fa"
+        ? "اگر مشکل ادامه داشت، صفحه را رفرش کن یا چند دقیقه بعد دوباره تلاش کن."
+        : "If it persists, refresh the page and try again in a minute.",
+    source: "api",
+    status,
+  };
+}
+
 export default function GeneratorPage() {
   const { lang } = useLanguage();
 
   const [platform, setPlatform] = usePersistState("platform", "linux");
   const [otherOS, setOtherOS] = usePersistState("other_os", "freebsd");
 
-  // Network defaults (General settings)
   const [netVendor, setNetVendor] = usePersistState("network_vendor", "cisco");
   const [deviceType, setDeviceType] = usePersistState("network_device_type", "router");
 
-  // Output Mode
   const [outputMode, setOutputMode] = usePersistState("generator_output_mode", "command");
-
-  // CLI only meaningful in Command mode
   const [cli, setCli] = usePersistState("generator_cli", defaultCliForPlatform(platform));
 
-  // knobs:
-  // - moreCommands: command only
-  // - moreDetails: all modes
   const [moreDetails, setMoreDetails] = usePersistState("generator_more_details", false);
   const [moreCommands, setMoreCommands] = usePersistState("generator_more_commands", false);
 
@@ -192,9 +376,10 @@ export default function GeneratorPage() {
   const [output, setOutput] = useState("");
   const [tool, setTool] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  // Advanced
+  // ✅ error is now an object (but backward compatible)
+  const [error, setError] = useState(null);
+
   const [showAdvanced, setShowAdvanced] = usePersistState("show_advanced", false);
   const [advancedEnabled, setAdvancedEnabled] = usePersistState("advanced_enabled", false);
   const [advancedSettings, setAdvancedSettings] = usePersistComplexState("advanced_settings", {});
@@ -202,15 +387,12 @@ export default function GeneratorPage() {
   const finalPlatform = platform === "other" ? `other:${otherOS}` : platform;
   const cliOptions = useMemo(() => cliOptionsForPlatform(platform), [platform]);
 
-  // Split pane (persisted)
   const [splitPct, setSplitPct] = usePersistState("generator_split_pct", 50);
   const splitWrapRef = useRef(null);
   const draggingRef = useRef(false);
 
-  // Abort / Cancel support
   const abortRef = useRef(null);
 
-  // keep CLI valid on platform changes
   useEffect(() => {
     const allowed = new Set(cliOptions.map((x) => String(x).toLowerCase()));
     const cur = String(cli || "").toLowerCase();
@@ -218,12 +400,10 @@ export default function GeneratorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platform]);
 
-  // if outputMode changes, ensure knobs make sense (NO auto-generate)
   useEffect(() => {
     if (outputMode !== "command") {
       if (moreCommands) setMoreCommands(false);
     }
-    // moreDetails stays for all modes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [outputMode]);
 
@@ -253,7 +433,7 @@ export default function GeneratorPage() {
     setInput("");
     setOutput("");
     setTool(null);
-    setError("");
+    setError(null);
   };
 
   function computeCliForPayload({ platform, outputMode, cli }) {
@@ -262,7 +442,6 @@ export default function GeneratorPage() {
     return String(cli || defaultCliForPlatform(platform)).toLowerCase();
   }
 
-  // Network os fields from advanced settings (schema uses snake_case)
   function pickNetworkOsType(s) {
     const o = s && typeof s === "object" ? s : {};
     return String(o.os_type || o.osType || "").trim();
@@ -273,12 +452,14 @@ export default function GeneratorPage() {
   }
 
   async function generate() {
-    if (!String(input || "").trim()) {
-      setError(lang === "fa" ? "⚠️ لطفا درخواست خود را وارد کنید" : "⚠️ Please enter your request");
+    // ✅ Precheck (no token waste)
+    const preErr = precheckUserRequest(input, lang);
+    if (preErr) {
+      setError(preErr);
       return;
     }
 
-    // Cancel any in-flight request before starting new one
+    // cancel in-flight
     if (abortRef.current) {
       try {
         abortRef.current.abort();
@@ -291,7 +472,7 @@ export default function GeneratorPage() {
     abortRef.current = controller;
 
     setLoading(true);
-    setError("");
+    setError(null);
 
     const baseCli = computeCliForPayload({ platform, outputMode, cli });
 
@@ -305,7 +486,6 @@ export default function GeneratorPage() {
       platform: finalPlatform,
       cli: baseCli,
 
-      // knobs
       moreDetails: Boolean(moreDetails),
       moreCommands: outputMode === "command" ? Boolean(moreCommands) : false,
 
@@ -314,7 +494,6 @@ export default function GeneratorPage() {
       vendor: platform === "network" ? netVendor : undefined,
       deviceType: platform === "network" ? deviceType : undefined,
 
-      // send both conventions for compatibility
       os_type: platform === "network" && netOsType ? netOsType : undefined,
       os_version: platform === "network" && netOsVersion ? netOsVersion : undefined,
       osType: platform === "network" && netOsType ? netOsType : undefined,
@@ -323,7 +502,7 @@ export default function GeneratorPage() {
       advancedEnabled: Boolean(advancedEnabled),
       advanced: advancedEnabled ? compactAdvanced(advancedSettings) : undefined,
 
-      user_request: String(input || "").trim(),
+      user_request: normalizeSpaces(input),
       timestamp: new Date().toISOString(),
     };
 
@@ -336,14 +515,7 @@ export default function GeneratorPage() {
       const built = buildToolFromResponse(result, lang, payload.cli);
       setTool(built);
     } catch (err) {
-      const msg = String(err?.name || err?.message || "");
-      const isAbort = err?.name === "AbortError" || /aborted|abort/i.test(msg);
-
-      if (isAbort) {
-        setError(lang === "fa" ? "⛔ تولید لغو شد" : "⛔ Generation cancelled");
-      } else {
-        setError(err?.message || (lang === "fa" ? "❌ خطا در ارتباط با سرور" : "❌ Server connection error"));
-      }
+      setError(formatApiErrorForUI(err, lang));
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
       setLoading(false);
@@ -359,7 +531,6 @@ export default function GeneratorPage() {
     }
   }
 
-  /** --------- UI: segmented control (Output Mode) --------- */
   const outputModes = useMemo(() => {
     return [
       {
@@ -388,7 +559,6 @@ export default function GeneratorPage() {
     setOutputMode(next);
   };
 
-  /** --------- split pane drag --------- */
   const startDrag = (clientX) => {
     const wrap = splitWrapRef.current;
     if (!wrap) return;
@@ -464,18 +634,21 @@ export default function GeneratorPage() {
 
   const dirClass = lang === "fa" ? "rtl" : "ltr";
 
-  // ✅ Modern “panel-ish” card for the area you pointed at
   const panelClass =
     "ccg-card ccg-glass p-4 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm ring-1 ring-black/5 dark:ring-white/10";
-
   const subCardClass =
     "ccg-card ccg-glass-soft p-3 rounded-2xl border border-gray-200/60 dark:border-white/10 shadow-sm";
-
   const knobBase =
     "ccg-card ccg-glass-soft p-3 rounded-2xl border border-gray-200/60 dark:border-white/10 shadow-sm text-left transition";
+  const knobActive = "ccg-knob-active ring-2 ring-blue-500/20 dark:ring-blue-400/20";
 
-  const knobActive =
-    "ccg-knob-active ring-2 ring-blue-500/20 dark:ring-blue-400/20";
+  // ✅ normalize error for display (string or object)
+  const errObj =
+    error && typeof error === "object"
+      ? error
+      : error
+      ? { code: "ERROR", message: String(error), hint: "", source: "client" }
+      : null;
 
   return (
     <div className={`space-y-4 md:space-y-6 ${dirClass}`}>
@@ -483,7 +656,6 @@ export default function GeneratorPage() {
         <FeedbackButton />
       </div>
 
-      {/* Platform & Output Mode */}
       <div className="ccg-container">
         <div className={panelClass}>
           <h2 className="font-bold text-base mb-3">{lang === "fa" ? "🎯 پلتفرم هدف" : "🎯 Target Platform"}</h2>
@@ -517,7 +689,6 @@ export default function GeneratorPage() {
             </div>
           )}
 
-          {/* Output Mode selector */}
           <div className="mt-4">
             <div className="text-xs font-medium mb-2">{lang === "fa" ? "🧭 نوع خروجی" : "🧭 Output Mode"}</div>
 
@@ -540,7 +711,6 @@ export default function GeneratorPage() {
                   </button>
                 );
               })}
-              {/* RTL/LTR indicator mapping */}
               <div
                 className="ccg-seg-indicator"
                 style={{
@@ -563,7 +733,6 @@ export default function GeneratorPage() {
             </div>
           </div>
 
-          {/* General settings row */}
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className={subCardClass}>
               <div className="text-xs font-semibold mb-2">{lang === "fa" ? "Shell / CLI" : "Shell / CLI"}</div>
@@ -642,7 +811,6 @@ export default function GeneratorPage() {
             )}
           </div>
 
-          {/* Output knobs */}
           <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
             <button
               type="button"
@@ -672,7 +840,6 @@ export default function GeneratorPage() {
             </button>
           </div>
 
-          {/* Modern info pill */}
           <div className="mt-3 rounded-xl border border-gray-200/70 dark:border-white/10 bg-gray-50/70 dark:bg-white/[0.03] px-3 py-2">
             <div className="text-[11px] text-gray-700 dark:text-gray-300">
               {lang === "fa"
@@ -744,13 +911,9 @@ export default function GeneratorPage() {
         )}
       </div>
 
-      {/* Split pane: Input | Output */}
+      {/* Split pane */}
       <div className="ccg-container">
-        <div
-          ref={splitWrapRef}
-          className={`ccg-split ${lang === "fa" ? "is-rtl" : "is-ltr"}`}
-          style={{ "--split": `${splitPct}%` }}
-        >
+        <div ref={splitWrapRef} className={`ccg-split ${lang === "fa" ? "is-rtl" : "is-ltr"}`} style={{ "--split": `${splitPct}%` }}>
           {/* Input */}
           <div className="ccg-card ccg-glass p-4 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm ring-1 ring-black/5 dark:ring-white/10">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
@@ -772,13 +935,17 @@ export default function GeneratorPage() {
               rows={4}
             />
 
-            {error && (
-              <div className="mt-3 p-2 ccg-alert-danger animate-fadeIn">
-                <div className="text-xs font-medium">{error}</div>
+            {/* ✅ Better error UI */}
+            {errObj && (
+              <div className="mt-3 rounded-xl border border-rose-200/70 bg-rose-50/80 p-3 text-rose-800 dark:border-rose-700/40 dark:bg-rose-900/20 dark:text-rose-200 animate-fadeIn">
+                <div className="text-xs font-semibold">
+                  {errObj.message}
+                  {errObj.code ? <span className="ml-2 opacity-70">({errObj.code})</span> : null}
+                </div>
+                {errObj.hint ? <div className="mt-1 text-xs opacity-95">💡 {errObj.hint}</div> : null}
               </div>
             )}
 
-            {/* Generate / Cancel */}
             <button
               onClick={loading ? cancelGenerate : generate}
               disabled={!loading && !String(input || "").trim()}

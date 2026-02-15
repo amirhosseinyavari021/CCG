@@ -1,14 +1,11 @@
-import { useState } from "react";
+// client/src/components/ui/SectionedMarkdown.jsx
 import { useMemo } from "react";
 import MarkdownBox from "./MarkdownBox";
 
-/**
- * TDZ-safe SectionedMarkdown:
- * - pure helpers (no closures referencing const before init)
- */
 function splitByHeadings(md) {
   const raw = String(md || "").replace(/\r\n/g, "\n");
   const lines = raw.split("\n");
+
   const sections = [];
   let currentTitle = null;
   let currentBody = [];
@@ -20,6 +17,7 @@ function splitByHeadings(md) {
   }
 
   for (const line of lines) {
+    // فقط ## تا ###### برای بخش‌ها
     const m = line.match(/^(#{2,6})\s+(.+)\s*$/);
     if (m) {
       if (currentTitle !== null || currentBody.length) push();
@@ -38,11 +36,22 @@ function splitByHeadings(md) {
 export default function SectionedMarkdown({ markdown, content, lang = "fa", defaultTitle }) {
   const md = content ?? markdown ?? "";
   const sections = useMemo(() => splitByHeadings(md), [md]);
+  const isFa = lang !== "en";
 
-  if (!String(md).trim()) return <MarkdownBox markdown={""} lang={lang} />;
+  if (!String(md).trim()) return <MarkdownBox content={""} lang={lang} />;
 
+  // بدون heading => یک کارت
   if (sections.length === 1 && !sections[0].title) {
-    return <MarkdownBox markdown={sections[0].body} lang={lang} />;
+    const title =
+      defaultTitle || (isFa ? "خروجی" : "Output");
+    return (
+      <div className="ccg-section-grid">
+        <div className="ccg-card p-4 sm:p-5">
+          <div className="font-semibold mb-3">{title}</div>
+          <MarkdownBox content={sections[0].body} lang={lang} />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -51,11 +60,12 @@ export default function SectionedMarkdown({ markdown, content, lang = "fa", defa
         const title =
           sec.title ||
           defaultTitle ||
-          (lang === "fa" ? `بخش ${idx + 1}` : `Section ${idx + 1}`);
+          (isFa ? `بخش ${idx + 1}` : `Section ${idx + 1}`);
+
         return (
           <div key={idx} className="ccg-card p-4 sm:p-5">
             <div className="font-semibold mb-3">{title}</div>
-            <MarkdownBox markdown={sec.body} lang={lang} />
+            <MarkdownBox content={sec.body} lang={lang} />
           </div>
         );
       })}
