@@ -25,22 +25,54 @@ function CopyButton({ text, labelFa = "کپی", labelEn = "Copy", lang = "fa" })
   );
 }
 
-function CodeBlock({ inline, className, children, lang = "fa" }) {
+function looksLikeTinySnippet(code) {
+  const t = String(code || "").trim();
+  if (!t) return true;
+  // تک‌خط‌های کوتاه مثل re / TypeError / text.lower() / [::-1]
+  const lines = t.split("\n").filter(Boolean);
+  if (lines.length > 2) return false;
+  if (t.length > 120) return false;
+  return true;
+}
+
+function CodeBlock({ inline, className, children, lang = "fa", allowCodeBlocks = true }) {
   const code = String(children || "").replace(/\n$/, "");
   const language = (className || "").replace("language-", "").trim();
 
   // inline code => بدون Copy و بدون Card
   if (inline) {
     return (
-      <code
-        dir="ltr"
-        className="px-1 py-0.5 rounded bg-white/10 border border-white/10 text-[0.95em]"
-      >
+      <code dir="ltr" className="px-1 py-0.5 rounded bg-white/10 border border-white/10 text-[0.95em]">
         {children}
       </code>
     );
   }
 
+  // ✅ اگر در این بخش اجازه code-block نداریم:
+  // هر چیزی که markdown به صورت block داد را تبدیل می‌کنیم به inline-highlight
+  // تا “کارت CODE + کپی” اصلاً ظاهر نشود.
+  if (!allowCodeBlocks) {
+    const tiny = looksLikeTinySnippet(code);
+
+    // tiny => inline-highlight
+    if (tiny) {
+      return (
+        <code dir="ltr" className="px-1 py-0.5 rounded bg-white/10 border border-white/10 text-[0.95em]">
+          {code}
+        </code>
+      );
+    }
+
+    // غیر tiny (اگر مدل واقعاً چند خط کد انداخت تو تفاوت‌ها) => به صورت متن ساده
+    // تا باز هم کارت CODE ساخته نشود
+    return (
+      <span dir="ltr" className="whitespace-pre-wrap font-mono text-[0.95em]">
+        {code}
+      </span>
+    );
+  }
+
+  // ✅ حالت عادی: فقط برای Merge Final
   return (
     <div className="my-3 rounded-xl border border-white/10 bg-black/20 overflow-hidden">
       <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-black/30">
@@ -62,8 +94,9 @@ function CodeBlock({ inline, className, children, lang = "fa" }) {
  */
 export default function MarkdownBox(props) {
   const lang = (props?.lang || "fa") === "en" ? "en" : "fa";
-  const md =
-    (props?.content ?? props?.markdown ?? props?.md ?? "")?.toString?.() ?? "";
+  const allowCodeBlocks = props?.allowCodeBlocks !== undefined ? Boolean(props.allowCodeBlocks) : true;
+
+  const md = (props?.content ?? props?.markdown ?? props?.md ?? "")?.toString?.() ?? "";
 
   const isFa = lang === "fa";
   const wrapperDir = isFa ? "rtl" : "ltr";
@@ -79,7 +112,7 @@ export default function MarkdownBox(props) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          code: (p) => <CodeBlock {...p} lang={lang} />,
+          code: (p) => <CodeBlock {...p} lang={lang} allowCodeBlocks={allowCodeBlocks} />,
         }}
       >
         {safeMd}

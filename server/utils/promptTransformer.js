@@ -1,5 +1,7 @@
 // server/utils/promptTransformer.js
-// Deterministic "generator" prompt => JSON tool contract (NOT chat)
+// Deterministic prompts for generator + comparator fallback
+
+import { buildComparatorPromptStrict } from "./promptBuilder.js";
 
 function asStr(x, d = "") {
   if (x === null || x === undefined) return d;
@@ -15,6 +17,11 @@ function asBool(x) {
   return x === true || x === "true" || x === 1 || x === "1";
 }
 
+/**
+ * Normalizes payload into variables that both:
+ * - stored prompt can accept
+ * - fallback prompt can enforce
+ */
 export function toPromptVariables(payload = {}) {
   const p = payload && typeof payload === "object" ? payload : {};
   const lang = asStr(p.lang, "fa").toLowerCase() === "en" ? "en" : "fa";
@@ -24,7 +31,7 @@ export function toPromptVariables(payload = {}) {
     platform === "windows" ? "powershell" : platform === "mac" ? "zsh" : "bash"
   ).toLowerCase();
 
-  const outputType = asStr(p.outputType, "tool").toLowerCase();
+  const outputType = asStr(p.outputType, "tool").toLowerCase(); // tool|python
   const knowledgeLevel = asStr(p.knowledgeLevel, "intermediate").toLowerCase();
 
   const moreDetails = asBool(p.moreDetails);
@@ -32,59 +39,58 @@ export function toPromptVariables(payload = {}) {
 
   const advanced = p.advanced && typeof p.advanced === "object" ? p.advanced : undefined;
 
+  const mode = asStr(p.mode, "generate").toLowerCase();
+
   return {
-    mode: asStr(p.mode, "generate").toLowerCase(),
-    modeStyle: asStr(p.modeStyle, "generator"),
+    mode,
+    // FIX: modeStyle always consistent with mode if not explicitly provided
+    modeStyle: asStr(p.modeStyle, mode === "compare" ? "comparator" : "generator"),
+
     lang,
     platform,
     os: platform,
     cli,
     outputType,
     knowledgeLevel,
+
     moreDetails,
     moreCommands,
-    user_request: asStr(p.user_request || p.userRequest || p.prompt || p.text || p.message, "").trim(),
+
+    // raw user request (USED ONLY IN GENERATOR MODE)
+    user_request:
+      mode === "compare"
+        ? ""
+        : asStr(p.user_request || p.userRequest || p.prompt || p.text || p.message, "").trim(),
+
+    // comparator inputs
+    input_a: asStr(p.input_a || p.inputA, ""),
+    input_b: asStr(p.input_b || p.inputB, ""),
+    codeLangA: asStr(p.codeLangA || "", ""),
+    codeLangB: asStr(p.codeLangB || "", ""),
+
+    // optional extras
     vendor: asStr(p.vendor, ""),
     deviceType: asStr(p.deviceType, ""),
     advanced,
-    input_a: asStr(p.input_a, ""),
-    input_b: asStr(p.input_b, ""),
-    codeLangA: asStr(p.codeLangA, ""),
-    codeLangB: asStr(p.codeLangB, ""),
   };
 }
 
-function languageRule(lang) {
-  if (lang === "en") {
-    return `LANGUAGE RULE (STRICT):
-- Output MUST be English only.
-- Do NOT output any other language.`;
-  }
-  return `قانون زبان (خیلی سخت‌گیرانه):
-- خروجی MUST فقط فارسی باشد.
-- هیچ زبان دیگری ننویس (نه کره‌ای/ژاپنی/چینی/انگلیسی و ...).`;
-}
-
-function jsonContractSpecFa({ outputType, cli, platform, altCount, detailLevel, lang }) {
+function jsonContractSpecFa({ outputType, cli, platform, altCount, detailLevel }) {
   const isPython = outputType === "python" || cli === "python";
-  const titleHint = lang === "fa" ? "عنوان کوتاه و مفید" : "Short useful title";
-
   return `
 You are CCG Command Generator (GENERATOR MODE). This is NOT chat.
 Return ONLY a valid JSON object (no markdown, no code fences, no extra text).
 
-${languageRule(lang)}
-
 JSON schema:
 {
   "tool": {
-    "title": "${titleHint}",
+    "title": "short Persian title",
     "lang": "${isPython ? "python" : cli}",
     "platform": "${platform}",
     "primary": { "label": "command", "command": "..." },
     "alternatives": [ { "label": "alternative", "command": "..." } ],
-    "explanation": [ "..." ],
-    "warnings": [ "..." ]
+    "explanation": [ "bullet 1", "bullet 2" ],
+    "warnings": [ "warning 1", "warning 2" ]
   }
 }
 
@@ -93,7 +99,7 @@ Rules:
 - Provide up to ${altCount} alternatives.
 - explanation length: ${detailLevel}.
 - warnings: always include at least 1 safety warning (permissions/data loss/impact).
-- Do NOT ask questions.
+- Do NOT ask questions, do NOT add “if you have questions…” lines.
 - Commands must match platform=${platform} and cli=${isPython ? "python" : cli}.
 `.trim();
 }
@@ -103,12 +109,19 @@ function fewShot() {
 Example:
 Input: user_request="restart computer", platform="windows", cli="powershell"
 Output:
-{"tool":{"title":"ریستارت ویندوز","lang":"powershell","platform":"windows","primary":{"label":"command","command":"Restart-Computer"},"alternatives":[{"label":"alternative","command":"shutdown /r /t 0"}],"explanation":["سیستم را ریستارت می‌کند.","اگر CMD لازم بود از shutdown استفاده کن."],"warnings":["قبل از اجرا فایل‌ها را ذخیره کن."]}}
+{"tool":{"title":"ریستارت سیستم در ویندوز (PowerShell)","lang":"powershell","platform":"windows","primary":{"label":"command","command":"Restart-Computer"},"alternatives":[{"label":"alternative","command":"shutdown /r /t 0"}],"explanation":["Restart-Computer سیستم را ریستارت می‌کند.","اگر CMD لازم بود از shutdown استفاده کنید."],"warnings":["اگر کار ذخیره نشده دارید، قبل از اجرا ذخیره کنید."]}}
 `.trim();
 }
 
 export function buildFallbackPrompt(v) {
   const vars = v && typeof v === "object" ? v : {};
+  const mode = asStr(vars.mode, "generate").toLowerCase();
+
+  // Comparator fallback: strict markdown comparator (no JSON)
+  if (mode === "compare") {
+    return buildComparatorPromptStrict(vars);
+  }
+
   const platform = asStr(vars.platform, "linux").toLowerCase();
   const cli = asStr(
     vars.cli,
@@ -122,9 +135,8 @@ export function buildFallbackPrompt(v) {
   const altCount = moreCommands ? 4 : 2;
   const detailLevel = moreDetails ? "detailed (4-8 bullets)" : "concise (2-4 bullets)";
 
-  const lang = asStr(vars.lang, "fa").toLowerCase() === "en" ? "en" : "fa";
+  const contract = jsonContractSpecFa({ outputType, cli, platform, altCount, detailLevel });
 
-  const contract = jsonContractSpecFa({ outputType, cli, platform, altCount, detailLevel, lang });
   const adv = vars.advanced ? JSON.stringify(vars.advanced) : "";
 
   return `
@@ -132,7 +144,7 @@ ${contract}
 
 ${fewShot()}
 
-User request:
+User request (Persian):
 ${asStr(vars.user_request, "")}
 
 Context:

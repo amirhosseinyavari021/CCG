@@ -33,6 +33,7 @@
         "express-validator": "^7.0.1",
         "google-auth-library": "^10.5.0",
         "helmet": "^8.1.0",
+        "highlight.js": "^11.11.1",
         "json5": "^2.2.3",
         "jsonwebtoken": "^9.0.2",
         "mongoose": "^8.0.0",

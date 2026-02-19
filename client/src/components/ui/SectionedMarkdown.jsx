@@ -17,7 +17,6 @@ function splitByHeadings(md) {
   }
 
   for (const line of lines) {
-    // فقط ## تا ###### برای بخش‌ها
     const m = line.match(/^(#{2,6})\s+(.+)\s*$/);
     if (m) {
       if (currentTitle !== null || currentBody.length) push();
@@ -33,6 +32,15 @@ function splitByHeadings(md) {
   return sections;
 }
 
+function isFinalCodeSectionTitle(title, lang) {
+  const t = String(title || "").trim();
+  if (!t) return false;
+
+  // فارسی / انگلیسی
+  if (lang === "en") return /final\s+merged\s+code/i.test(t);
+  return /کد\s*Merge\s*نهایی/i.test(t) || /کد\s*مرج\s*نهایی/i.test(t);
+}
+
 export default function SectionedMarkdown({ markdown, content, lang = "fa", defaultTitle }) {
   const md = content ?? markdown ?? "";
   const sections = useMemo(() => splitByHeadings(md), [md]);
@@ -40,10 +48,8 @@ export default function SectionedMarkdown({ markdown, content, lang = "fa", defa
 
   if (!String(md).trim()) return <MarkdownBox content={""} lang={lang} />;
 
-  // بدون heading => یک کارت
   if (sections.length === 1 && !sections[0].title) {
-    const title =
-      defaultTitle || (isFa ? "خروجی" : "Output");
+    const title = defaultTitle || (isFa ? "خروجی" : "Output");
     return (
       <div className="ccg-section-grid">
         <div className="ccg-card p-4 sm:p-5">
@@ -57,15 +63,15 @@ export default function SectionedMarkdown({ markdown, content, lang = "fa", defa
   return (
     <div className="ccg-section-grid">
       {sections.map((sec, idx) => {
-        const title =
-          sec.title ||
-          defaultTitle ||
-          (isFa ? `بخش ${idx + 1}` : `Section ${idx + 1}`);
+        const title = sec.title || defaultTitle || (isFa ? `بخش ${idx + 1}` : `Section ${idx + 1}`);
+
+        // ✅ فقط در بخش کد نهایی اجازه code-block کارت‌دار داریم
+        const allowCodeBlocks = isFinalCodeSectionTitle(title, lang);
 
         return (
           <div key={idx} className="ccg-card p-4 sm:p-5">
             <div className="font-semibold mb-3">{title}</div>
-            <MarkdownBox content={sec.body} lang={lang} />
+            <MarkdownBox content={sec.body} lang={lang} allowCodeBlocks={allowCodeBlocks} />
           </div>
         );
       })}

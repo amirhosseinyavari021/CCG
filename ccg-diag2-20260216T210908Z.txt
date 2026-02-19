@@ -1,0 +1,2300 @@
+
+============================================================
+## BASICS
+
+============================================================
+
+$ pwd
+/home/cando/CCG
+
+$ node -v
+v22.22.0
+
+$ npm -v
+10.9.4
+
+$ pm2 -v
+6.0.14
+
+$ date -u
+Mon Feb 16 09:09:08 PM UTC 2026
+
+============================================================
+## ENV (masked)
+
+============================================================
+AI_PROVIDER=
+AI_PRIMARY_MODEL=
+OPENAI_BASE_URL=
+OPENROUTER_BASE_URL=
+AI_HTTP_TIMEOUT_MS=
+AI_HTTP_MAX_RETRIES=
+PORT=
+NODE_ENV=
+DOTENV_PATH=
+OPENAI_API_KEY=
+OPENROUTER_API_KEY=
+
+============================================================
+## .env (relevant lines masked)
+
+============================================================
+6:PORT=***masked***
+7:NODE_ENV=***masked***
+15:AI_PROVIDER=***masked***
+35:OPENROUTER_API_KEY=***masked***
+37:OPENROUTER_BASE_URL=***masked***
+
+============================================================
+## PM2 (env + describe)
+
+============================================================
+
+$ pm2 describe ccg
+ Describing process with id 0 - name ccg 
+┌───────────────────┬────────────────────────────────────┐
+│ status            │ online                             │
+│ name              │ ccg                                │
+│ namespace         │ default                            │
+│ version           │ 3.2.0                              │
+│ restarts          │ 95                                 │
+│ uptime            │ 13m                                │
+│ entire log path   │ /home/cando/CCG/logs/pm2.log       │
+│ script path       │ /home/cando/CCG/server.js          │
+│ script args       │ N/A                                │
+│ error log path    │ /home/cando/CCG/logs/pm2-error.log │
+│ out log path      │ /home/cando/CCG/logs/pm2-out.log   │
+│ pid path          │ /home/cando/.pm2/pids/ccg-0.pid    │
+│ interpreter       │ node                               │
+│ interpreter args  │ N/A                                │
+│ script id         │ 0                                  │
+│ exec cwd          │ /home/cando/CCG                    │
+│ exec mode         │ fork_mode                          │
+│ node.js version   │ 22.22.0                            │
+│ node env          │ N/A                                │
+│ watch & reload    │ ✘                                  │
+│ unstable restarts │ 0                                  │
+│ created at        │ 2026-02-16T20:55:25.580Z           │
+└───────────────────┴────────────────────────────────────┘
+ Actions available 
+┌────────────────────────┐
+│ km:heapdump            │
+│ km:cpu:profiling:start │
+│ km:cpu:profiling:stop  │
+│ km:heap:sampling:start │
+│ km:heap:sampling:stop  │
+└────────────────────────┘
+ Trigger via: pm2 trigger ccg <action_name>
+
+ Code metrics value 
+┌────────────────────────┬───────────┐
+│ Used Heap Size         │ 14.98 MiB │
+│ Heap Usage             │ 86.86 %   │
+│ Heap Size              │ 17.25 MiB │
+│ Event Loop Latency p95 │ 1.47 ms   │
+│ Event Loop Latency     │ 0.55 ms   │
+│ Active handles         │ 4         │
+│ Active requests        │ 0         │
+│ HTTP                   │ 0 req/min │
+│ HTTP P95 Latency       │ 14040 ms  │
+│ HTTP Mean Latency      │ 14040 ms  │
+└────────────────────────┴───────────┘
+ Divergent env variables from local env 
+┌────────────────┬────────────────────────────────────────┐
+│ SSH_CONNECTION │ 217.218.49.55 52892 192.168.150.123 22 │
+│ SHLVL          │ 1                                      │
+│ XDG_SESSION_ID │ 15771                                  │
+│ SSH_CLIENT     │ 217.218.49.55 52892 22                 │
+│ OLDPWD         │ /home/cando/CCG/client                 │
+└────────────────┴────────────────────────────────────────┘
+
+ Add your own code metrics: http://bit.ly/code-metrics
+ Use `pm2 logs ccg [--lines 1000]` to display logs
+ Use `pm2 env 0` to display environment variables
+ Use `pm2 monit` to monitor CPU and Memory usage ccg
+
+$ pm2 env 0
+time: true
+log_date_format: YYYY-MM-DDTHH:mm:ss
+namespace: default
+pm_log_path: /home/cando/CCG/logs/pm2.log
+km_link: false
+vizion_running: false
+NODE_APP_INSTANCE: 0
+SHELL: /bin/bash
+NVM_INC: /home/cando/.nvm/versions/node/v22.22.0/include/node
+PWD: /home/cando/CCG
+LOGNAME: cando
+XDG_SESSION_TYPE: tty
+HOME: /home/cando
+LANG: en_US.UTF-8
+LS_COLORS: rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=00:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.zst=01;31:*.tzst=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.wim=01;31:*.swm=01;31:*.dwm=01;31:*.esd=01;31:*.avif=01;35:*.jpg=01;35:*.jpeg=01;35:*.mjpg=01;35:*.mjpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.webp=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:*~=00;90:*#=00;90:*.bak=00;90:*.crdownload=00;90:*.dpkg-dist=00;90:*.dpkg-new=00;90:*.dpkg-old=00;90:*.dpkg-tmp=00;90:*.old=00;90:*.orig=00;90:*.part=00;90:*.rej=00;90:*.rpmnew=00;90:*.rpmorig=00;90:*.rpmsave=00;90:*.swp=00;90:*.tmp=00;90:*.ucf-dist=00;90:*.ucf-new=00;90:*.ucf-old=00;90:
+SSH_CONNECTION: 217.218.49.55 52892 192.168.150.123 22
+NVM_DIR: /home/cando/.nvm
+LESSCLOSE: /usr/bin/lesspipe %s %s
+XDG_SESSION_CLASS: user
+TERM: xterm
+LESSOPEN: | /usr/bin/lesspipe %s
+USER: cando
+SHLVL: 1
+NVM_CD_FLAGS: 
+XDG_SESSION_ID: 15771
+XDG_RUNTIME_DIR: /run/user/1000
+SSH_CLIENT: 217.218.49.55 52892 22
+DEBUGINFOD_URLS: https://debuginfod.ubuntu.com 
+XDG_DATA_DIRS: /usr/share/gnome:/usr/local/share:/usr/share:/var/lib/snapd/desktop
+PATH: /home/cando/.nvm/versions/node/v22.22.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+DBUS_SESSION_BUS_ADDRESS: unix:path=/run/user/1000/bus
+NVM_BIN: /home/cando/.nvm/versions/node/v22.22.0/bin
+SSH_TTY: /dev/pts/1
+OLDPWD: /home/cando/CCG/client
+_: /usr/bin/pm2
+PM2_USAGE: CLI
+PM2_HOME: /home/cando/.pm2
+unique_id: 63ba8dcb-669f-45bc-9ce9-47a4ec1ed0da
+version: 3.2.0
+node_version: 22.22.0
+
+============================================================
+## CRITICAL FILES
+
+============================================================
+
+### FILE: server/routes/ccgRoutes.js
+---
+    1 | // /home/cando/CCG/server/routes/ccgRoutes.js
+    2 | import express from "express";
+    3 | import { runAI } from "../utils/aiClient.js";
+    4 | import { formatOutput, normalizeCompareMarkdown } from "../utils/outputFormatter.js";
+    5 | import { toPromptVariables, buildFallbackPrompt } from "../utils/promptTransformer.js";
+    6 | import { buildComparatorPromptStrict } from "../utils/promptBuilder.js";
+    7 | 
+    8 | const router = express.Router();
+    9 | 
+   10 | router.get("/health", (req, res) => res.json({ ok: true, service: "ccg", ts: Date.now() }));
+   11 | 
+   12 | function safeObj(x) {
+   13 |   return x && typeof x === "object" && !Array.isArray(x) ? x : {};
+   14 | }
+   15 | 
+   16 | const MAX_COMPARE_CODE_CHARS = 30000;
+   17 | function capText(t, max) {
+   18 |   const s = String(t || "");
+   19 |   if (s.length <= max) return s;
+   20 |   return s.slice(0, max) + `\n/* ...TRUNCATED (${s.length - max} chars) ... */\n`;
+   21 | }
+   22 | 
+   23 | function asLang(x) {
+   24 |   return String(x || "").trim().toLowerCase();
+   25 | }
+   26 | 
+   27 | // --- very light syntax validators (heuristics, not parsers) ---
+   28 | function sniffLang(code) {
+   29 |   const s = String(code || "").slice(0, 6000);
+   30 | 
+   31 |   if (/^\s*#!/.test(s) && /(bash|sh)/i.test(s)) return "bash";
+   32 |   if (/^\s*#!/.test(s) && /python/i.test(s)) return "python";
+   33 | 
+   34 |   if (/\bimport\s+React\b|\bexport\s+default\b|\buseState\b/.test(s)) return "javascript";
+   35 |   if (/\binterface\s+\w+|\btype\s+\w+\s*=|:\s*\w+(\[\])?;/.test(s)) return "typescript";
+   36 | 
+   37 |   if (/\bdef\s+\w+\s*\(|\bfrom\s+\w+\s+import\b|\bprint\s*\(/.test(s)) return "python";
+   38 |   if (/\bfunction\s+\w+\s*\(|\bconst\b|\blet\b|\bmodule\.exports\b|\brequire\(/.test(s)) return "javascript";
+   39 | 
+   40 |   if (/^\s*[{[][\s\S]*[}\]]\s*$/.test(s) && /":\s*"/.test(s)) return "json";
+   41 |   if (/^\s*---\s*$|^\s*\w+:\s+.+/m.test(s)) return "yaml";
+   42 | 
+   43 |   if (/\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bFROM\b|\bWHERE\b/i.test(s)) return "sql";
+   44 |   if (/\bpackage\s+main\b|\bfmt\./.test(s)) return "go";
+   45 |   if (/\bpublic\s+class\b|\bstatic\s+void\s+main\b/.test(s)) return "java";
+   46 |   if (/#include\s+<\w+>|\bprintf\s*\(|\bint\s+main\s*\(/.test(s)) return "c";
+   47 |   if (/#include\s+<\w+>|\bstd::\w+|\bcout\b/.test(s)) return "cpp";
+   48 |   if (/\busing\s+System;|\bnamespace\b|\bpublic\s+class\b/.test(s)) return "csharp";
+   49 |   if (/\bfn\s+\w+\s*\(|\blet\s+mut\b|\buse\s+\w+::/.test(s)) return "rust";
+   50 | 
+   51 |   if (/\bGet-Process\b|\bSet-ExecutionPolicy\b|\bWrite-Host\b/i.test(s)) return "powershell";
+   52 |   if (/\becho\s+%[A-Z_]+%|\bREM\b/i.test(s)) return "cmd";
+   53 | 
+   54 |   return "";
+   55 | }
+   56 | 
+   57 | function validateLangHeuristic(lang, code) {
+   58 |   const l = asLang(lang);
+   59 |   if (!l || l === "auto") return { ok: true };
+   60 | 
+   61 |   const s = String(code || "").trim();
+   62 |   if (!s) return { ok: true };
+   63 | 
+   64 |   // minimal "does it look like" checks
+   65 |   const looks = (re) => re.test(s.slice(0, 8000));
+   66 | 
+   67 |   switch (l) {
+   68 |     case "python":
+   69 |       return { ok: looks(/\bdef\s+\w+\s*\(|\bimport\s+\w+|\bfrom\s+\w+\s+import\b|\bclass\s+\w+/) || looks(/:\s*(#.*)?$/m) };
+   70 |     case "javascript":
+   71 |       return { ok: looks(/\b(function|const|let|var|import|export|class)\b/) || looks(/=>/) };
+   72 |     case "typescript":
+   73 |       return { ok: looks(/\b(interface|type)\b/) || looks(/:\s*\w+/) || looks(/\bas\s+\w+/) };
+   74 |     case "json":
+   75 |       return { ok: looks(/^\s*[{[]/) && looks(/[}\]]\s*$/) };
+   76 |     case "yaml":
+   77 |       return { ok: looks(/^\s*\w+:\s+.+/m) || looks(/^\s*---\s*$/m) };
+   78 |     case "sql":
+   79 |       return { ok: looks(/\b(SELECT|INSERT|UPDATE|DELETE)\b/i) };
+   80 |     case "bash":
+   81 |       return { ok: looks(/^\s*#!/) || looks(/\b(echo|cd|ls|grep|awk|sed)\b/) };
+   82 |     case "powershell":
+   83 |       return { ok: looks(/\b(Get-|Set-|New-|Remove-|Write-Host)\w*/i) };
+   84 |     case "go":
+   85 |       return { ok: looks(/\bpackage\s+\w+/) || looks(/\bfunc\s+\w+\s*\(/) };
+   86 |     case "java":
+   87 |       return { ok: looks(/\bpublic\s+class\b/) || looks(/\bstatic\s+void\s+main\b/) };
+   88 |     case "c":
+   89 |       return { ok: looks(/#include\s+<\w+>/) || looks(/\bint\s+main\s*\(/) };
+   90 |     case "cpp":
+   91 |       return { ok: looks(/#include\s+<\w+>/) && (looks(/\bstd::\w+/) || looks(/\bcout\b/)) };
+   92 |     case "csharp":
+   93 |       return { ok: looks(/\busing\s+System;/) || looks(/\bnamespace\b/) };
+   94 |     case "rust":
+   95 |       return { ok: looks(/\bfn\s+\w+\s*\(/) || looks(/\buse\s+\w+::/) };
+   96 |     default:
+   97 |       return { ok: true };
+   98 |   }
+   99 | }
+  100 | 
+  101 | function pickComparatorMode(codeLangA, codeLangB, detectedA, detectedB) {
+  102 |   const aSel = asLang(codeLangA);
+  103 |   const bSel = asLang(codeLangB);
+  104 | 
+  105 |   const a = aSel && aSel !== "auto" ? aSel : asLang(detectedA);
+  106 |   const b = bSel && bSel !== "auto" ? bSel : asLang(detectedB);
+  107 | 
+  108 |   if (a && b && a === b) return { sameLang: true, mode: "single", resolvedA: a, resolvedB: b };
+  109 |   return { sameLang: false, mode: "dual", resolvedA: a || aSel || detectedA || "", resolvedB: b || bSel || detectedB || "" };
+  110 | }
+  111 | 
+  112 | function hasFence(md) {
+  113 |   return /```[\s\S]*?```/m.test(String(md || ""));
+  114 | }
+  115 | function countFenceMarkers(md) {
+  116 |   const m = String(md || "").match(/```/g);
+  117 |   return m ? m.length : 0;
+  118 | }
+  119 | 
+  120 | function isGoodCompare(md, lang, mode) {
+  121 |   const t = String(md || "").trim();
+  122 |   if (!t) return false;
+  123 | 
+  124 |   const fa = lang !== "en";
+  125 | 
+  126 |   if (mode === "single") {
+  127 |     const req = fa ? ["## تفاوت‌های فنی", "## کد Merge نهایی"] : ["## Technical Differences", "## Final Merged Code"];
+  128 |     if (!req.every((h) => t.includes(h))) return false;
+  129 |     if (!hasFence(t)) return false;
+  130 |     if (countFenceMarkers(t) !== 2) return false; // exactly one block
+  131 |     // no fence before final section
+  132 |     const hFinal = req[1];
+  133 |     const idx = t.indexOf(hFinal);
+  134 |     if (idx > 0 && t.slice(0, idx).includes("```")) return false;
+  135 |     return true;
+  136 |   }
+  137 | 
+  138 |   // dual
+  139 |   const req = fa
+  140 |     ? ["## تفاوت‌های فنی", "## کد نهایی برای A", "## کد نهایی برای B"]
+  141 |     : ["## Technical Differences", "## Final Code for A", "## Final Code for B"];
+  142 | 
+  143 |   if (!req[0] || !t.includes(req[0])) return false;
+  144 |   if (!t.includes(req[1]) || !t.includes(req[2])) return false;
+  145 |   if (!hasFence(t)) return false;
+  146 |   if (countFenceMarkers(t) !== 4) return false; // exactly two blocks
+  147 |   // no fences before final A section
+  148 |   const idxA = t.indexOf(req[1]);
+  149 |   if (idxA > 0 && t.slice(0, idxA).includes("```")) return false;
+  150 |   return true;
+  151 | }
+  152 | 
+  153 | router.post("/", async (req, res) => {
+  154 |   const t0 = Date.now();
+  155 |   const rid = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  156 | 
+  157 |   try {
+  158 |     res.setHeader("Content-Type", "application/json; charset=utf-8");
+  159 |     res.setHeader("Cache-Control", "no-store");
+  160 |     res.setHeader("X-Request-Id", rid);
+  161 | 
+  162 |     const body = safeObj(req.body);
+  163 |     const lang = String(body.lang || "fa").toLowerCase() === "en" ? "en" : "fa";
+  164 |     const mode = String(body.mode || "generate").toLowerCase();
+  165 | 
+  166 |     const platform = String(body.platform || body.os || "linux").toLowerCase();
+  167 |     const cli = String(body.cli || body.shell || "bash").toLowerCase();
+  168 | 
+  169 |     const moreDetails = Boolean(body.moreDetails);
+  170 |     const moreCommands = Boolean(body.moreCommands);
+  171 |     const pythonScript = Boolean(body.pythonScript);
+  172 | 
+  173 |     let inputA = body.input_a;
+  174 |     let inputB = body.input_b;
+  175 |     if (mode === "compare") {
+  176 |       inputA = capText(inputA, MAX_COMPARE_CODE_CHARS);
+  177 |       inputB = capText(inputB, MAX_COMPARE_CODE_CHARS);
+  178 |     }
+  179 | 
+  180 |     // --- language detection + validation (compare only) ---
+  181 |     const codeLangA = asLang(body.codeLangA || "auto");
+  182 |     const codeLangB = asLang(body.codeLangB || "auto");
+  183 | 
+  184 |     if (mode === "compare") {
+  185 |       const vA = validateLangHeuristic(codeLangA, inputA);
+  186 |       const vB = validateLangHeuristic(codeLangB, inputB);
+  187 | 
+  188 |       if (!vA.ok || !vB.ok) {
+  189 |         return res.status(400).json({
+  190 |           ok: false,
+  191 |           error: {
+  192 |             code: "LANG_MISMATCH",
+  193 |             userMessage: lang === "fa" ? "زبان انتخاب‌شده با سینتکس کد هم‌خوانی ندارد." : "Selected language does not match code syntax.",
+  194 |             hint:
+  195 |               lang === "fa"
+  196 |                 ? "زبان را روی Auto بگذار یا زبان درست را انتخاب کن."
+  197 |                 : "Set language to Auto or choose the correct language.",
+  198 |           },
+  199 |           details: {
+  200 |             codeLangA,
+  201 |             codeLangB,
+  202 |             aOk: vA.ok,
+  203 |             bOk: vB.ok,
+  204 |           },
+  205 |           output: "",
+  206 |           markdown: "",
+  207 |           requestId: rid,
+  208 |           ms: Date.now() - t0,
+  209 |         });
+  210 |       }
+  211 |     }
+  212 | 
+  213 |     const detectedA = mode === "compare" ? sniffLang(inputA) : "";
+  214 |     const detectedB = mode === "compare" ? sniffLang(inputB) : "";
+  215 | 
+  216 |     const { sameLang, mode: outMode, resolvedA, resolvedB } = mode === "compare"
+  217 |       ? pickComparatorMode(codeLangA, codeLangB, detectedA, detectedB)
+  218 |       : { sameLang: false, mode: "single", resolvedA: "", resolvedB: "" };
+  219 | 
+  220 |     // IMPORTANT: ignore user_request for compare
+  221 |     const safeBody = { ...body };
+  222 |     if (mode === "compare") {
+  223 |       delete safeBody.user_request;
+  224 |       delete safeBody.userRequest;
+  225 |       delete safeBody.request;
+  226 |     }
+  227 | 
+  228 |     const variables = toPromptVariables({
+  229 |       ...safeBody,
+  230 |       input_a: inputA,
+  231 |       input_b: inputB,
+  232 |       lang,
+  233 |       platform,
+  234 |       os: platform,
+  235 |       cli: pythonScript ? "python" : cli,
+  236 |       outputType: pythonScript ? "python" : "tool",
+  237 |       moreDetails,
+  238 |       moreCommands,
+  239 |       pythonScript,
+  240 |       requestId: rid,
+  241 |     });
+  242 | 
+  243 |     // inject compare flags (used by promptBuilder + normalizer)
+  244 |     if (variables.mode === "compare") {
+  245 |       variables.sameLang = sameLang;
+  246 |       variables.compareOutputMode = outMode; // single | dual
+  247 |       variables.detectedLangA = resolvedA || detectedA || codeLangA;
+  248 |       variables.detectedLangB = resolvedB || detectedB || codeLangB;
+  249 |     }
+  250 | 
+  251 |     const fallbackPrompt = buildFallbackPrompt(variables);
+  252 | 
+  253 |     const ai = await runAI({
+  254 |       variables,
+  255 |       fallbackPrompt,
+  256 |       temperature: 0.25,
+  257 |       requestId: rid,
+  258 |     });
+  259 | 
+  260 |     if (ai?.error) {
+  261 |       return res.status(502).json({
+  262 |         ok: false,
+  263 |         error: {
+  264 |           code: "AI_PROVIDER_ERROR",
+  265 |           userMessage: lang === "fa" ? "خطا در سرویس هوش مصنوعی." : "AI provider error.",
+  266 |           hint: lang === "fa" ? "چند لحظه بعد دوباره تلاش کن." : "Please try again in a moment.",
+  267 |         },
+  268 |         details: String(ai.error || ""),
+  269 |         output: "",
+  270 |         markdown: "",
+  271 |         requestId: rid,
+  272 |         ms: Date.now() - t0,
+  273 |       });
+  274 |     }
+  275 | 
+  276 |     let raw = String(ai?.output || "").trim();
+  277 | 
+  278 |     if (variables.mode === "compare") {
+  279 |       // Normalize to enforce: no code blocks in differences + correct number of final blocks
+  280 |       raw = normalizeCompareMarkdown(raw, {
+  281 |         lang,
+  282 |         mode: variables.compareOutputMode,
+  283 |         detectedLangA: variables.detectedLangA,
+  284 |         detectedLangB: variables.detectedLangB,
+  285 |       });
+  286 | 
+  287 |       if (!isGoodCompare(raw, lang, variables.compareOutputMode)) {
+  288 |         const strictPrompt = buildComparatorPromptStrict(variables);
+  289 | 
+  290 |         const ai2 = await runAI({
+  291 |           variables: { ...variables, prompt: strictPrompt },
+  292 |           fallbackPrompt,
+  293 |           temperature: 0.15,
+  294 |           requestId: rid,
+  295 |         });
+  296 | 
+  297 |         const raw2 = String(ai2?.output || "").trim();
+  298 |         if (raw2) {
+  299 |           const fixed2 = normalizeCompareMarkdown(raw2, {
+  300 |             lang,
+  301 |             mode: variables.compareOutputMode,
+  302 |             detectedLangA: variables.detectedLangA,
+  303 |             detectedLangB: variables.detectedLangB,
+  304 |           });
+  305 |           if (isGoodCompare(fixed2, lang, variables.compareOutputMode)) raw = fixed2;
+  306 |         }
+  307 |       }
+  308 | 
+  309 |       // final normalize pass
+  310 |       raw = normalizeCompareMarkdown(raw, {
+  311 |         lang,
+  312 |         mode: variables.compareOutputMode,
+  313 |         detectedLangA: variables.detectedLangA,
+  314 |         detectedLangB: variables.detectedLangB,
+  315 |       });
+  316 | 
+  317 |       if (!isGoodCompare(raw, lang, variables.compareOutputMode)) {
+  318 |         return res.status(502).json({
+  319 |           ok: false,
+  320 |           error: {
+  321 |             code: "COMPARE_CONTRACT_FAILED",
+  322 |             userMessage: lang === "fa" ? "خروجی مقایسه مطابق قرارداد تولید نشد." : "Comparator output contract failed.",
+  323 |             hint: lang === "fa" ? "دوباره تلاش کن یا حجم کد را کمتر کن." : "Retry or shorten code.",
+  324 |           },
+  325 |           details: {
+  326 |             compareOutputMode: variables.compareOutputMode,
+  327 |             detectedLangA: variables.detectedLangA,
+  328 |             detectedLangB: variables.detectedLangB,
+  329 |           },
+  330 |           output: "",
+  331 |           markdown: "",
+  332 |           requestId: rid,
+  333 |           ms: Date.now() - t0,
+  334 |         });
+  335 |       }
+  336 | 
+  337 |       return res.status(200).json({
+  338 |         ok: true,
+  339 |         output: raw,
+  340 |         markdown: raw,
+  341 |         requestId: rid,
+  342 |         ms: Date.now() - t0,
+  343 |         lang,
+  344 |         flags: { mode: "compare", sameLang, compareOutputMode: variables.compareOutputMode },
+  345 |       });
+  346 |     }
+  347 | 
+  348 |     // generator formatting (unchanged)
+  349 |     const formatted = formatOutput(raw, {
+  350 |       cli,
+  351 |       lang,
+  352 |       wantMoreCommands: moreCommands ? 5 : 2,
+  353 |     });
+  354 | 
+  355 |     return res.status(200).json({
+  356 |       ok: true,
+  357 |       output: formatted.markdown || "",
+  358 |       markdown: formatted.markdown || "",
+  359 |       commands: formatted.commands || [],
+  360 |       moreCommands: formatted.moreCommands || [],
+  361 |       pythonScript: formatted.pythonScript || "",
+  362 |       requestId: rid,
+  363 |       ms: Date.now() - t0,
+  364 |       lang,
+  365 |       flags: { moreDetails, moreCommands, pythonScript },
+  366 |     });
+  367 |   } catch (e) {
+  368 |     const msg = e?.message ? e.message : String(e);
+  369 |     return res.status(500).json({
+  370 |       ok: false,
+  371 |       error: {
+  372 |         code: "SERVER_ERROR",
+  373 |         userMessage: "خطای داخلی سرور",
+  374 |         hint: "اگر مشکل ادامه داشت، چند دقیقه بعد دوباره تلاش کن.",
+  375 |       },
+  376 |       details: msg,
+  377 |       output: "",
+  378 |       markdown: "",
+  379 |       requestId: rid,
+  380 |       ms: Date.now() - t0,
+  381 |     });
+  382 |   }
+  383 | });
+  384 | 
+  385 | export default router;
+
+### FILE: server/utils/aiClient.js
+---
+    1 | // /home/cando/CCG/server/utils/aiClient.js
+    2 | import fs from "fs";
+    3 | import path from "path";
+    4 | import { callOpenAICompat } from "./openaiCompat.js";
+    5 | import { buildGeneratorPrompt, buildComparatorPrompt } from "./promptBuilder.js";
+    6 | 
+    7 | function s(v) {
+    8 |   return v === null || v === undefined ? "" : String(v);
+    9 | }
+   10 | 
+   11 | function toInt(v, def) {
+   12 |   const n = Number.parseInt(String(v ?? ""), 10);
+   13 |   return Number.isFinite(n) ? n : def;
+   14 | }
+   15 | 
+   16 | /** ---------------- Safe Provider Logger (NO secrets, NO prompt) ---------------- */
+   17 | const logDir = path.join(process.cwd(), "logs");
+   18 | const providerLogFile = path.join(logDir, "ai-provider.log");
+   19 | 
+   20 | function ensureLogDir() {
+   21 |   try {
+   22 |     if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+   23 |   } catch {}
+   24 | }
+   25 | 
+   26 | function safeShort(v, n = 240) {
+   27 |   const t = s(v).replace(/\s+/g, " ").trim();
+   28 |   return t.length > n ? t.slice(0, n) + "…" : t;
+   29 | }
+   30 | 
+   31 | function logProviderEvent(evt) {
+   32 |   try {
+   33 |     ensureLogDir();
+   34 |     const ts = new Date().toISOString();
+   35 |     fs.appendFileSync(providerLogFile, JSON.stringify({ ts, ...evt }) + "\n", { flag: "a" });
+   36 |   } catch {
+   37 |     // never break request flow due to logging
+   38 |   }
+   39 | }
+   40 | /** --------------------------------------------------------------------------- */
+   41 | 
+   42 | function pickProvider(ctx) {
+   43 |   const p = s(ctx.aiProvider || process.env.AI_PROVIDER || "openai").toLowerCase().trim();
+   44 |   return p === "openrouter" ? "openrouter" : "openai";
+   45 | }
+   46 | 
+   47 | function getCompatConfig(provider, ctx) {
+   48 |   if (provider === "openrouter") {
+   49 |     const apiKey = s(process.env.OPENROUTER_API_KEY).trim();
+   50 |     const model =
+   51 |       s(ctx.model).trim() ||
+   52 |       s(process.env.OPENROUTER_MODEL).trim() ||
+   53 |       s(process.env.AI_PRIMARY_MODEL).trim() ||
+   54 |       "openrouter/auto";
+   55 | 
+   56 |     const baseUrl = s(process.env.OPENROUTER_BASE_URL).trim() || "https://openrouter.ai/api/v1";
+   57 | 
+   58 |     const extraHeaders = {};
+   59 |     if (process.env.OPENROUTER_HTTP_REFERER) extraHeaders["HTTP-Referer"] = process.env.OPENROUTER_HTTP_REFERER;
+   60 |     if (process.env.OPENROUTER_APP_TITLE) extraHeaders["X-Title"] = process.env.OPENROUTER_APP_TITLE;
+   61 | 
+   62 |     return { apiKey, model, baseUrl, extraHeaders };
+   63 |   }
+   64 | 
+   65 |   const apiKey = s(process.env.OPENAI_API_KEY).trim();
+   66 |   const model = s(ctx.model).trim() || s(process.env.AI_PRIMARY_MODEL).trim() || "gpt-4.1";
+   67 |   const baseUrl = s(process.env.OPENAI_BASE_URL).trim() || "https://api.openai.com/v1";
+   68 |   return { apiKey, model, baseUrl, extraHeaders: {} };
+   69 | }
+   70 | 
+   71 | function buildPromptByMode(ctx) {
+   72 |   const mode = s(ctx.mode || "generate").toLowerCase();
+   73 |   if (mode === "compare") return buildComparatorPrompt(ctx);
+   74 |   return buildGeneratorPrompt(ctx);
+   75 | }
+   76 | 
+   77 | /**
+   78 |  * runAI({ variables, fallbackPrompt, temperature, requestId, ... })
+   79 |  * - NEVER throws (returns { error } instead)
+   80 |  */
+   81 | export async function runAI(vars = {}) {
+   82 |   const t0 = Date.now();
+   83 | 
+   84 |   const base = vars && typeof vars === "object" ? vars : {};
+   85 |   const v = base.variables && typeof base.variables === "object" ? base.variables : {};
+   86 |   const ctx = { ...v, ...base };
+   87 | 
+   88 |   const mode = s(ctx.mode || "generate").toLowerCase();
+   89 |   const provider = pickProvider(ctx);
+   90 |   const { apiKey, model, baseUrl, extraHeaders } = getCompatConfig(provider, ctx);
+   91 | 
+   92 |   const rid = s(ctx.requestId || ctx.request_id || ctx.rid || "").trim() || undefined;
+   93 | 
+   94 |   // ✅ hard fail if key is missing (fast response, no hang)
+   95 |   if (provider === "openrouter" && !apiKey) {
+   96 |     const err = "OPENROUTER_API_KEY is not configured (AI_PROVIDER=openrouter).";
+   97 |     logProviderEvent({ rid, provider, model: s(model || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(err) });
+   98 |     return { error: err, output: "" };
+   99 |   }
+  100 |   if (provider === "openai" && !apiKey) {
+  101 |     const err = "OPENAI_API_KEY is not configured (AI_PROVIDER=openai).";
+  102 |     logProviderEvent({ rid, provider, model: s(model || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(err) });
+  103 |     return { error: err, output: "" };
+  104 |   }
+  105 | 
+  106 |   // prompt selection
+  107 |   const prompt = s(ctx.prompt).trim() || buildPromptByMode(ctx);
+  108 |   const fallbackPrompt = s(ctx.fallbackPrompt || base.fallbackPrompt || "").trim();
+  109 | 
+  110 |   // ✅ fail-fast defaults to prevent long-hang and upstream timeouts
+  111 |   const timeoutMs = toInt(process.env.AI_HTTP_TIMEOUT_MS, 55_000);
+  112 |   const maxRetries = toInt(process.env.AI_HTTP_MAX_RETRIES, 0);
+  113 | 
+  114 |   try {
+  115 |     const res = await callOpenAICompat({
+  116 |       prompt,
+  117 |       model,
+  118 |       temperature: typeof ctx.temperature === "number" ? ctx.temperature : 0.25,
+  119 |       apiKey,
+  120 |       baseUrl,
+  121 |       headers: extraHeaders,
+  122 |       provider,
+  123 |       timeoutMs,
+  124 |       maxRetries,
+  125 |     });
+  126 | 
+  127 |     // fallback retry (only once) if primary fails and we have fallbackPrompt
+  128 |     if (res?.error && fallbackPrompt) {
+  129 |       const retry = await callOpenAICompat({
+  130 |         prompt: fallbackPrompt,
+  131 |         model,
+  132 |         temperature: typeof ctx.temperature === "number" ? ctx.temperature : 0.25,
+  133 |         apiKey,
+  134 |         baseUrl,
+  135 |         headers: extraHeaders,
+  136 |         provider,
+  137 |         timeoutMs,
+  138 |         maxRetries,
+  139 |       });
+  140 | 
+  141 |       if (retry?.error) {
+  142 |         logProviderEvent({ rid, provider, model: s(model || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(retry.error) });
+  143 |         return { error: retry.error, output: "" };
+  144 |       }
+  145 | 
+  146 |       logProviderEvent({ rid, provider, model: s(model || "unknown"), mode, ok: true, ms: Date.now() - t0 });
+  147 |       return { output: s(retry?.output || ""), raw: retry };
+  148 |     }
+  149 | 
+  150 |     if (res?.error) {
+  151 |       logProviderEvent({ rid, provider, model: s(model || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(res.error) });
+  152 |       return { error: res.error, output: "" };
+  153 |     }
+  154 | 
+  155 |     logProviderEvent({ rid, provider, model: s(model || "unknown"), mode, ok: true, ms: Date.now() - t0 });
+  156 |     return { output: s(res?.output || ""), raw: res };
+  157 |   } catch (e) {
+  158 |     const err = e?.message ? e.message : String(e);
+  159 |     logProviderEvent({ rid, provider, model: s(model || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(err) });
+  160 |     return { error: err, output: "" };
+  161 |   }
+  162 | }
+
+### FILE: server/utils/openaiCompat.js
+---
+    1 | // /home/cando/CCG/server/utils/openaiCompat.js
+    2 | import dotenv from "dotenv";
+    3 | import OpenAI from "openai";
+    4 | 
+    5 | // Load .env reliably (PM2 doesn't load it by default unless you pass --update-env)
+    6 | dotenv.config({ path: process.env.DOTENV_PATH || "/home/cando/CCG/.env" });
+    7 | 
+    8 | function s(v) {
+    9 |   return v === null || v === undefined ? "" : String(v);
+   10 | }
+   11 | 
+   12 | function toInt(v, def) {
+   13 |   const n = Number.parseInt(String(v ?? ""), 10);
+   14 |   return Number.isFinite(n) ? n : def;
+   15 | }
+   16 | 
+   17 | function pickProvider(optsProvider) {
+   18 |   const p = s(optsProvider || process.env.AI_PROVIDER || "openai").toLowerCase().trim();
+   19 |   return p === "openrouter" ? "openrouter" : "openai";
+   20 | }
+   21 | 
+   22 | function getApiKey(provider, optsApiKey) {
+   23 |   const fromOpts = s(optsApiKey).trim();
+   24 |   if (fromOpts) return fromOpts;
+   25 | 
+   26 |   if (provider === "openrouter") return s(process.env.OPENROUTER_API_KEY).trim();
+   27 |   return s(process.env.OPENAI_API_KEY).trim();
+   28 | }
+   29 | 
+   30 | function getBaseURL(provider, optsBase) {
+   31 |   const b = s(optsBase).trim();
+   32 |   if (b) return b;
+   33 | 
+   34 |   if (provider === "openrouter") {
+   35 |     return s(process.env.OPENROUTER_BASE_URL).trim() || "https://openrouter.ai/api/v1";
+   36 |   }
+   37 |   return s(process.env.OPENAI_BASE_URL).trim() || "https://api.openai.com/v1";
+   38 | }
+   39 | 
+   40 | function getModel(provider, optsModel) {
+   41 |   const m = s(optsModel).trim();
+   42 |   if (m) return m;
+   43 | 
+   44 |   if (provider === "openrouter") return s(process.env.OPENROUTER_MODEL).trim() || "openrouter/auto";
+   45 | 
+   46 |   return (
+   47 |     s(process.env.AI_PRIMARY_MODEL).trim() ||
+   48 |     s(process.env.OPENAI_MODEL).trim() ||
+   49 |     "gpt-4.1"
+   50 |   );
+   51 | }
+   52 | 
+   53 | function extractErr(e) {
+   54 |   const status = e?.status || e?.response?.status || e?.response?.statusCode || "";
+   55 |   const code = e?.code || e?.response?.data?.error?.code || "";
+   56 |   const message =
+   57 |     e?.response?.data?.error?.message ||
+   58 |     e?.error?.message ||
+   59 |     e?.message ||
+   60 |     String(e);
+   61 | 
+   62 |   const parts = [];
+   63 |   if (status) parts.push(`HTTP ${status}`);
+   64 |   if (code) parts.push(`code=${code}`);
+   65 |   if (message) parts.push(message);
+   66 | 
+   67 |   return parts.join(" | ").trim() || "Unknown AI error";
+   68 | }
+   69 | 
+   70 | /**
+   71 |  * callOpenAICompat(opts)
+   72 |  * Expected by server/utils/aiClient.js
+   73 |  * - NEVER throws (returns { output, error, raw })
+   74 |  *
+   75 |  * opts:
+   76 |  * - prompt (string) REQUIRED
+   77 |  * - model, temperature, max_tokens
+   78 |  * - provider ("openai"|"openrouter")
+   79 |  * - apiKey
+   80 |  * - baseUrl/baseURL
+   81 |  * - headers (object)
+   82 |  * - timeoutMs, maxRetries
+   83 |  */
+   84 | export async function callOpenAICompat(opts = {}) {
+   85 |   const prompt = s(opts.prompt).trim();
+   86 |   if (!prompt) return { output: "", error: "Empty prompt" };
+   87 | 
+   88 |   const provider = pickProvider(opts.provider);
+   89 | 
+   90 |   const apiKey = getApiKey(provider, opts.apiKey);
+   91 |   if (!apiKey) {
+   92 |     return {
+   93 |       output: "",
+   94 |       error:
+   95 |         provider === "openrouter"
+   96 |           ? "OPENROUTER_API_KEY is not configured (AI_PROVIDER=openrouter)."
+   97 |           : "OPENAI_API_KEY is not configured (AI_PROVIDER=openai).",
+   98 |     };
+   99 |   }
+  100 | 
+  101 |   const baseURL = getBaseURL(provider, opts.baseUrl || opts.baseURL);
+  102 |   const model = getModel(provider, opts.model);
+  103 | 
+  104 |   const temperature = typeof opts.temperature === "number" ? opts.temperature : 0.2;
+  105 |   const max_tokens = typeof opts.max_tokens === "number" ? opts.max_tokens : undefined;
+  106 | 
+  107 |   // ✅ Fail-fast defaults (prevent hanging requests)
+  108 |   const timeoutMs =
+  109 |     typeof opts.timeoutMs === "number" ? opts.timeoutMs : toInt(process.env.AI_HTTP_TIMEOUT_MS, 55_000);
+  110 |   const maxRetries =
+  111 |     typeof opts.maxRetries === "number" ? opts.maxRetries : toInt(process.env.AI_HTTP_MAX_RETRIES, 0);
+  112 | 
+  113 |   const headers = opts.headers && typeof opts.headers === "object" ? opts.headers : {};
+  114 | 
+  115 |   let client;
+  116 |   try {
+  117 |     client = new OpenAI({
+  118 |       apiKey,
+  119 |       baseURL,
+  120 |       defaultHeaders: Object.keys(headers).length ? headers : undefined,
+  121 |       timeout: timeoutMs,
+  122 |       maxRetries,
+  123 |     });
+  124 |   } catch (e) {
+  125 |     return { output: "", error: `Failed to create OpenAI client: ${extractErr(e)}`, raw: e };
+  126 |   }
+  127 | 
+  128 |   try {
+  129 |     const resp = await client.chat.completions.create({
+  130 |       model,
+  131 |       temperature,
+  132 |       max_tokens,
+  133 |       messages: [{ role: "user", content: prompt }],
+  134 |     });
+  135 | 
+  136 |     const content = resp?.choices?.[0]?.message?.content ?? "";
+  137 |     if (!s(content).trim()) return { output: "", error: "Empty model output", raw: resp };
+  138 | 
+  139 |     return { output: content, error: "", raw: resp };
+  140 |   } catch (e) {
+  141 |     return { output: "", error: extractErr(e), raw: e };
+  142 |   }
+  143 | }
+
+### FILE: server/utils/promptBuilder.js
+---
+    1 | // /home/cando/CCG/server/utils/promptBuilder.js
+    2 | // Provides prompts used by aiClient / routes.
+    3 | // IMPORTANT: Must export:
+    4 | // - buildGeneratorPrompt
+    5 | // - buildComparatorPrompt
+    6 | // - buildComparatorPromptStrict
+    7 | 
+    8 | function s(v) {
+    9 |   return v === null || v === undefined ? "" : String(v);
+   10 | }
+   11 | 
+   12 | function langOf(ctx) {
+   13 |   return s(ctx?.lang || "fa").toLowerCase() === "en" ? "en" : "fa";
+   14 | }
+   15 | 
+   16 | function norm(x) {
+   17 |   return s(x).replace(/\s+/g, " ").trim();
+   18 | }
+   19 | 
+   20 | function meta(ctx) {
+   21 |   const a = norm(ctx?.codeLangA || "auto");
+   22 |   const b = norm(ctx?.codeLangB || "auto");
+   23 |   const same = a && b && a !== "auto" && b !== "auto" && a === b ? "same" : "maybe-diff";
+   24 |   return `meta: codeLangA=${a}, codeLangB=${b}, relation=${same}`;
+   25 | }
+   26 | 
+   27 | function isSameLang(ctx) {
+   28 |   const a = norm(ctx?.codeLangA || "auto");
+   29 |   const b = norm(ctx?.codeLangB || "auto");
+   30 |   return a !== "auto" && b !== "auto" && a === b;
+   31 | }
+   32 | 
+   33 | /**
+   34 |  * Generator prompt:
+   35 |  * - Conservative to avoid breaking existing generator behavior.
+   36 |  */
+   37 | export function buildGeneratorPrompt(ctx = {}) {
+   38 |   const lang = langOf(ctx);
+   39 |   const platform = norm(ctx.platform || ctx.os || "linux");
+   40 |   const cli = norm(ctx.cli || (platform === "windows" ? "powershell" : platform === "mac" ? "zsh" : "bash"));
+   41 |   const req = s(ctx.user_request || ctx.userRequest || ctx.prompt || ctx.text || ctx.message || "").trim();
+   42 | 
+   43 |   if (lang === "en") {
+   44 |     return [
+   45 |       "You are CCG Command Generator.",
+   46 |       "Return a helpful answer. Prefer a clean, structured response.",
+   47 |       `Platform: ${platform}`,
+   48 |       `CLI: ${cli}`,
+   49 |       "",
+   50 |       "User request:",
+   51 |       req || "(empty)",
+   52 |     ].join("\n");
+   53 |   }
+   54 | 
+   55 |   return [
+   56 |     "تو CCG Command Generator هستی.",
+   57 |     "پاسخ را مفید، درست و ساختاریافته بده.",
+   58 |     `پلتفرم: ${platform}`,
+   59 |     `CLI: ${cli}`,
+   60 |     "",
+   61 |     "درخواست کاربر:",
+   62 |     req || "(خالی)",
+   63 |   ].join("\n");
+   64 | }
+   65 | 
+   66 | /**
+   67 |  * Comparator prompt (2-section strict contract):
+   68 |  * - EXACTLY two headings
+   69 |  * - NO code blocks in differences (no ``` and no indented code)
+   70 |  * - Final section:
+   71 |  *   - If same language => exactly ONE fenced code block (merged)
+   72 |  *   - If different languages => exactly TWO fenced code blocks (one per language)
+   73 |  */
+   74 | export function buildComparatorPrompt(ctx = {}) {
+   75 |   const lang = langOf(ctx);
+   76 |   const codeA = s(ctx.input_a || "");
+   77 |   const codeB = s(ctx.input_b || "");
+   78 |   const sameLang = isSameLang(ctx);
+   79 | 
+   80 |   const finalRuleEn = sameLang
+   81 |     ? [
+   82 |         "4) In 'Final Merged Code':",
+   83 |         "   - Provide exactly ONE fenced code block containing ONLY the merged/improved final code.",
+   84 |         "   - No extra text inside that fenced block.",
+   85 |       ]
+   86 |     : [
+   87 |         "4) In 'Final Merged Code':",
+   88 |         "   - Provide exactly TWO fenced code blocks:",
+   89 |         "     - First: best structured/improved code for Code A language.",
+   90 |         "     - Second: best structured/improved code for Code B language.",
+   91 |         "   - Each fenced block must contain ONLY code (no explanations inside).",
+   92 |         "   - You may add short bold labels OUTSIDE the code blocks to indicate which language each block is.",
+   93 |       ];
+   94 | 
+   95 |   const finalRuleFa = sameLang
+   96 |     ? [
+   97 |         "4) در بخش «کد Merge نهایی»:",
+   98 |         "   - دقیقاً فقط یک کدبلاک سه‌بک‌تیک بده و داخلش فقط کد نهایی مرج‌شده/بهترشده باشد.",
+   99 |         "   - هیچ متن اضافی داخل کدبلاک ننویس.",
+  100 |       ]
+  101 |     : [
+  102 |         "4) در بخش «کد Merge نهایی»:",
+  103 |         "   - دقیقاً دو کدبلاک سه‌بک‌تیک بده:",
+  104 |         "     - اول: بهترین نسخه ساختاریافته/توسعه‌یافته برای زبان کد A.",
+  105 |         "     - دوم: بهترین نسخه ساختاریافته/توسعه‌یافته برای زبان کد B.",
+  106 |         "   - داخل هر کدبلاک فقط کد باشد (هیچ توضیحی داخلش نباشد).",
+  107 |         "   - می‌توانی بیرون از کدبلاک‌ها یک برچسب کوتاه بولد برای زبان هر کد بنویسی.",
+  108 |       ];
+  109 | 
+  110 |   if (lang === "en") {
+  111 |     return [
+  112 |       "You are a senior code reviewer. Compare Code A and Code B deeply and professionally.",
+  113 |       "CRITICAL OUTPUT CONTRACT (MUST FOLLOW):",
+  114 |       "1) Output MUST be valid Markdown.",
+  115 |       "2) Output MUST contain EXACTLY two sections in this exact order:",
+  116 |       "   - ## Technical Differences",
+  117 |       "   - ## Final Merged Code",
+  118 |       "3) In 'Technical Differences':",
+  119 |       "   - DO NOT use fenced code blocks (no ``` anywhere).",
+  120 |       "   - DO NOT use indented code blocks (no leading 4 spaces / tabs).",
+  121 |       "   - Use inline backticks only for identifiers, e.g. `TypeError`, `re`, `isinstance()`.",
+  122 |       "   - Write technical but fluent explanation; paragraphs + bullet points are allowed.",
+  123 |       ...finalRuleEn,
+  124 |       "5) Do NOT add any other headings/sections.",
+  125 |       "6) Language MUST be English only.",
+  126 |       "",
+  127 |       meta(ctx),
+  128 |       "",
+  129 |       "Code A:",
+  130 |       codeA,
+  131 |       "",
+  132 |       "Code B:",
+  133 |       codeB,
+  134 |     ].join("\n");
+  135 |   }
+  136 | 
+  137 |   return [
+  138 |     "تو یک ریویور ارشد کد هستی. کد A و کد B را دقیق و فنی مقایسه کن.",
+  139 |     "قرارداد خروجی (خیلی سخت‌گیرانه و باید رعایت شود):",
+  140 |     "1) خروجی حتماً Markdown معتبر باشد.",
+  141 |     "2) خروجی دقیقاً فقط دو بخش داشته باشد و دقیقاً با همین تیترها و به همین ترتیب:",
+  142 |     "   - ## تفاوت‌های فنی",
+  143 |     "   - ## کد Merge نهایی",
+  144 |     "3) در بخش «تفاوت‌های فنی»:",
+  145 |     "   - مطلقاً کدبلاک سه‌بک‌تیک نده (هیچ ``` در این بخش نباشد).",
+  146 |     "   - مطلقاً indented code block نده (هیچ خطی با ۴ فاصله/Tab برای کد نباشد).",
+  147 |     "   - فقط برای نام‌ها/اصطلاحات/Exceptionها/ماژول‌ها از بک‌تیک خطی استفاده کن مثل `TypeError`، `re`، `isinstance()`.",
+  148 |     "   - توضیح باید فنی، روان، دقیق و با کیفیت باشد (پاراگراف + بولت مجاز است).",
+  149 |     ...finalRuleFa,
+  150 |     "5) هیچ تیتر/بخش دیگری اضافه نکن.",
+  151 |     "6) زبان خروجی فقط فارسی.",
+  152 |     "",
+  153 |     meta(ctx),
+  154 |     "",
+  155 |     "کد A:",
+  156 |     codeA,
+  157 |     "",
+  158 |     "کد B:",
+  159 |     codeB,
+  160 |   ].join("\n");
+  161 | }
+  162 | 
+  163 | /**
+  164 |  * Strict retry prompt (even harder)
+  165 |  */
+  166 | export function buildComparatorPromptStrict(ctx = {}) {
+  167 |   const lang = langOf(ctx);
+  168 |   const base = buildComparatorPrompt(ctx);
+  169 |   const sameLang = isSameLang(ctx);
+  170 | 
+  171 |   if (lang === "en") {
+  172 |     return [
+  173 |       base,
+  174 |       "",
+  175 |       "STRICT ENFORCEMENT:",
+  176 |       "- If you are about to output any fenced/indented code in Technical Differences, convert it to inline backticks.",
+  177 |       `- Final Merged Code must contain exactly ${sameLang ? "ONE" : "TWO"} fenced code block(s).`,
+  178 |       "- Do not add any other headings.",
+  179 |     ].join("\n");
+  180 |   }
+  181 | 
+  182 |   return [
+  183 |     base,
+  184 |     "",
+  185 |     "حالت سخت‌گیرانه:",
+  186 |     "- اگر می‌خواهی در «تفاوت‌های فنی» کدبلاک یا کدِ تو رفته بدهی، اجازه نداری؛ تبدیلش کن به بک‌تیک خطی.",
+  187 |     `- «کد Merge نهایی» دقیقاً فقط ${sameLang ? "یک" : "دو"} کدبلاک داشته باشد.`,
+  188 |     "- هیچ تیتر دیگری اضافه نکن.",
+  189 |   ].join("\n");
+  190 | }
+
+### FILE: server/utils/promptTransformer.js
+---
+    1 | // server/utils/promptTransformer.js
+    2 | // Deterministic prompts for generator + comparator fallback
+    3 | 
+    4 | import { buildComparatorPromptStrict } from "./promptBuilder.js";
+    5 | 
+    6 | function asStr(x, d = "") {
+    7 |   if (x === null || x === undefined) return d;
+    8 |   if (typeof x === "string") return x;
+    9 |   try {
+   10 |     return String(x);
+   11 |   } catch {
+   12 |     return d;
+   13 |   }
+   14 | }
+   15 | 
+   16 | function asBool(x) {
+   17 |   return x === true || x === "true" || x === 1 || x === "1";
+   18 | }
+   19 | 
+   20 | /**
+   21 |  * Normalizes payload into variables that both:
+   22 |  * - stored prompt can accept
+   23 |  * - fallback prompt can enforce
+   24 |  */
+   25 | export function toPromptVariables(payload = {}) {
+   26 |   const p = payload && typeof payload === "object" ? payload : {};
+   27 |   const lang = asStr(p.lang, "fa").toLowerCase() === "en" ? "en" : "fa";
+   28 |   const platform = asStr(p.platform || p.os, "linux").toLowerCase();
+   29 |   const cli = asStr(
+   30 |     p.cli,
+   31 |     platform === "windows" ? "powershell" : platform === "mac" ? "zsh" : "bash"
+   32 |   ).toLowerCase();
+   33 | 
+   34 |   const outputType = asStr(p.outputType, "tool").toLowerCase(); // tool|python
+   35 |   const knowledgeLevel = asStr(p.knowledgeLevel, "intermediate").toLowerCase();
+   36 | 
+   37 |   const moreDetails = asBool(p.moreDetails);
+   38 |   const moreCommands = asBool(p.moreCommands);
+   39 | 
+   40 |   const advanced = p.advanced && typeof p.advanced === "object" ? p.advanced : undefined;
+   41 | 
+   42 |   const mode = asStr(p.mode, "generate").toLowerCase();
+   43 | 
+   44 |   return {
+   45 |     mode,
+   46 |     // FIX: modeStyle always consistent with mode if not explicitly provided
+   47 |     modeStyle: asStr(p.modeStyle, mode === "compare" ? "comparator" : "generator"),
+   48 | 
+   49 |     lang,
+   50 |     platform,
+   51 |     os: platform,
+   52 |     cli,
+   53 |     outputType,
+   54 |     knowledgeLevel,
+   55 | 
+   56 |     moreDetails,
+   57 |     moreCommands,
+   58 | 
+   59 |     // raw user request (USED ONLY IN GENERATOR MODE)
+   60 |     user_request:
+   61 |       mode === "compare"
+   62 |         ? ""
+   63 |         : asStr(p.user_request || p.userRequest || p.prompt || p.text || p.message, "").trim(),
+   64 | 
+   65 |     // comparator inputs
+   66 |     input_a: asStr(p.input_a || p.inputA, ""),
+   67 |     input_b: asStr(p.input_b || p.inputB, ""),
+   68 |     codeLangA: asStr(p.codeLangA || "", ""),
+   69 |     codeLangB: asStr(p.codeLangB || "", ""),
+   70 | 
+   71 |     // optional extras
+   72 |     vendor: asStr(p.vendor, ""),
+   73 |     deviceType: asStr(p.deviceType, ""),
+   74 |     advanced,
+   75 |   };
+   76 | }
+   77 | 
+   78 | function jsonContractSpecFa({ outputType, cli, platform, altCount, detailLevel }) {
+   79 |   const isPython = outputType === "python" || cli === "python";
+   80 |   return `
+   81 | You are CCG Command Generator (GENERATOR MODE). This is NOT chat.
+   82 | Return ONLY a valid JSON object (no markdown, no code fences, no extra text).
+   83 | 
+   84 | JSON schema:
+   85 | {
+   86 |   "tool": {
+   87 |     "title": "short Persian title",
+   88 |     "lang": "${isPython ? "python" : cli}",
+   89 |     "platform": "${platform}",
+   90 |     "primary": { "label": "command", "command": "..." },
+   91 |     "alternatives": [ { "label": "alternative", "command": "..." } ],
+   92 |     "explanation": [ "bullet 1", "bullet 2" ],
+   93 |     "warnings": [ "warning 1", "warning 2" ]
+   94 |   }
+   95 | }
+   96 | 
+   97 | Rules:
+   98 | - Always provide exactly 1 primary command/script.
+   99 | - Provide up to ${altCount} alternatives.
+  100 | - explanation length: ${detailLevel}.
+  101 | - warnings: always include at least 1 safety warning (permissions/data loss/impact).
+  102 | - Do NOT ask questions, do NOT add “if you have questions…” lines.
+  103 | - Commands must match platform=${platform} and cli=${isPython ? "python" : cli}.
+  104 | `.trim();
+  105 | }
+  106 | 
+  107 | function fewShot() {
+  108 |   return `
+  109 | Example:
+  110 | Input: user_request="restart computer", platform="windows", cli="powershell"
+  111 | Output:
+  112 | {"tool":{"title":"ریستارت سیستم در ویندوز (PowerShell)","lang":"powershell","platform":"windows","primary":{"label":"command","command":"Restart-Computer"},"alternatives":[{"label":"alternative","command":"shutdown /r /t 0"}],"explanation":["Restart-Computer سیستم را ریستارت می‌کند.","اگر CMD لازم بود از shutdown استفاده کنید."],"warnings":["اگر کار ذخیره نشده دارید، قبل از اجرا ذخیره کنید."]}}
+  113 | `.trim();
+  114 | }
+  115 | 
+  116 | export function buildFallbackPrompt(v) {
+  117 |   const vars = v && typeof v === "object" ? v : {};
+  118 |   const mode = asStr(vars.mode, "generate").toLowerCase();
+  119 | 
+  120 |   // Comparator fallback: strict markdown comparator (no JSON)
+  121 |   if (mode === "compare") {
+  122 |     return buildComparatorPromptStrict(vars);
+  123 |   }
+  124 | 
+  125 |   const platform = asStr(vars.platform, "linux").toLowerCase();
+  126 |   const cli = asStr(
+  127 |     vars.cli,
+  128 |     platform === "windows" ? "powershell" : platform === "mac" ? "zsh" : "bash"
+  129 |   ).toLowerCase();
+  130 | 
+  131 |   const outputType = asStr(vars.outputType, "tool").toLowerCase();
+  132 |   const moreDetails = !!vars.moreDetails;
+  133 |   const moreCommands = !!vars.moreCommands;
+  134 | 
+  135 |   const altCount = moreCommands ? 4 : 2;
+  136 |   const detailLevel = moreDetails ? "detailed (4-8 bullets)" : "concise (2-4 bullets)";
+  137 | 
+  138 |   const contract = jsonContractSpecFa({ outputType, cli, platform, altCount, detailLevel });
+  139 | 
+  140 |   const adv = vars.advanced ? JSON.stringify(vars.advanced) : "";
+  141 | 
+  142 |   return `
+  143 | ${contract}
+  144 | 
+  145 | ${fewShot()}
+  146 | 
+  147 | User request (Persian):
+  148 | ${asStr(vars.user_request, "")}
+  149 | 
+  150 | Context:
+  151 | - platform=${platform}
+  152 | - cli=${cli}
+  153 | - pythonScript=${outputType === "python" ? "true" : "false"}
+  154 | - moreDetails=${moreDetails ? "true" : "false"}
+  155 | - moreCommands=${moreCommands ? "true" : "false"}
+  156 | ${adv ? `- advanced=${adv}` : ""}
+  157 | 
+  158 | Return ONLY JSON.
+  159 | `.trim();
+  160 | }
+
+### FILE: server/utils/outputFormatter.js
+---
+    1 | // /home/cando/CCG/server/utils/outputFormatter.js
+    2 | 
+    3 | function s(v) {
+    4 |   return v === null || v === undefined ? "" : String(v);
+    5 | }
+    6 | 
+    7 | function isObj(x) {
+    8 |   return x && typeof x === "object" && !Array.isArray(x);
+    9 | }
+   10 | 
+   11 | function tryParseJSON(text) {
+   12 |   const t = s(text).trim();
+   13 |   if (!t) return null;
+   14 | 
+   15 |   const fenced = t.match(/```json\s*([\s\S]*?)```/i);
+   16 |   const raw = fenced ? fenced[1].trim() : t;
+   17 | 
+   18 |   if (!(raw.startsWith("{") && raw.endsWith("}"))) return null;
+   19 | 
+   20 |   try {
+   21 |     return JSON.parse(raw);
+   22 |   } catch {
+   23 |     return null;
+   24 |   }
+   25 | }
+   26 | 
+   27 | function normLine(line) {
+   28 |   return s(line).replace(/\r/g, "").trim();
+   29 | }
+   30 | 
+   31 | function splitLines(txt) {
+   32 |   return s(txt)
+   33 |     .split("\n")
+   34 |     .map(normLine)
+   35 |     .filter(Boolean);
+   36 | }
+   37 | 
+   38 | function uniq(arr) {
+   39 |   const out = [];
+   40 |   const seen = new Set();
+   41 |   for (const x of arr) {
+   42 |     const v = s(x).trim();
+   43 |     if (!v) continue;
+   44 |     if (seen.has(v)) continue;
+   45 |     seen.add(v);
+   46 |     out.push(v);
+   47 |   }
+   48 |   return out;
+   49 | }
+   50 | 
+   51 | function takeN(arr, n) {
+   52 |   return arr.slice(0, Math.max(0, n));
+   53 | }
+   54 | 
+   55 | function buildMarkdown({
+   56 |   lang = "fa",
+   57 |   cli = "bash",
+   58 |   command = "",
+   59 |   explanation = "",
+   60 |   warning = "",
+   61 |   alternatives = [],
+   62 |   details = [],
+   63 |   pythonScript = "",
+   64 |   pythonNotes = "",
+   65 | }) {
+   66 |   const fa = lang === "fa";
+   67 | 
+   68 |   if (pythonScript) {
+   69 |     const title = fa ? "### اسکریپت پایتون" : "### Python Script";
+   70 |     const notesTitle = fa ? "### توضیحات" : "### Notes";
+   71 |     return [
+   72 |       title,
+   73 |       "",
+   74 |       "```python",
+   75 |       s(pythonScript).trim(),
+   76 |       "```",
+   77 |       "",
+   78 |       pythonNotes ? `${notesTitle}\n\n${s(pythonNotes).trim()}` : "",
+   79 |     ]
+   80 |       .filter(Boolean)
+   81 |       .join("\n");
+   82 |   }
+   83 | 
+   84 |   const cmdTitle = fa ? "### ✅ دستور اصلی" : "### ✅ Main Command";
+   85 |   const expTitle = fa ? "### توضیح" : "### Explanation";
+   86 |   const warnTitle = fa ? "### ⚠️ هشدار" : "### ⚠️ Warning";
+   87 |   const altTitle = fa ? "### 🔁 دستورات جایگزین" : "### 🔁 Alternative Commands";
+   88 |   const detTitle = fa ? "### 📌 توضیحات بیشتر" : "### 📌 More Details";
+   89 | 
+   90 |   const out = [];
+   91 | 
+   92 |   if (command) {
+   93 |     out.push(cmdTitle, "", "```" + cli, s(command).trim(), "```", "");
+   94 |   }
+   95 | 
+   96 |   if (explanation) {
+   97 |     out.push(expTitle, "", s(explanation).trim(), "");
+   98 |   }
+   99 | 
+  100 |   if (warning) {
+  101 |     out.push(warnTitle, "", `> ${s(warning).trim()}`, "");
+  102 |   }
+  103 | 
+  104 |   if (alternatives && alternatives.length) {
+  105 |     out.push(altTitle, "");
+  106 |     for (const c of alternatives) {
+  107 |       out.push("```" + cli, s(c).trim(), "```", "");
+  108 |     }
+  109 |   }
+  110 | 
+  111 |   if (details && details.length) {
+  112 |     out.push(detTitle, "");
+  113 |     for (const d of details) out.push(`- ${s(d).trim()}`);
+  114 |     out.push("");
+  115 |   }
+  116 | 
+  117 |   return out.join("\n").trim() + "\n";
+  118 | }
+  119 | 
+  120 | /**
+  121 |  * formatOutput(input, opts)
+  122 |  */
+  123 | export function formatOutput(input, opts = {}) {
+  124 |   const cli = s(opts.cli || "bash").toLowerCase();
+  125 |   const lang = s(opts.lang || "fa").toLowerCase() === "en" ? "en" : "fa";
+  126 |   const wantMoreCommands = Number(opts.wantMoreCommands) > 0 ? Number(opts.wantMoreCommands) : 2;
+  127 | 
+  128 |   let rawText = "";
+  129 |   if (isObj(input)) {
+  130 |     rawText =
+  131 |       s(input.text) ||
+  132 |       s(input.rawText) ||
+  133 |       s(input.markdown) ||
+  134 |       s(input.output) ||
+  135 |       JSON.stringify(input);
+  136 |   } else {
+  137 |     rawText = s(input);
+  138 |   }
+  139 | 
+  140 |   const parsed = tryParseJSON(rawText);
+  141 | 
+  142 |   if (parsed && isObj(parsed)) {
+  143 |     const mode = s(parsed.mode).toLowerCase();
+  144 |     const command = s(parsed.command).trim();
+  145 | 
+  146 |     const alternatives = uniq(parsed.alternatives || parsed.moreCommands || []);
+  147 |     const details = uniq(parsed.details || parsed.moreDetails || []);
+  148 | 
+  149 |     const warning = s(parsed.warning).trim();
+  150 |     const explanation = s(parsed.explanation).trim();
+  151 | 
+  152 |     const pythonScript = s(parsed.pythonScript || parsed.script).trim();
+  153 |     const pythonNotes = s(parsed.pythonNotes || parsed.notes).trim();
+  154 | 
+  155 |     if (mode === "python" || pythonScript) {
+  156 |       return {
+  157 |         markdown: buildMarkdown({
+  158 |           lang,
+  159 |           pythonScript,
+  160 |           pythonNotes,
+  161 |         }),
+  162 |         commands: [],
+  163 |         moreCommands: [],
+  164 |         pythonScript,
+  165 |       };
+  166 |     }
+  167 | 
+  168 |     const finalAlternatives = takeN(alternatives, wantMoreCommands);
+  169 | 
+  170 |     const md = buildMarkdown({
+  171 |       lang,
+  172 |       cli,
+  173 |       command,
+  174 |       explanation,
+  175 |       warning,
+  176 |       alternatives: finalAlternatives,
+  177 |       details,
+  178 |     });
+  179 | 
+  180 |     return {
+  181 |       markdown: md,
+  182 |       commands: command ? [command] : [],
+  183 |       moreCommands: finalAlternatives,
+  184 |       pythonScript: "",
+  185 |     };
+  186 |   }
+  187 | 
+  188 |   const re = /```(\w+)?\s*([\s\S]*?)```/g;
+  189 |   const blocks = [];
+  190 |   let m;
+  191 |   while ((m = re.exec(rawText)) !== null) {
+  192 |     blocks.push({
+  193 |       lang: s(m[1]).trim().toLowerCase(),
+  194 |       code: s(m[2]).trim(),
+  195 |     });
+  196 |   }
+  197 | 
+  198 |   const cliLangs = new Set(["bash", "zsh", "sh", "powershell", "ps1", "cmd", "bat"]);
+  199 |   const cliBlocks = blocks.filter((b) => cliLangs.has(b.lang));
+  200 |   const py = blocks.find((b) => b.lang === "python");
+  201 | 
+  202 |   const cmd = cliBlocks[0]?.code ? splitLines(cliBlocks[0].code)[0] : "";
+  203 |   const more = cliBlocks[1]?.code ? splitLines(cliBlocks[1].code) : [];
+  204 | 
+  205 |   const pythonScript = py?.code ? py.code : "";
+  206 | 
+  207 |   return {
+  208 |     markdown: s(rawText).trim(),
+  209 |     commands: cmd ? [cmd] : [],
+  210 |     moreCommands: takeN(uniq(more), wantMoreCommands),
+  211 |     pythonScript,
+  212 |   };
+  213 | }
+  214 | 
+  215 | export const formatAIOutput = formatOutput;
+  216 | 
+  217 | /* -------------------------------------------------------------------------- */
+  218 | /*                   Comparator Normalizer (WEB Compare only)                  */
+  219 | /* -------------------------------------------------------------------------- */
+  220 | 
+  221 | function collapseExtraBlankLines(md) {
+  222 |   return s(md)
+  223 |     .replace(/[ \t]+\n/g, "\n")
+  224 |     .replace(/\n{4,}/g, "\n\n\n");
+  225 | }
+  226 | 
+  227 | function stripNoiseLines(md, { lang = "fa" } = {}) {
+  228 |   const fa = lang !== "en";
+  229 |   const lines = s(md).replace(/\r\n/g, "\n").split("\n");
+  230 |   const out = [];
+  231 | 
+  232 |   for (const rawLine of lines) {
+  233 |     const line = rawLine.trim();
+  234 |     if (!line) {
+  235 |       out.push(rawLine);
+  236 |       continue;
+  237 |     }
+  238 |     if (/^(CODE|Copy)$/i.test(line)) continue;
+  239 |     if (fa && /^(کپی|کپي)$/u.test(line)) continue;
+  240 |     out.push(rawLine);
+  241 |   }
+  242 |   return out.join("\n");
+  243 | }
+  244 | 
+  245 | function toInlineCode(text) {
+  246 |   const t = s(text).trim();
+  247 |   if (!t) return "";
+  248 |   const one = t.replace(/\s+/g, " ").trim();
+  249 |   return "`" + one.replace(/`+/g, "") + "`";
+  250 | }
+  251 | 
+  252 | function stripFencesToInline(md) {
+  253 |   let t = s(md);
+  254 | 
+  255 |   t = t.replace(/```[^\n]*\n([\s\S]*?)```/g, (_, inner) => {
+  256 |     const body = s(inner).trim();
+  257 |     if (!body) return "";
+  258 |     const firstLine = body.split(/\r?\n/).map((x) => x.trim()).filter(Boolean)[0] || body;
+  259 |     return toInlineCode(firstLine);
+  260 |   });
+  261 | 
+  262 |   t = t.replace(/```([^`]+)```/g, (_, inner) => toInlineCode(inner));
+  263 | 
+  264 |   return t;
+  265 | }
+  266 | 
+  267 | function stripIndentedBlocks(md) {
+  268 |   const lines = s(md).replace(/\r\n/g, "\n").split("\n");
+  269 |   const out = [];
+  270 |   let buf = [];
+  271 |   let inBlock = false;
+  272 | 
+  273 |   function flush() {
+  274 |     if (!inBlock) return;
+  275 |     const content = buf
+  276 |       .map((x) => x.replace(/^( {4}|\t)/, ""))
+  277 |       .join("\n")
+  278 |       .trim();
+  279 | 
+  280 |     if (!content) {
+  281 |       buf = [];
+  282 |       inBlock = false;
+  283 |       return;
+  284 |     }
+  285 | 
+  286 |     const one = content.replace(/\s+/g, " ").trim();
+  287 |     const isShort = one.length <= 90 && content.split("\n").filter(Boolean).length <= 2;
+  288 | 
+  289 |     if (isShort) out.push(toInlineCode(one));
+  290 |     else out.push(one);
+  291 | 
+  292 |     buf = [];
+  293 |     inBlock = false;
+  294 |   }
+  295 | 
+  296 |   for (const line of lines) {
+  297 |     const isIndented = /^( {4}|\t)/.test(line);
+  298 | 
+  299 |     if (isIndented) {
+  300 |       inBlock = true;
+  301 |       buf.push(line);
+  302 |       continue;
+  303 |     }
+  304 | 
+  305 |     if (inBlock) flush();
+  306 |     out.push(line);
+  307 |   }
+  308 | 
+  309 |   if (inBlock) flush();
+  310 |   return out.join("\n");
+  311 | }
+  312 | 
+  313 | function ensureTwoHeadings(md, { lang = "fa" } = {}) {
+  314 |   const fa = lang !== "en";
+  315 | 
+  316 |   const hDiffNew = fa ? "## تفاوت‌های فنی" : "## Technical Differences";
+  317 |   const hMergeNew = fa ? "## کد Merge نهایی" : "## Final Merged Code";
+  318 | 
+  319 |   let t = s(md);
+  320 | 
+  321 |   t = t.replace(/^#{1,6}\s*(تفاوت ها|تفاوت‌ها|تفاوت)\s*$/gmu, hDiffNew);
+  322 |   t = t.replace(/^#{1,6}\s*(کیفیت\s*و\s*امنیت|کیفیت\/امنیت)\s*$/gmu, "");
+  323 |   t = t.replace(/^#{1,6}\s*(کد\s*نهایی|کد\s*مرج\s*نهایی|کد\s*Merged\s*نهایی|کد\s*Merge\s*نهایی)\s*$/gmu, hMergeNew);
+  324 | 
+  325 |   t = t.replace(/^#{1,6}\s*(differences|diff)\s*$/gmu, hDiffNew);
+  326 |   t = t.replace(/^#{1,6}\s*(quality\s*&\s*security|security\s*&\s*quality)\s*$/gmu, "");
+  327 |   t = t.replace(/^#{1,6}\s*(final\s*merged\s*code|merged\s*code|final\s*code)\s*$/gmu, hMergeNew);
+  328 | 
+  329 |   if (!t.includes(hDiffNew) && !t.includes(hMergeNew)) {
+  330 |     return [
+  331 |       hDiffNew,
+  332 |       "",
+  333 |       t.trim(),
+  334 |       "",
+  335 |       hMergeNew,
+  336 |       "",
+  337 |       "```txt\n" + (fa ? "کد نهایی ارائه نشد." : "Final code not provided.") + "\n```",
+  338 |     ].join("\n");
+  339 |   }
+  340 | 
+  341 |   if (!t.includes(hDiffNew) && t.includes(hMergeNew)) {
+  342 |     t = [hDiffNew, "", fa ? "تحلیل تفاوت‌ها در این بخش ارائه می‌شود." : "Differences analysis goes here.", "", t.trim()].join("\n");
+  343 |   }
+  344 | 
+  345 |   if (t.includes(hDiffNew) && !t.includes(hMergeNew)) {
+  346 |     t = [t.trim(), "", hMergeNew, "", "```txt\n" + (fa ? "کد نهایی ارائه نشد." : "Final code not provided.") + "\n```"].join("\n");
+  347 |   }
+  348 | 
+  349 |   return t;
+  350 | }
+  351 | 
+  352 | function enforceNoBlocksOutsideFinal(md, { lang = "fa", maxFinalFences = 1 } = {}) {
+  353 |   const fa = lang !== "en";
+  354 |   const hMerge = fa ? "## کد Merge نهایی" : "## Final Merged Code";
+  355 | 
+  356 |   let t = s(md);
+  357 |   const idx = t.indexOf(hMerge);
+  358 | 
+  359 |   if (idx < 0) {
+  360 |     t = stripFencesToInline(t);
+  361 |     t = stripIndentedBlocks(t);
+  362 |     return t;
+  363 |   }
+  364 | 
+  365 |   let before = t.slice(0, idx);
+  366 |   let after = t.slice(idx);
+  367 | 
+  368 |   before = stripFencesToInline(before);
+  369 |   before = stripIndentedBlocks(before);
+  370 | 
+  371 |   let keptCount = 0;
+  372 |   after = after.replace(/```[^\n]*\n([\s\S]*?)```/g, (full) => {
+  373 |     if (keptCount < Math.max(1, Number(maxFinalFences) || 1)) {
+  374 |       keptCount += 1;
+  375 |       return full;
+  376 |     }
+  377 |     const inner = full.replace(/```[^\n]*\n([\s\S]*?)```/m, "$1");
+  378 |     const firstLine = s(inner).trim().split(/\r?\n/).map((x) => x.trim()).filter(Boolean)[0] || s(inner).trim();
+  379 |     return toInlineCode(firstLine);
+  380 |   });
+  381 | 
+  382 |   after = after.replace(/```([^`]+)```/g, (_, inner) => toInlineCode(inner));
+  383 |   after = stripIndentedBlocks(after);
+  384 | 
+  385 |   return (before + after).trim();
+  386 | }
+  387 | 
+  388 | export function normalizeCompareMarkdown(md, opts = {}) {
+  389 |   const lang = s(opts.lang || "fa").toLowerCase() === "en" ? "en" : "fa";
+  390 |   const maxFinalFences = Number.isFinite(opts.maxFinalFences) ? Number(opts.maxFinalFences) : 1;
+  391 | 
+  392 |   let t = s(md || "");
+  393 |   t = stripNoiseLines(t, { lang });
+  394 | 
+  395 |   t = ensureTwoHeadings(t, { lang });
+  396 |   t = enforceNoBlocksOutsideFinal(t, { lang, maxFinalFences });
+  397 | 
+  398 |   t = collapseExtraBlankLines(t).trim() + "\n";
+  399 |   return t;
+  400 | }
+
+### FILE: server/core/response.js
+---
+    1 | // server/core/response.js
+    2 | import { ERROR_MESSAGES } from "./errors.js";
+    3 | 
+    4 | export function ok(res, { output_md, meta = {}, extra = {} }) {
+    5 |   // Backward compatible fields:
+    6 |   // - output (old)
+    7 |   // - error (old)
+    8 |   return res.json({
+    9 |     ok: true,
+   10 |     data: {
+   11 |       output_md,
+   12 |       meta,
+   13 |       ...extra,
+   14 |     },
+   15 |     error: null,
+   16 |     output: output_md,
+   17 |   });
+   18 | }
+   19 | 
+   20 | export function fail(res, { code, status = 500, lang = "en", details = {}, message }) {
+   21 |   const safeLang = lang === "fa" ? "fa" : "en";
+   22 |   const msg =
+   23 |     message ||
+   24 |     ERROR_MESSAGES?.[code]?.[safeLang] ||
+   25 |     ERROR_MESSAGES.INTERNAL_ERROR[safeLang];
+   26 | 
+   27 |   // standard headers for rate limit UX
+   28 |   if (code === "RATE_LIMITED" && typeof details?.retryAfterSec === "number") {
+   29 |     res.setHeader("Retry-After", String(details.retryAfterSec));
+   30 |   }
+   31 | 
+   32 |   return res.status(status).json({
+   33 |     ok: false,
+   34 |     data: null,
+   35 |     error: {
+   36 |       code,
+   37 |       message: msg,
+   38 |       details,
+   39 |     },
+   40 |     // Backward compatible
+   41 |     output: "",
+   42 |   });
+   43 | }
+   44 | 
+
+### FILE: server/core/ccgError.js
+---
+    1 | // server/core/ccgError.js
+    2 | export class CCGError extends Error {
+    3 |   /**
+    4 |    * @param {object} opts
+    5 |    * @param {string} opts.code - stable code (EN) e.g. RATE_LIMITED
+    6 |    * @param {number} [opts.status=500]
+    7 |    * @param {object} [opts.details]
+    8 |    * @param {string} [opts.message] - fallback (EN), localized later
+    9 |    */
+   10 |   constructor({ code, status = 500, details = {}, message = "" }) {
+   11 |     super(message || code);
+   12 |     this.name = "CCGError";
+   13 |     this.code = code;
+   14 |     this.status = status;
+   15 |     this.details = details;
+   16 |   }
+   17 | }
+
+### FILE: server/middleware/errorHandler.js
+---
+    1 | // server/middleware/errorHandler.js
+    2 | import { CCGError } from "../core/ccgError.js";
+    3 | import { fail } from "../core/response.js";
+    4 | 
+    5 | export function errorHandler(err, req, res, next) {
+    6 |   // detect language
+    7 |   const lang =
+    8 |     (req.user?.lang) ||
+    9 |     (req.body?.lang) ||
+   10 |     (req.query?.lang) ||
+   11 |     "en";
+   12 | 
+   13 |   // known typed errors
+   14 |   if (err instanceof CCGError) {
+   15 |     return fail(res, {
+   16 |       code: err.code || "INTERNAL_ERROR",
+   17 |       status: err.status || 500,
+   18 |       lang,
+   19 |       details: err.details || {},
+   20 |       message: err.message,
+   21 |     });
+   22 |   }
+   23 | 
+   24 |   // fallback
+   25 |   console.error("Unhandled error:", err);
+   26 |   return fail(res, {
+   27 |     code: "INTERNAL_ERROR",
+   28 |     status: 500,
+   29 |     lang,
+   30 |     details: {},
+   31 |   });
+   32 | }
+
+### FILE: server/middleware/ccgNormalize.js
+---
+    1 | // server/middleware/ccgNormalize.js (ESM)
+    2 | // هدف: یکسان‌سازی کلیدهای فرانت/بک برای جلوگیری از 400 های ناشی از mismatch
+    3 | export function ccgNormalize(req, res, next) {
+    4 |   try {
+    5 |     // اطمینان از اینکه body وجود دارد
+    6 |     let b = req.body;
+    7 |     if (b == null) b = {};
+    8 |     if (typeof b === "string") {
+    9 |       try { b = JSON.parse(b); } catch { b = { raw: b }; }
+   10 |     }
+   11 |     if (typeof b !== "object") b = {};
+   12 | 
+   13 |     // helper
+   14 |     const pick = (...keys) => {
+   15 |       for (const k of keys) {
+   16 |         if (b[k] !== undefined && b[k] !== null) return b[k];
+   17 |       }
+   18 |       return undefined;
+   19 |     };
+   20 | 
+   21 |     // فیلدهای اصلی (alias ها)
+   22 |     const userRequest = pick("userRequest", "user_request", "request", "prompt", "text", "body", "input");
+   23 |     const lang = pick("lang", "language") ?? "fa";
+   24 |     const mode = pick("mode", "action", "task") ?? "generate";
+   25 | 
+   26 |     // فیلدهای اختیاری (چیزهایی که تو UI داشتید)
+   27 |     const awarenessLevel = pick("awarenessLevel", "awareness_level", "awareness", "level");
+   28 |     const outputStyle = pick("outputStyle", "output_style", "style");
+   29 |     const network = pick("network", "netword", "netwrok"); // typo tolerant
+   30 |     const description = pick("description", "details", "desc");
+   31 | 
+   32 |     // یک بدنه‌ی نرمال
+   33 |     const normalized = {
+   34 |       mode,
+   35 |       lang,
+   36 |       userRequest: typeof userRequest === "string" ? userRequest : (userRequest != null ? String(userRequest) : ""),
+   37 |       awarenessLevel,
+   38 |       outputStyle,
+   39 |       network,
+   40 |       description,
+   41 |       // باقی فیلدها را هم نگه می‌داریم (بدون شکستن)
+   42 |       ...b,
+   43 |     };
+   44 | 
+   45 |     // ولی مطمئن می‌شیم کلید canonical هم وجود دارد
+   46 |     normalized.userRequest = normalized.userRequest ?? "";
+   47 |     normalized.lang = normalized.lang ?? "fa";
+   48 |     normalized.mode = normalized.mode ?? "generate";
+   49 | 
+   50 |     // در req.body بگذار
+   51 |     req.body = normalized;
+   52 |     // برای دیباگ
+   53 |     req.ccgNormalized = { keys: Object.keys(normalized), preview: (normalized.userRequest || "").slice(0, 120) };
+   54 | 
+   55 |     return next();
+   56 |   } catch (e) {
+   57 |     // fail-safe
+   58 |     return next();
+   59 |   }
+   60 | }
+   61 | 
+   62 | export default ccgNormalize;
+
+============================================================
+## SEARCH: compare contract/validator
+
+============================================================
+
+$ grep -RInE COMPARE_CONTRACT_FAILED|compareOutputMode|contract|validator|validate|sanitize|normalize.*compare|Comparator|buildComparatorPrompt|buildComparatorPromptStrict server
+server/utils/aiClient.js:5:import { buildGeneratorPrompt, buildComparatorPrompt } from "./promptBuilder.js";
+server/utils/aiClient.js:73:  if (mode === "compare") return buildComparatorPrompt(ctx);
+server/utils/chatStore.js:11:function sanitizeProfile(p = {}) {
+server/utils/chatStore.js:37:  const p = sanitizeProfile(profile);
+server/utils/chatStore.js:82:  s.profile = { ...s.profile, ...sanitizeProfile(patch) };
+server/utils/outputFormatter.js':7:// نکته: چون مدل ممکن است "چتی" جواب بدهد، ما sanitize و section-extract انجام می‌دهیم.
+server/utils/outputFormatter.js':52:function sanitizeMarkdown(md) {
+server/utils/outputFormatter.js':149:  const cleaned = sanitizeMarkdown(md);
+server/utils/outputFormatter.js':286:  const raw = sanitizeMarkdown(String(rawText || text || "").trim());
+server/utils/outputFormatter.js':289:  // Case 1: JSON tool contract
+server/utils/promptBuilder.js:5:// - buildComparatorPrompt
+server/utils/promptBuilder.js:6:// - buildComparatorPromptStrict
+server/utils/promptBuilder.js:67: * Comparator prompt (2-section strict contract):
+server/utils/promptBuilder.js:74:export function buildComparatorPrompt(ctx = {}) {
+server/utils/promptBuilder.js:166:export function buildComparatorPromptStrict(ctx = {}) {
+server/utils/promptBuilder.js:168:  const base = buildComparatorPrompt(ctx);
+server/utils/outputFormatter.js:218:/*                   Comparator Normalizer (WEB Compare only)                  */
+server/utils/promptTransformer.js:4:import { buildComparatorPromptStrict } from "./promptBuilder.js";
+server/utils/promptTransformer.js:120:  // Comparator fallback: strict markdown comparator (no JSON)
+server/utils/promptTransformer.js:122:    return buildComparatorPromptStrict(vars);
+server/utils/promptTransformer.js:138:  const contract = jsonContractSpecFa({ outputType, cli, platform, altCount, detailLevel });
+server/utils/promptTransformer.js:143:${contract}
+server/routes/ccgRoutes.j:90:function validateUserRequest(userRequest, lang) {
+server/routes/ccgRoutes.j:170:    const invalid = validateUserRequest(userRequest, lang);
+server/routes/ccgRoutes.js:6:import { buildComparatorPromptStrict } from "../utils/promptBuilder.js";
+server/routes/ccgRoutes.js:27:// --- very light syntax validators (heuristics, not parsers) ---
+server/routes/ccgRoutes.js:57:function validateLangHeuristic(lang, code) {
+server/routes/ccgRoutes.js:101:function pickComparatorMode(codeLangA, codeLangB, detectedA, detectedB) {
+server/routes/ccgRoutes.js:185:      const vA = validateLangHeuristic(codeLangA, inputA);
+server/routes/ccgRoutes.js:186:      const vB = validateLangHeuristic(codeLangB, inputB);
+server/routes/ccgRoutes.js:217:      ? pickComparatorMode(codeLangA, codeLangB, detectedA, detectedB)
+server/routes/ccgRoutes.js:246:      variables.compareOutputMode = outMode; // single | dual
+server/routes/ccgRoutes.js:282:        mode: variables.compareOutputMode,
+server/routes/ccgRoutes.js:287:      if (!isGoodCompare(raw, lang, variables.compareOutputMode)) {
+server/routes/ccgRoutes.js:288:        const strictPrompt = buildComparatorPromptStrict(variables);
+server/routes/ccgRoutes.js:301:            mode: variables.compareOutputMode,
+server/routes/ccgRoutes.js:305:          if (isGoodCompare(fixed2, lang, variables.compareOutputMode)) raw = fixed2;
+server/routes/ccgRoutes.js:312:        mode: variables.compareOutputMode,
+server/routes/ccgRoutes.js:317:      if (!isGoodCompare(raw, lang, variables.compareOutputMode)) {
+server/routes/ccgRoutes.js:321:            code: "COMPARE_CONTRACT_FAILED",
+server/routes/ccgRoutes.js:322:            userMessage: lang === "fa" ? "خروجی مقایسه مطابق قرارداد تولید نشد." : "Comparator output contract failed.",
+server/routes/ccgRoutes.js:326:            compareOutputMode: variables.compareOutputMode,
+server/routes/ccgRoutes.js:344:        flags: { mode: "compare", sameLang, compareOutputMode: variables.compareOutputMode },
+server/routes/ccgRoutes.js.backup:81:function validateRequest(normalized) {
+server/routes/ccgRoutes.js.backup:232:        const validation = validateRequest(normalized);
+server/routes/ccgRoutes.js.backup:244:        log(`[${req.requestId}] Request validated successfully`);
+server/src/routes/smart.js:90:function validateNormalizedInput(x, req) {
+server/src/routes/smart.js:160:    validateNormalizedInput(normalized, req);
+
+============================================================
+## SEARCH: parsing/formatting output
+
+============================================================
+
+$ grep -RInE formatOutput|outputFormatter|markdown|Sectioned|ToolResult|schema server
+server/utils/chatStore.js:18:    outputType: b.outputType ? String(b.outputType) : "markdown",
+server/utils/formatter.js:3:function pickSection(markdown, title) {
+server/utils/formatter.js:6:  const m = markdown.match(re);
+server/utils/formatter.js:10:function extractFirstCodeBlock(markdown) {
+server/utils/formatter.js:12:  const m = markdown.match(re);
+server/utils/outputFormatter.js':1:// server/utils/outputFormatter.js
+server/utils/outputFormatter.js':148:function markdownToTool(md, cli, outputType) {
+server/utils/outputFormatter.js':155:  //   b) else -> first code block in entire markdown
+server/utils/outputFormatter.js':271:  // ✅ TOOL: full structured markdown
+server/utils/outputFormatter.js':301:    const markdown = toolToMarkdown(tool, cli, outputType);
+server/utils/outputFormatter.js':302:    return { tool, markdown };
+server/utils/outputFormatter.js':305:  // Case 2: markdown free-form -> extract tool
+server/utils/outputFormatter.js':306:  const tool = markdownToTool(raw, cli, outputType);
+server/utils/outputFormatter.js':315:  const markdown = toolToMarkdown(tool, cli, outputType);
+server/utils/outputFormatter.js':316:  return { tool, markdown };
+server/utils/outputFormatter.js':319:export function formatOutput(args = {}) {
+server/utils/outputFormatter.js':320:  const { tool, markdown } = formatToolResponse(args);
+server/utils/outputFormatter.js':321:  return { tool, markdown };
+server/utils/outputFormatter.js:1:// /home/cando/CCG/server/utils/outputFormatter.js
+server/utils/outputFormatter.js:121: * formatOutput(input, opts)
+server/utils/outputFormatter.js:123:export function formatOutput(input, opts = {}) {
+server/utils/outputFormatter.js:133:      s(input.markdown) ||
+server/utils/outputFormatter.js:157:        markdown: buildMarkdown({
+server/utils/outputFormatter.js:181:      markdown: md,
+server/utils/outputFormatter.js:208:    markdown: s(rawText).trim(),
+server/utils/outputFormatter.js:215:export const formatAIOutput = formatOutput;
+server/utils/promptTransformer.js:82:Return ONLY a valid JSON object (no markdown, no code fences, no extra text).
+server/utils/promptTransformer.js:84:JSON schema:
+server/utils/promptTransformer.js:120:  // Comparator fallback: strict markdown comparator (no JSON)
+server/routes/ccgRoutes.j:4:import { formatOutput } from "../utils/outputFormatter.js";
+server/routes/ccgRoutes.j:228:        markdown: "",
+server/routes/ccgRoutes.j:243:    const formatted = formatOutput(raw, {
+server/routes/ccgRoutes.j:251:      output: formatted.markdown || "",
+server/routes/ccgRoutes.j:252:      markdown: formatted.markdown || "",
+server/routes/ccgRoutes.j:275:      markdown: "",
+server/routes/ccgRoutes.js:4:import { formatOutput, normalizeCompareMarkdown } from "../utils/outputFormatter.js";
+server/routes/ccgRoutes.js:206:          markdown: "",
+server/routes/ccgRoutes.js:270:        markdown: "",
+server/routes/ccgRoutes.js:331:          markdown: "",
+server/routes/ccgRoutes.js:340:        markdown: raw,
+server/routes/ccgRoutes.js:349:    const formatted = formatOutput(raw, {
+server/routes/ccgRoutes.js:357:      output: formatted.markdown || "",
+server/routes/ccgRoutes.js:358:      markdown: formatted.markdown || "",
+server/routes/ccgRoutes.js:378:      markdown: "",
+server/routes/chatRoutes.js:5:import { formatOutput } from "../utils/outputFormatter.js";
+server/routes/chatRoutes.js:110:      outputType: profile.outputType || "markdown",
+server/routes/chatRoutes.js:128:    const out = formatOutput({ outputType: profile.outputType, text: rawOut, fenceLang: profile.cli === "powershell" ? "powershell" : "bash" });
+server/routes/ccgRoutes.js.backup:64:        outputType: String(body.outputType || "markdown").toLowerCase(),
+server/routes/ccgRoutes.js.backup:131:    // تولید markdown پاسخ
+server/routes/ccgRoutes.js.backup:132:    const markdown = `# 🚀 پاسخ CCG API
+server/routes/ccgRoutes.js.backup:168:        markdown: markdown,
+server/routes/ccgRoutes.js.backup:429:            markdown: aiResult.markdown,
+
+============================================================
+## NODE IMPORT CHECKS (exports)
+
+============================================================
+
+$ node -e import('./server/utils/promptBuilder.js').then(m=>console.log('promptBuilder exports:',Object.keys(m))).catch(e=>console.error('promptBuilder import error:',e))
+promptBuilder exports: [
+  'buildComparatorPrompt',
+  'buildComparatorPromptStrict',
+  'buildGeneratorPrompt'
+]
+
+$ node -e import('./server/utils/promptTransformer.js').then(m=>console.log('promptTransformer exports:',Object.keys(m))).catch(e=>console.error('promptTransformer import error:',e))
+promptTransformer exports: [ 'buildFallbackPrompt', 'toPromptVariables' ]
+
+$ node -e import('./server/utils/openaiCompat.js').then(m=>console.log('openaiCompat exports:',Object.keys(m))).catch(e=>console.error('openaiCompat import error:',e))
+openaiCompat exports: [ 'callOpenAICompat' ]
+
+$ node -e import('./server/utils/aiClient.js').then(m=>console.log('aiClient exports:',Object.keys(m))).catch(e=>console.error('aiClient import error:',e))
+aiClient exports: [ 'runAI' ]
+
+============================================================
+## LOCAL API TEST (compare, small)
+
+============================================================
+RID=diag2-20260216T210908Z-1074
+
+$ curl -s -D - http://127.0.0.1:50000/api/ccg -H Content-Type: application/json -d {"mode":"compare","lang":"fa","input_a":"print(1)","input_b":"print(2)","requestId":"diag2-20260216T210908Z-1074","codeLangA":"auto","codeLangB":"auto"}
+HTTP/1.1 502 Bad Gateway
+Content-Type: application/json; charset=utf-8
+Cache-Control: no-store
+X-Request-Id: 1771276150615-66af54796f65c
+Content-Length: 383
+ETag: W/"17f-I0UibOpO9pLWDz8RWwFHZ7RmR3E"
+Date: Mon, 16 Feb 2026 21:09:37 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"ok":false,"error":{"code":"COMPARE_CONTRACT_FAILED","userMessage":"خروجی مقایسه مطابق قرارداد تولید نشد.","hint":"دوباره تلاش کن یا حجم کد را کمتر کن."},"details":{"compareOutputMode":"single","detectedLangA":"python","detectedLangB":"python"},"output":"","markdown":"","requestId":"1771276150615-66af54796f65c","ms":27215}
+--- body (first 2000 chars) ---
+
+$ curl -s http://127.0.0.1:50000/api/ccg -H Content-Type: application/json -d {"mode":"compare","lang":"fa","input_a":"print(1)","input_b":"print(2)","requestId":"diag2-20260216T210908Z-1074","codeLangA":"auto","codeLangB":"auto"}
+{"ok":false,"error":{"code":"COMPARE_CONTRACT_FAILED","userMessage":"خروجی مقایسه مطابق قرارداد تولید نشد.","hint":"دوباره تلاش کن یا حجم کد را کمتر کن."},"details":{"compareOutputMode":"single","detectedLangA":"python","detectedLangB":"python"},"output":"","markdown":"","requestId":"1771276177871-e6a6f4e9da0cc","ms":19922}
+-------------------------------
+
+============================================================
+## LOG TAILS (no sudo)
+
+============================================================
+[2026-02-16T19:07:54.476Z] Platform: linux/x64
+[2026-02-16T19:07:54.476Z] ----------------------------------------
+[2026-02-16T19:07:54.476Z] ENVIRONMENT VARIABLES:
+[2026-02-16T19:07:54.476Z]   NODE_ENV: production
+[2026-02-16T19:07:54.476Z]   PORT: 50000
+[2026-02-16T19:07:54.476Z]   LICENSE: Cando
+[2026-02-16T19:07:54.476Z]   VERSION: 3.2.0
+[2026-02-16T19:07:54.476Z]   AI_PROVIDER: openrouter
+[2026-02-16T19:07:54.476Z]   LANG: en_US.UTF-8
+[2026-02-16T19:07:54.476Z]   BASE_URL: https://ccg.cando.ac
+[2026-02-16T19:07:54.476Z]   FRONTEND_URL: https://ccg.cando.ac
+[2026-02-16T19:07:54.476Z]   ENABLE_CHAT: true
+[2026-02-16T19:07:54.477Z]   ENABLE_COMPARATOR: true
+[2026-02-16T19:07:54.477Z] ----------------------------------------
+[2026-02-16T19:07:54.477Z] SERVICE STATUS:
+[2026-02-16T19:07:54.477Z]   ✅ MongoDB URI is configured
+[2026-02-16T19:07:54.477Z]   ⚠️ OpenAI API Key is NOT properly configured
+[2026-02-16T19:07:54.477Z] ============================================================
+[2026-02-16T19:07:54.487Z] 🎉 SERVER STARTED SUCCESSFULLY
+[2026-02-16T19:07:54.487Z] 🌐 Listening on: http://0.0.0.0:50000
+[2026-02-16T19:07:54.487Z] 📁 Logs are being saved to: /home/cando/CCG/logs/server-debug.log
+[2026-02-16T19:07:54.488Z] ============================================================
+[2026-02-16T19:20:51.613Z] 
+----------------------------------------
+[2026-02-16T19:20:51.614Z] ⚠️ Received SIGINT, initiating graceful shutdown...
+[2026-02-16T19:20:51.614Z] ✅ HTTP server closed
+[2026-02-16T19:20:51.614Z] 📅 Server uptime: 777.60 seconds
+[2026-02-16T19:20:51.615Z] 👋 Shutdown complete
+[2026-02-16T19:20:52.279Z] ============================================================
+[2026-02-16T19:20:52.281Z] 🚀 STARTING CCG SERVER v3.2.0
+[2026-02-16T19:20:52.282Z] ============================================================
+[2026-02-16T19:20:52.288Z] ============================================================
+[2026-02-16T19:20:52.289Z] 📊 STARTUP INFORMATION
+[2026-02-16T19:20:52.289Z] ============================================================
+[2026-02-16T19:20:52.289Z] PID: 581818
+[2026-02-16T19:20:52.290Z] Port: 50000
+[2026-02-16T19:20:52.290Z] Host: 0.0.0.0
+[2026-02-16T19:20:52.291Z] NODE_ENV: production
+[2026-02-16T19:20:52.292Z] Working Directory: /home/cando/CCG
+[2026-02-16T19:20:52.292Z] Start Time: 2026-02-16T19:20:52.292Z
+[2026-02-16T19:20:52.292Z] Node Version: v22.22.0
+[2026-02-16T19:20:52.293Z] Platform: linux/x64
+[2026-02-16T19:20:52.293Z] ----------------------------------------
+[2026-02-16T19:20:52.293Z] ENVIRONMENT VARIABLES:
+[2026-02-16T19:20:52.293Z]   NODE_ENV: production
+[2026-02-16T19:20:52.293Z]   PORT: 50000
+[2026-02-16T19:20:52.294Z]   LICENSE: Cando
+[2026-02-16T19:20:52.294Z]   VERSION: 3.2.0
+[2026-02-16T19:20:52.294Z]   AI_PROVIDER: openrouter
+[2026-02-16T19:20:52.294Z]   LANG: en_US.UTF-8
+[2026-02-16T19:20:52.294Z]   BASE_URL: https://ccg.cando.ac
+[2026-02-16T19:20:52.295Z]   FRONTEND_URL: https://ccg.cando.ac
+[2026-02-16T19:20:52.295Z]   ENABLE_CHAT: true
+[2026-02-16T19:20:52.295Z]   ENABLE_COMPARATOR: true
+[2026-02-16T19:20:52.295Z] ----------------------------------------
+[2026-02-16T19:20:52.295Z] SERVICE STATUS:
+[2026-02-16T19:20:52.295Z]   ✅ MongoDB URI is configured
+[2026-02-16T19:20:52.296Z]   ⚠️ OpenAI API Key is NOT properly configured
+[2026-02-16T19:20:52.296Z] ============================================================
+[2026-02-16T19:20:52.318Z] 🎉 SERVER STARTED SUCCESSFULLY
+[2026-02-16T19:20:52.318Z] 🌐 Listening on: http://0.0.0.0:50000
+[2026-02-16T19:20:52.318Z] 📁 Logs are being saved to: /home/cando/CCG/logs/server-debug.log
+[2026-02-16T19:20:52.318Z] ============================================================
+[2026-02-16T19:20:58.549Z] [mlpk7zjpqkxvn] → POST /api/ccg from 127.0.0.1
+[2026-02-16T19:20:58.549Z] [mlpk7zjpqkxvn] Body (truncated): {"mode":"compare","modeStyle":"comparator","lang":"fa","input_a":"def parse_errors(path):\n    f = open(path, \"r\", encoding=\"utf-8\")\n    errors = []\n    count = 0\n    for line in f:\n        line = line.rstrip(\"\\n\")\n        if \"ERROR\" in line:\n            count += 1\n            errors.append(line)\n    f.close()\n    last5 = errors[-5:]\n    result = {\"count\": count, \"last5\": last5}\n    return result\n\nif __name__ == \"__main__\":\n    data = parse_errors(\"app.log\")\n    print(\"ERROR count:\", data[\"count\"])\n    for x in data[\"last5\"]:\n        print(x)","input_b":"from pathlib import Path\ndef parse_errors(path):\n    path = Path(path)\n    if not path.exists() ...
+[2026-02-16T19:21:46.459Z] [mlpk7zjpqkxvn] ← POST /api/ccg - 502 (47911ms, 325 bytes)
+[2026-02-16T19:23:36.514Z] 
+----------------------------------------
+[2026-02-16T19:23:36.514Z] ⚠️ Received SIGINT, initiating graceful shutdown...
+[2026-02-16T19:23:36.515Z] ✅ HTTP server closed
+[2026-02-16T19:23:36.516Z] 📅 Server uptime: 164.78 seconds
+[2026-02-16T19:23:36.516Z] 👋 Shutdown complete
+[2026-02-16T19:23:37.267Z] ============================================================
+[2026-02-16T19:23:37.268Z] 🚀 STARTING CCG SERVER v3.2.0
+[2026-02-16T19:23:37.269Z] ============================================================
+[2026-02-16T19:23:37.271Z] ============================================================
+[2026-02-16T19:23:37.272Z] 📊 STARTUP INFORMATION
+[2026-02-16T19:23:37.272Z] ============================================================
+[2026-02-16T19:23:37.272Z] PID: 581862
+[2026-02-16T19:23:37.272Z] Port: 50000
+[2026-02-16T19:23:37.272Z] Host: 0.0.0.0
+[2026-02-16T19:23:37.273Z] NODE_ENV: production
+[2026-02-16T19:23:37.273Z] Working Directory: /home/cando/CCG
+[2026-02-16T19:23:37.273Z] Start Time: 2026-02-16T19:23:37.273Z
+[2026-02-16T19:23:37.273Z] Node Version: v22.22.0
+[2026-02-16T19:23:37.273Z] Platform: linux/x64
+[2026-02-16T19:23:37.273Z] ----------------------------------------
+[2026-02-16T19:23:37.274Z] ENVIRONMENT VARIABLES:
+[2026-02-16T19:23:37.274Z]   NODE_ENV: production
+[2026-02-16T19:23:37.274Z]   PORT: 50000
+[2026-02-16T19:23:37.274Z]   LICENSE: Cando
+[2026-02-16T19:23:37.274Z]   VERSION: 3.2.0
+[2026-02-16T19:23:37.274Z]   AI_PROVIDER: openrouter
+[2026-02-16T19:23:37.274Z]   LANG: en_US.UTF-8
+[2026-02-16T19:23:37.274Z]   BASE_URL: https://ccg.cando.ac
+[2026-02-16T19:23:37.274Z]   FRONTEND_URL: https://ccg.cando.ac
+[2026-02-16T19:23:37.274Z]   ENABLE_CHAT: true
+[2026-02-16T19:23:37.274Z]   ENABLE_COMPARATOR: true
+[2026-02-16T19:23:37.275Z] ----------------------------------------
+[2026-02-16T19:23:37.275Z] SERVICE STATUS:
+[2026-02-16T19:23:37.275Z]   ✅ MongoDB URI is configured
+[2026-02-16T19:23:37.275Z]   ⚠️ OpenAI API Key is NOT properly configured
+[2026-02-16T19:23:37.275Z] ============================================================
+[2026-02-16T19:23:37.285Z] 🎉 SERVER STARTED SUCCESSFULLY
+[2026-02-16T19:23:37.286Z] 🌐 Listening on: http://0.0.0.0:50000
+[2026-02-16T19:23:37.286Z] 📁 Logs are being saved to: /home/cando/CCG/logs/server-debug.log
+[2026-02-16T19:23:37.286Z] ============================================================
+[2026-02-16T19:29:16.128Z] 
+----------------------------------------
+[2026-02-16T19:29:16.129Z] ⚠️ Received SIGINT, initiating graceful shutdown...
+[2026-02-16T19:29:16.130Z] ✅ HTTP server closed
+[2026-02-16T19:29:16.130Z] 📅 Server uptime: 339.49 seconds
+[2026-02-16T19:29:16.130Z] 👋 Shutdown complete
+[2026-02-16T19:29:16.701Z] ============================================================
+[2026-02-16T19:29:16.703Z] 🚀 STARTING CCG SERVER v3.2.0
+[2026-02-16T19:29:16.703Z] ============================================================
+[2026-02-16T19:29:16.706Z] ============================================================
+[2026-02-16T19:29:16.706Z] 📊 STARTUP INFORMATION
+[2026-02-16T19:29:16.706Z] ============================================================
+[2026-02-16T19:29:16.706Z] PID: 581918
+[2026-02-16T19:29:16.706Z] Port: 50000
+[2026-02-16T19:29:16.707Z] Host: 0.0.0.0
+[2026-02-16T19:29:16.707Z] NODE_ENV: production
+[2026-02-16T19:29:16.707Z] Working Directory: /home/cando/CCG
+[2026-02-16T19:29:16.707Z] Start Time: 2026-02-16T19:29:16.707Z
+[2026-02-16T19:29:16.707Z] Node Version: v22.22.0
+[2026-02-16T19:29:16.708Z] Platform: linux/x64
+[2026-02-16T19:29:16.708Z] ----------------------------------------
+[2026-02-16T19:29:16.708Z] ENVIRONMENT VARIABLES:
+[2026-02-16T19:29:16.708Z]   NODE_ENV: production
+[2026-02-16T19:29:16.708Z]   PORT: 50000
+[2026-02-16T19:29:16.708Z]   LICENSE: Cando
+[2026-02-16T19:29:16.708Z]   VERSION: 3.2.0
+[2026-02-16T19:29:16.708Z]   AI_PROVIDER: openrouter
+[2026-02-16T19:29:16.708Z]   LANG: en_US.UTF-8
+[2026-02-16T19:29:16.708Z]   BASE_URL: https://ccg.cando.ac
+[2026-02-16T19:29:16.708Z]   FRONTEND_URL: https://ccg.cando.ac
+[2026-02-16T19:29:16.708Z]   ENABLE_CHAT: true
+[2026-02-16T19:29:16.708Z]   ENABLE_COMPARATOR: true
+[2026-02-16T19:29:16.709Z] ----------------------------------------
+[2026-02-16T19:29:16.709Z] SERVICE STATUS:
+[2026-02-16T19:29:16.709Z]   ✅ MongoDB URI is configured
+[2026-02-16T19:29:16.709Z]   ⚠️ OpenAI API Key is NOT properly configured
+[2026-02-16T19:29:16.709Z] ============================================================
+[2026-02-16T19:29:16.719Z] 🎉 SERVER STARTED SUCCESSFULLY
+[2026-02-16T19:29:16.719Z] 🌐 Listening on: http://0.0.0.0:50000
+[2026-02-16T19:29:16.720Z] 📁 Logs are being saved to: /home/cando/CCG/logs/server-debug.log
+[2026-02-16T19:29:16.720Z] ============================================================
+[2026-02-16T19:29:26.748Z] [mlpkivobsttw7] → POST /api/ccg from 127.0.0.1
+[2026-02-16T19:29:26.748Z] [mlpkivobsttw7] Body (truncated): {"mode":"compare","modeStyle":"comparator","lang":"fa","input_a":"def parse_errors(path):\n    f = open(path, \"r\", encoding=\"utf-8\")\n    errors = []\n    count = 0\n    for line in f:\n        line = line.rstrip(\"\\n\")\n        if \"ERROR\" in line:\n            count += 1\n            errors.append(line)\n    f.close()\n    last5 = errors[-5:]\n    result = {\"count\": count, \"last5\": last5}\n    return result\n\nif __name__ == \"__main__\":\n    data = parse_errors(\"app.log\")\n    print(\"ERROR count:\", data[\"count\"])\n    for x in data[\"last5\"]:\n        print(x)","input_b":"from pathlib import Path\ndef parse_errors(path):\n    path = Path(path)\n    if not path.exists() ...
+[2026-02-16T19:43:58.776Z] [mlpl1kjcyg4r5] → POST /api/ccg from 127.0.0.1
+[2026-02-16T19:43:58.776Z] [mlpl1kjcyg4r5] Body: {"mode":"compare","lang":"fa","input_a":"print(1)","input_b":"print(2)"}
+[2026-02-16T19:46:21.227Z] [mlpl1kjcyg4r5] ← POST /api/ccg - 502 (142451ms, 326 bytes)
+[2026-02-16T19:47:09.038Z] 
+----------------------------------------
+[2026-02-16T19:47:09.038Z] ⚠️ Received SIGINT, initiating graceful shutdown...
+[2026-02-16T19:47:09.039Z] ✅ HTTP server closed
+[2026-02-16T19:47:09.039Z] 📅 Server uptime: 1072.79 seconds
+[2026-02-16T19:47:09.039Z] 👋 Shutdown complete
+[2026-02-16T19:47:09.621Z] ============================================================
+[2026-02-16T19:47:09.623Z] 🚀 STARTING CCG SERVER v3.2.0
+[2026-02-16T19:47:09.623Z] ============================================================
+[2026-02-16T19:47:09.626Z] ============================================================
+[2026-02-16T19:47:09.626Z] 📊 STARTUP INFORMATION
+[2026-02-16T19:47:09.626Z] ============================================================
+[2026-02-16T19:47:09.626Z] PID: 581991
+[2026-02-16T19:47:09.627Z] Port: 50000
+[2026-02-16T19:47:09.627Z] Host: 0.0.0.0
+[2026-02-16T19:47:09.627Z] NODE_ENV: production
+[2026-02-16T19:47:09.627Z] Working Directory: /home/cando/CCG
+[2026-02-16T19:47:09.628Z] Start Time: 2026-02-16T19:47:09.628Z
+[2026-02-16T19:47:09.628Z] Node Version: v22.22.0
+[2026-02-16T19:47:09.628Z] Platform: linux/x64
+[2026-02-16T19:47:09.628Z] ----------------------------------------
+[2026-02-16T19:47:09.628Z] ENVIRONMENT VARIABLES:
+[2026-02-16T19:47:09.628Z]   NODE_ENV: production
+[2026-02-16T19:47:09.628Z]   PORT: 50000
+[2026-02-16T19:47:09.628Z]   LICENSE: Cando
+[2026-02-16T19:47:09.628Z]   VERSION: 3.2.0
+[2026-02-16T19:47:09.628Z]   AI_PROVIDER: openrouter
+[2026-02-16T19:47:09.628Z]   LANG: en_US.UTF-8
+[2026-02-16T19:47:09.629Z]   BASE_URL: https://ccg.cando.ac
+[2026-02-16T19:47:09.629Z]   FRONTEND_URL: https://ccg.cando.ac
+[2026-02-16T19:47:09.629Z]   ENABLE_CHAT: true
+[2026-02-16T19:47:09.629Z]   ENABLE_COMPARATOR: true
+[2026-02-16T19:47:09.629Z] ----------------------------------------
+[2026-02-16T19:47:09.629Z] SERVICE STATUS:
+[2026-02-16T19:47:09.629Z]   ✅ MongoDB URI is configured
+[2026-02-16T19:47:09.629Z]   ⚠️ OpenAI API Key is NOT properly configured
+[2026-02-16T19:47:09.629Z] ============================================================
+[2026-02-16T19:47:09.640Z] 🎉 SERVER STARTED SUCCESSFULLY
+[2026-02-16T19:47:09.640Z] 🌐 Listening on: http://0.0.0.0:50000
+[2026-02-16T19:47:09.640Z] 📁 Logs are being saved to: /home/cando/CCG/logs/server-debug.log
+[2026-02-16T19:47:09.640Z] ============================================================
+[2026-02-16T19:47:13.840Z] [mlpl5r1sfjpyl] → POST /api/ccg from 127.0.0.1
+[2026-02-16T19:47:13.841Z] [mlpl5r1sfjpyl] Body: {"mode":"compare","lang":"fa","input_a":"print(1)","input_b":"print(2)"}
+[2026-02-16T19:50:10.062Z] [mlpl5r1sfjpyl] ← POST /api/ccg - 502 (176222ms, 326 bytes)
+[2026-02-16T20:55:25.652Z] 
+----------------------------------------
+[2026-02-16T20:55:25.652Z] ⚠️ Received SIGINT, initiating graceful shutdown...
+[2026-02-16T20:55:25.653Z] ✅ HTTP server closed
+[2026-02-16T20:55:25.653Z] 📅 Server uptime: 4096.49 seconds
+[2026-02-16T20:55:25.653Z] 👋 Shutdown complete
+[2026-02-16T20:55:26.350Z] ============================================================
+[2026-02-16T20:55:26.353Z] 🚀 STARTING CCG SERVER v3.2.0
+[2026-02-16T20:55:26.353Z] ============================================================
+[2026-02-16T20:55:26.359Z] ============================================================
+[2026-02-16T20:55:26.359Z] 📊 STARTUP INFORMATION
+[2026-02-16T20:55:26.359Z] ============================================================
+[2026-02-16T20:55:26.360Z] PID: 583652
+[2026-02-16T20:55:26.360Z] Port: 50000
+[2026-02-16T20:55:26.361Z] Host: 0.0.0.0
+[2026-02-16T20:55:26.361Z] NODE_ENV: production
+[2026-02-16T20:55:26.362Z] Working Directory: /home/cando/CCG
+[2026-02-16T20:55:26.362Z] Start Time: 2026-02-16T20:55:26.362Z
+[2026-02-16T20:55:26.362Z] Node Version: v22.22.0
+[2026-02-16T20:55:26.363Z] Platform: linux/x64
+[2026-02-16T20:55:26.363Z] ----------------------------------------
+[2026-02-16T20:55:26.363Z] ENVIRONMENT VARIABLES:
+[2026-02-16T20:55:26.363Z]   NODE_ENV: production
+[2026-02-16T20:55:26.363Z]   PORT: 50000
+[2026-02-16T20:55:26.363Z]   LICENSE: Cando
+[2026-02-16T20:55:26.364Z]   VERSION: 3.2.0
+[2026-02-16T20:55:26.364Z]   AI_PROVIDER: openrouter
+[2026-02-16T20:55:26.364Z]   LANG: en_US.UTF-8
+[2026-02-16T20:55:26.364Z]   BASE_URL: https://ccg.cando.ac
+[2026-02-16T20:55:26.364Z]   FRONTEND_URL: https://ccg.cando.ac
+[2026-02-16T20:55:26.364Z]   ENABLE_CHAT: true
+[2026-02-16T20:55:26.365Z]   ENABLE_COMPARATOR: true
+[2026-02-16T20:55:26.365Z] ----------------------------------------
+[2026-02-16T20:55:26.365Z] SERVICE STATUS:
+[2026-02-16T20:55:26.365Z]   ✅ MongoDB URI is configured
+[2026-02-16T20:55:26.365Z]   ⚠️ OpenAI API Key is NOT properly configured
+[2026-02-16T20:55:26.365Z] ============================================================
+[2026-02-16T20:55:26.387Z] 🎉 SERVER STARTED SUCCESSFULLY
+[2026-02-16T20:55:26.387Z] 🌐 Listening on: http://0.0.0.0:50000
+[2026-02-16T20:55:26.388Z] 📁 Logs are being saved to: /home/cando/CCG/logs/server-debug.log
+[2026-02-16T20:55:26.388Z] ============================================================
+[2026-02-16T20:55:33.730Z] [mlpnlmjm6cxg2] → POST /api/ccg from 127.0.0.1
+[2026-02-16T20:55:33.731Z] [mlpnlmjm6cxg2] Body: {"mode":"compare","lang":"fa","input_a":"print(1)","input_b":"print(2)"}
+[2026-02-16T20:55:47.740Z] [mlpnlmjm6cxg2] ← POST /api/ccg - 502 (14010ms, 325 bytes)
+[2026-02-16T21:07:32.951Z] [mlpo11hzym041] → POST /api/ccg from 127.0.0.1
+[2026-02-16T21:07:32.952Z] [mlpo11hzym041] Body: {"mode":"compare","lang":"fa","input_a":"print(1)","input_b":"print(2)","requestId":"diag-20260216T210421Z-32602","codeLangA":"auto","codeLangB":"auto"}
+[2026-02-16T21:07:52.056Z] [mlpo11hzym041] ← POST /api/ccg - 502 (19105ms, 325 bytes)
+[2026-02-16T21:09:10.614Z] [mlpo34uuwyyy4] → POST /api/ccg from 127.0.0.1
+[2026-02-16T21:09:10.615Z] [mlpo34uuwyyy4] Body: {"mode":"compare","lang":"fa","input_a":"print(1)","input_b":"print(2)","requestId":"diag2-20260216T210908Z-1074","codeLangA":"auto","codeLangB":"auto"}
+[2026-02-16T21:09:37.830Z] [mlpo34uuwyyy4] ← POST /api/ccg - 502 (27216ms, 325 bytes)
+[2026-02-16T21:09:37.871Z] [mlpo3pvzubt6y] → POST /api/ccg from 127.0.0.1
+[2026-02-16T21:09:37.871Z] [mlpo3pvzubt6y] Body: {"mode":"compare","lang":"fa","input_a":"print(1)","input_b":"print(2)","requestId":"diag2-20260216T210908Z-1074","codeLangA":"auto","codeLangB":"auto"}
+[2026-02-16T21:09:57.793Z] [mlpo3pvzubt6y] ← POST /api/ccg - 502 (19922ms, 325 bytes)
+
+{"ts":"2026-02-14T16:34:42.322Z","provider":"openrouter","model":"openrouter/free","mode":"generate","ok":true,"ms":1856}
+{"ts":"2026-02-14T16:35:17.376Z","provider":"openrouter","model":"openrouter/free","mode":"generate","ok":true,"ms":11777}
+{"ts":"2026-02-14T16:35:30.321Z","provider":"openrouter","model":"openrouter/free","mode":"generate","ok":true,"ms":7853}
+{"ts":"2026-02-14T16:35:55.367Z","provider":"openrouter","model":"openrouter/free","mode":"generate","ok":true,"ms":7501}
+{"ts":"2026-02-14T17:48:01.492Z","provider":"openrouter","model":"openrouter/free","mode":"generate","ok":true,"ms":8678}
+{"ts":"2026-02-14T18:18:00.664Z","provider":"openrouter","model":"openrouter/free","mode":"generate","ok":true,"ms":9705}
+{"ts":"2026-02-14T18:20:03.962Z","provider":"openrouter","model":"openrouter/free","mode":"generate","ok":true,"ms":22456}
+{"ts":"2026-02-14T18:36:09.469Z","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":27380}
+{"ts":"2026-02-14T18:36:56.565Z","provider":"openrouter","model":"openrouter/free","mode":"generate","ok":true,"ms":15758}
+{"ts":"2026-02-14T19:06:12.565Z","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":35526}
+{"ts":"2026-02-14T19:21:49.785Z","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":6947}
+{"ts":"2026-02-14T19:38:51.542Z","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":16293}
+{"ts":"2026-02-14T19:39:02.271Z","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":35326}
+{"ts":"2026-02-15T10:40:29.502Z","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":81727}
+{"ts":"2026-02-15T11:28:12.055Z","rid":"1771154844711-988a7e930aae","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":47343}
+{"ts":"2026-02-15T11:30:09.106Z","rid":"1771155006102-23d1034963864","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":3002}
+{"ts":"2026-02-15T11:42:47.217Z","rid":"1771155761647-44c5636fe4264","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":5568}
+{"ts":"2026-02-15T11:43:47.647Z","rid":"1771155782126-bc611f6a020e5","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":45521}
+{"ts":"2026-02-15T12:01:24.414Z","rid":"1771156775882-9e75df4b0797b","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":108530}
+{"ts":"2026-02-15T12:44:43.926Z","rid":"1771159473283-c0aad060ea5cc","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":10641}
+{"ts":"2026-02-15T12:45:02.731Z","rid":"1771159473283-c0aad060ea5cc","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":18803}
+{"ts":"2026-02-15T12:47:00.792Z","rid":"1771159618511-ad2a9ee1ff4ec","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":2281}
+{"ts":"2026-02-15T12:47:52.622Z","rid":"1771159618511-ad2a9ee1ff4ec","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":51830}
+{"ts":"2026-02-15T13:27:50.691Z","rid":"1771162022385-4889590fbf16d","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":48304}
+{"ts":"2026-02-15T13:31:49.623Z","rid":"1771162274536-c6569e0fcdb78","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":35087}
+{"ts":"2026-02-15T13:35:36.055Z","rid":"1771162022385-4889590fbf16d","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":465362}
+{"ts":"2026-02-15T14:03:09.655Z","rid":"1771164167495-ab7645e9389b3","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":22157}
+{"ts":"2026-02-15T14:36:29.487Z","rid":"1771166145961-817ffced8c1f2","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":43523}
+{"ts":"2026-02-15T14:51:34.135Z","rid":"1771167081786-486aa42d6a7cc","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":12348}
+{"ts":"2026-02-15T14:59:52.808Z","rid":"1771167081786-486aa42d6a7cc","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":498672}
+{"ts":"2026-02-15T15:37:08.225Z","rid":"1771169789359-6572700ad7cec","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":38865}
+{"ts":"2026-02-15T15:41:54.934Z","rid":"1771169789359-6572700ad7cec","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":286709}
+{"ts":"2026-02-15T16:00:08.985Z","rid":"1771171200694-99a58efd7a0e4","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":8288}
+{"ts":"2026-02-15T16:00:57.358Z","rid":"1771171246018-21da4d959e505","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":11340}
+{"ts":"2026-02-15T16:01:08.359Z","rid":"1771171246018-21da4d959e505","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":11000}
+{"ts":"2026-02-15T16:10:17.505Z","rid":"1771171805576-1805a47049225","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":11925}
+{"ts":"2026-02-15T16:10:31.583Z","rid":"1771171805576-1805a47049225","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":14078}
+{"ts":"2026-02-15T16:11:29.736Z","rid":"1771171839730-9b2e4ae6dc9aa","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":false,"ms":50005,"err":"AI request timed out (abort)"}
+{"ts":"2026-02-15T16:24:35.016Z","rid":"1771172643467-a74db77343a79","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":false,"ms":31547,"err":"AI request timed out (abort)"}
+{"ts":"2026-02-15T16:37:40.392Z","rid":"1771173455128-25e3cdc78d45f","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":5264}
+{"ts":"2026-02-15T16:38:09.134Z","rid":"1771173455128-25e3cdc78d45f","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":false,"ms":28741,"err":"Empty model output"}
+{"ts":"2026-02-15T17:04:13.787Z","rid":"1771175038705-be5185f90ae2b","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":15081}
+{"ts":"2026-02-15T17:04:49.145Z","rid":"1771175038705-be5185f90ae2b","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":35356}
+{"ts":"2026-02-15T17:11:05.117Z","rid":"1771175427898-fedf5c778d8c","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":false,"ms":37215,"err":"Empty model output"}
+{"ts":"2026-02-15T17:11:50.992Z","rid":"1771175503535-6d58e7b16cc11","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":false,"ms":7456,"err":"Empty model output"}
+{"ts":"2026-02-15T17:31:53.815Z","rid":"1771176663800-cb19e4e028cde","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":false,"ms":50011,"err":"AI request timed out (abort)"}
+{"ts":"2026-02-15T17:34:28.383Z","rid":"1771176859853-9dfc265fb91ed","provider":"openrouter","model":"openrouter/free","mode":"generate","ok":true,"ms":8529}
+{"ts":"2026-02-15T17:58:33.506Z","rid":"1771178303431-6f9bd09c92c86","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":10071}
+{"ts":"2026-02-15T17:58:49.487Z","rid":"1771178303431-6f9bd09c92c86","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":15981}
+{"ts":"2026-02-15T17:59:01.230Z","rid":"1771178315842-720db8b8b7dc1","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":25388}
+{"ts":"2026-02-15T17:59:15.360Z","rid":"1771178315842-720db8b8b7dc1","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":14129}
+{"ts":"2026-02-15T18:40:08.175Z","rid":"1771180775122-39f64c212c3cf","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":33051}
+{"ts":"2026-02-15T18:45:42.669Z","rid":"1771180766909-5c5ca6c259118","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":375757}
+{"ts":"2026-02-15T19:04:41.584Z","rid":"1771182205757-5ee995e164edf","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":75825}
+{"ts":"2026-02-15T19:05:43.837Z","rid":"1771182205757-5ee995e164edf","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":62252}
+{"ts":"2026-02-15T19:28:27.381Z","rid":"1771183641701-3790d60beb7c1","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":65678}
+{"ts":"2026-02-15T20:11:39.365Z","rid":"1771186244628-c194d46f054ea","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":54735}
+{"ts":"2026-02-16T13:48:07.872Z","rid":"1771249672857-2cbc9cd37e33a","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":15015}
+{"ts":"2026-02-16T13:48:51.060Z","rid":"1771249683122-dd93c24b0ff52","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":47938}
+{"ts":"2026-02-16T13:49:09.912Z","rid":"1771249692850-cdea7c16881f2","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":57062}
+{"ts":"2026-02-16T13:49:11.515Z","rid":"1771249672857-2cbc9cd37e33a","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":63642}
+{"ts":"2026-02-16T14:29:52.068Z","rid":"1771252143469-a3ee63b057b69","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":48598}
+{"ts":"2026-02-16T14:54:57.464Z","rid":"1771253676987-54c7bcfa2dc34","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":20476}
+{"ts":"2026-02-16T16:10:53.632Z","rid":"1771258178576-2e1c742c0302a","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":75053}
+{"ts":"2026-02-16T16:11:24.431Z","rid":"1771258232931-44183c54f6811","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":51500}
+{"ts":"2026-02-16T16:38:12.039Z","rid":"1771259876336-a95be8e367d16","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":15701}
+{"ts":"2026-02-16T17:08:01.610Z","rid":"1771261659417-8ed24a531224e","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":22191}
+{"ts":"2026-02-16T17:35:23.835Z","rid":"1771263290716-699a669c86ada","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":33118}
+{"ts":"2026-02-16T17:54:12.821Z","rid":"1771264417798-b0fd6fdba9f78","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":35021}
+{"ts":"2026-02-16T18:09:34.958Z","rid":"1771265350958-ad41a018c264","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":23998}
+{"ts":"2026-02-16T18:10:42.235Z","rid":"1771265433954-831af89a948f6","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":8280}
+{"ts":"2026-02-16T18:11:07.145Z","rid":"1771265433954-831af89a948f6","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":24910}
+{"ts":"2026-02-16T18:53:35.664Z","rid":"1771267998303-67716882e2ab3","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":17357}
+{"ts":"2026-02-16T18:55:31.324Z","rid":"1771267998303-67716882e2ab3","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":115656}
+{"ts":"2026-02-16T19:02:59.816Z","rid":"1771268566753-52a5e11867a2f","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":13063}
+{"ts":"2026-02-16T19:03:29.253Z","rid":"1771268566753-52a5e11867a2f","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":29436}
+{"ts":"2026-02-16T19:06:37.772Z","rid":"1771268785347-ff90c2cfb57d1","provider":"openai","model":"gpt-4.1","mode":"compare","ok":true,"ms":12421}
+{"ts":"2026-02-16T19:06:54.704Z","rid":"1771268785347-ff90c2cfb57d1","provider":"openai","model":"gpt-4.1","mode":"compare","ok":true,"ms":16928}
+{"ts":"2026-02-16T19:21:22.030Z","rid":"1771269658551-2d6ec0e3bc17b","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":23475}
+{"ts":"2026-02-16T19:21:46.457Z","rid":"1771269658551-2d6ec0e3bc17b","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":24422}
+{"ts":"2026-02-16T19:29:42.606Z","rid":"1771270166750-0d411346c843","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":15850}
+{"ts":"2026-02-16T19:46:15.316Z","rid":"1771271038777-9e9e2e3a72ebb","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":136538}
+{"ts":"2026-02-16T19:46:21.225Z","rid":"1771271038777-9e9e2e3a72ebb","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":5907}
+{"ts":"2026-02-16T19:47:27.360Z","rid":"1771271233843-de8da6bd98731","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":13513}
+{"ts":"2026-02-16T19:50:10.059Z","rid":"1771271233843-de8da6bd98731","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":162693}
+{"ts":"2026-02-16T20:55:45.845Z","rid":"1771275333733-fc0f90b1b7a24","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":12107}
+{"ts":"2026-02-16T20:55:47.738Z","rid":"1771275333733-fc0f90b1b7a24","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":1887}
+{"ts":"2026-02-16T21:07:45.353Z","rid":"1771276052952-8c748a5b5317c","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":12399}
+{"ts":"2026-02-16T21:07:52.055Z","rid":"1771276052952-8c748a5b5317c","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":6701}
+{"ts":"2026-02-16T21:09:26.211Z","rid":"1771276150615-66af54796f65c","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":15596}
+{"ts":"2026-02-16T21:09:37.830Z","rid":"1771276150615-66af54796f65c","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":11618}
+{"ts":"2026-02-16T21:09:46.183Z","rid":"1771276177871-e6a6f4e9da0cc","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":8311}
+{"ts":"2026-02-16T21:09:57.792Z","rid":"1771276177871-e6a6f4e9da0cc","provider":"openrouter","model":"openrouter/free","mode":"compare","ok":true,"ms":11609}
+
+============================================================
+## DONE
+
+============================================================
+Saved: /home/cando/CCG/ccg-diag2-20260216T210908Z.txt

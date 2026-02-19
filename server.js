@@ -5,6 +5,7 @@
 import "dotenv/config";
 import express from "express";
 import ccgRoutes from "./server/routes/ccgRoutes.js";
+console.log("[server] ccgRoutes typeof =", typeof ccgRoutes);
 import domainGuard from "./server/middleware/domainGuard.js";
 import chatRoutes from "./server/routes/chatRoutes.js";
 import fs from "fs";
@@ -40,11 +41,8 @@ function redactSensitive(obj) {
     for (const [k, v] of Object.entries(x)) {
       const lk = String(k).toLowerCase();
       const isSensitive = SENSITIVE_KEYS.some((s) => lk.includes(s));
-      if (isSensitive) {
-        out[k] = "[REDACTED]";
-      } else {
-        out[k] = walk(v);
-      }
+      if (isSensitive) out[k] = "[REDACTED]";
+      else out[k] = walk(v);
     }
     return out;
   }
@@ -81,11 +79,8 @@ app.use((req, res, next) => {
       const bodyStr = JSON.stringify(safeBody);
 
       // keep logs bounded
-      if (bodyStr.length < 1200) {
-        log(`[${requestId}] Body: ${bodyStr}`);
-      } else {
-        log(`[${requestId}] Body (truncated): ${bodyStr.substring(0, 700)}...`);
-      }
+      if (bodyStr.length < 1200) log(`[${requestId}] Body: ${bodyStr}`);
+      else log(`[${requestId}] Body (truncated): ${bodyStr.substring(0, 700)}...`);
     } catch {
       log(`[${requestId}] Body: [unserializable]`);
     }
@@ -124,7 +119,7 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// Main API routes
+// ✅ Main API routes (FIXED)
 app.use("/api/ccg", ccgRoutes);
 app.use("/api/chat", chatRoutes);
 
@@ -164,7 +159,7 @@ app.get("/api/info", (req, res) => {
   res.json(info);
 });
 
-// 404 handler for API routes
+// 404 handler for API routes (keep this LAST)
 app.use("/api", (req, res) => {
   log(`[404] API route not found: ${req.method} ${req.originalUrl}`);
   res.status(404).json({
@@ -230,28 +225,17 @@ const envToShow = [
 ];
 
 envToShow.forEach((key) => {
-  if (process.env[key]) {
-    log(`  ${key}: ${process.env[key]}`);
-  }
+  if (process.env[key]) log(`  ${key}: ${process.env[key]}`);
 });
 
 // بررسی سرویس‌ها
 log("-".repeat(40));
 log("SERVICE STATUS:");
+if (process.env.MONGO_URI) log("  ✅ MongoDB URI is configured");
+else log("  ⚠️ MongoDB URI is NOT configured");
 
-// بررسی MongoDB
-if (process.env.MONGO_URI) {
-  log("  ✅ MongoDB URI is configured");
-} else {
-  log("  ⚠️ MongoDB URI is NOT configured");
-}
-
-// بررسی OpenAI
-if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.length > 30) {
-  log("  ✅ OpenAI API Key is configured");
-} else {
-  log("  ⚠️ OpenAI API Key is NOT properly configured");
-}
+if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.length > 30) log("  ✅ OpenAI API Key is configured");
+else log("  ⚠️ OpenAI API Key is NOT properly configured");
 
 log("=".repeat(60));
 
@@ -293,10 +277,6 @@ process.on("unhandledRejection", (error) => {
   log("[CRITICAL] Unhandled Promise Rejection:");
   log(`  Error: ${error.message}`);
   log(`  Stack: ${error.stack}`);
-
-  if (process.env.NODE_ENV === "production") {
-    // notification hook (future)
-  }
 });
 
 process.on("uncaughtException", (error) => {
@@ -319,5 +299,4 @@ process.on("SIGUSR1", () => {
 
 process.on("SIGHUP", () => {
   log("[INFO] SIGHUP received - Reloading configuration...");
-  // config reload hook (future)
 });

@@ -1,17 +1,10 @@
-// /home/cando/CCG/client/src/services/aiService.js
+// client/src/services/aiService.js
+import { withBase } from "../config/api";
 
-/**
- * callCCG(payload, { signal, timeoutMs })
- * - Supports AbortController via fetch signal (used for Cancel).
- * - Adds optional timeoutMs to prevent endless waits BUT configurable per mode.
- * - Returns parsed JSON on success.
- * - Throws Error with (status, data) on failure for richer UI messages.
- */
-export async function callCCG(payload, opts = {}) {
+function makeAbortable(opts = {}) {
   const externalSignal = opts?.signal;
   const timeoutMs = Number.isFinite(Number(opts?.timeoutMs)) ? Number(opts.timeoutMs) : 0;
 
-  // Merge external abort signal + timeout into a single controller (if needed)
   let controller = null;
   let timer = null;
 
@@ -36,17 +29,26 @@ export async function callCCG(payload, opts = {}) {
     }, timeoutMs);
   }
 
-  const finalSignal = controller ? controller.signal : externalSignal;
+  return {
+    signal: controller ? controller.signal : externalSignal,
+    cleanup: () => {
+      if (timer) clearTimeout(timer);
+    },
+  };
+}
+
+async function fetchJson(path, payload, opts = {}) {
+  const { signal, cleanup } = makeAbortable(opts);
+  const url = withBase(path);
 
   try {
-    const res = await fetch("/api/ccg", {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload || {}),
-      signal: finalSignal,
+      signal,
     });
 
-    // Some responses might be empty (e.g. 204)
     if (res.status === 204) return {};
 
     const contentType = res.headers.get("content-type") || "";
@@ -60,7 +62,6 @@ export async function callCCG(payload, opts = {}) {
     }
 
     if (!res.ok) {
-      // If nginx returns HTML (504/502), keep it short but meaningful
       const rawText = typeof data === "string" ? data.trim() : "";
       const isGatewayHtml =
         rawText.startsWith("<!DOCTYPE html") ||
@@ -84,7 +85,6 @@ export async function callCCG(payload, opts = {}) {
     if (typeof data === "string") return { output: data };
     return data || {};
   } catch (e) {
-    // Normalize abort/timeout errors for UI
     const name = e?.name || "";
     const msg = String(e?.message || "");
 
@@ -102,6 +102,15 @@ export async function callCCG(payload, opts = {}) {
 
     throw e;
   } finally {
-    if (timer) clearTimeout(timer);
+    cleanup();
   }
+}
+
+export async function callCCG(payload, opts = {}) {
+  return fetchJson("/api/ccg", payload, opts);
+}
+
+export async function callChat(payload, opts = {}) {
+  const timeoutMs = Number.isFinite(Number(opts?.timeoutMs)) ? Number(opts.timeoutMs) : 60_000;
+  return fetchJson("/api/chat", payload, { ...opts, timeoutMs });
 }

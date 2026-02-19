@@ -2,147 +2,121 @@
 import dotenv from "dotenv";
 import OpenAI from "openai";
 
-// Load .env reliably (PM2 does NOT load it by default)
+// Load .env reliably
 dotenv.config({ path: process.env.DOTENV_PATH || "/home/cando/CCG/.env" });
 
 function s(v) {
   return v === null || v === undefined ? "" : String(v);
 }
-function num(v, d) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : d;
+
+function toInt(v, def) {
+  const n = Number.parseInt(String(v ?? ""), 10);
+  return Number.isFinite(n) ? n : def;
 }
 
-/**
- * getOpenAIClient({ apiKey, baseURL, headers })
- * - Supports OpenAI & OpenRouter (OpenAI-compatible) by injecting apiKey/baseURL
- * - NEVER throws (returns { client:null, error } instead)
- */
-export function getOpenAIClient(opts = {}) {
-  const apiKey = s(opts.apiKey).trim() || s(process.env.OPENAI_API_KEY).trim();
+function pickProvider(optsProvider) {
+  const p = s(optsProvider || process.env.AI_PROVIDER || "openai").toLowerCase().trim();
+  return p === "openrouter" ? "openrouter" : "openai";
+}
 
-  const baseURL = s(opts.baseURL).trim() || s(process.env.OPENAI_BASE_URL).trim() || undefined;
+function getApiKey(provider, optsApiKey) {
+  const fromOpts = s(optsApiKey).trim();
+  if (fromOpts) return fromOpts;
+  return provider === "openrouter" ? s(process.env.OPENROUTER_API_KEY).trim() : s(process.env.OPENAI_API_KEY).trim();
+}
 
-  const headers = opts.headers && typeof opts.headers === "object" ? opts.headers : {};
+function getBaseURL(provider, optsBase) {
+  const b = s(optsBase).trim();
+  if (b) return b;
+  if (provider === "openrouter") return s(process.env.OPENROUTER_BASE_URL).trim() || "https://openrouter.ai/api/v1";
+  return s(process.env.OPENAI_BASE_URL).trim() || "https://api.openai.com/v1";
+}
 
-  if (!apiKey) {
-    return {
-      client: null,
-      error:
-        "API key is missing. (For OpenRouter set OPENROUTER_API_KEY + AI_PROVIDER=openrouter). " +
-        "If OpenAI: set OPENAI_API_KEY. سپس PM2 را با --update-env ریستارت کن.",
-    };
-  }
+function getModel(provider, optsModel) {
+  const m = s(optsModel).trim();
+  if (m) return m;
+  if (provider === "openrouter") return s(process.env.OPENROUTER_MODEL).trim() || "openrouter/auto";
+  return s(process.env.AI_PRIMARY_MODEL).trim() || s(process.env.OPENAI_MODEL).trim() || "gpt-4.1";
+}
 
-  try {
-    const client = new OpenAI({
-      apiKey,
-      baseURL,
-      defaultHeaders: Object.keys(headers).length ? headers : undefined,
-    });
-    return { client, error: "" };
-  } catch (e) {
-    return { client: null, error: e?.message ? e.message : String(e) };
-  }
+function extractErr(e) {
+  const status = e?.status || e?.response?.status || e?.response?.statusCode || "";
+  const code = e?.code || e?.response?.data?.error?.code || "";
+  const message =
+    e?.response?.data?.error?.message ||
+    e?.error?.message ||
+    e?.message ||
+    String(e);
+
+  const parts = [];
+  if (status) parts.push(`HTTP ${status}`);
+  if (code) parts.push(`code=${code}`);
+  if (message) parts.push(message);
+  return parts.join(" | ").trim() || "Unknown AI error";
 }
 
 /**
  * callOpenAICompat(opts)
- * - prompt, model, temperature
- * - max_tokens OR maxTokens
- * - provider, apiKey, baseUrl/baseURL, headers
- * - signal, timeoutMs
- *
- * IMPORTANT: Never throws
+ * - NEVER throws (returns { output, error, raw })
  */
 export async function callOpenAICompat(opts = {}) {
   const prompt = s(opts.prompt).trim();
   if (!prompt) return { output: "", error: "Empty prompt" };
 
-  const provider = s(opts.provider || process.env.AI_PROVIDER || "openai").toLowerCase().trim();
+  const provider = pickProvider(opts.provider);
+  const apiKey = getApiKey(provider, opts.apiKey);
+  if (!apiKey) {
+    return {
+      output: "",
+      error: provider === "openrouter"
+        ? "OPENROUTER_API_KEY is not configured (AI_PROVIDER=openrouter)."
+        : "OPENAI_API_KEY is not configured (AI_PROVIDER=openai).",
+    };
+  }
 
-  const model =
-    s(opts.model).trim() ||
-    (provider === "openrouter" ? s(process.env.OPENROUTER_MODEL).trim() : "") ||
-    s(process.env.AI_PRIMARY_MODEL).trim() ||
-    s(process.env.OPENAI_MODEL).trim() ||
-    "gpt-4.1";
+  const baseURL = getBaseURL(provider, opts.baseUrl || opts.baseURL);
+  const model = getModel(provider, opts.model);
 
   const temperature = typeof opts.temperature === "number" ? opts.temperature : 0.2;
+  const max_tokens = typeof opts.max_tokens === "number" ? opts.max_tokens : undefined;
 
-  const max_tokens =
-    typeof opts.max_tokens === "number"
-      ? opts.max_tokens
-      : typeof opts.maxTokens === "number"
-      ? opts.maxTokens
-      : undefined;
+  const timeoutMs =
+    typeof opts.timeoutMs === "number"
+      ? opts.timeoutMs
+      : toInt(process.env.AI_HTTP_TIMEOUT_MS, 35_000);
 
-  const apiKey =
-    s(opts.apiKey).trim() ||
-    (provider === "openrouter" ? s(process.env.OPENROUTER_API_KEY).trim() : s(process.env.OPENAI_API_KEY).trim());
-
-  const baseURL =
-    s(opts.baseUrl).trim() ||
-    s(opts.baseURL).trim() ||
-    (provider === "openrouter"
-      ? s(process.env.OPENROUTER_BASE_URL).trim() || "https://openrouter.ai/api/v1"
-      : s(process.env.OPENAI_BASE_URL).trim() || "https://api.openai.com/v1");
+  const maxRetries =
+    typeof opts.maxRetries === "number"
+      ? opts.maxRetries
+      : toInt(process.env.AI_HTTP_MAX_RETRIES, 1);
 
   const headers = opts.headers && typeof opts.headers === "object" ? opts.headers : {};
 
-  const { client, error: clientErr } = getOpenAIClient({ apiKey, baseURL, headers });
-  if (!client) return { output: "", error: clientErr || "Failed to create AI client" };
-
-  const externalSignal = opts.signal;
-  const timeoutMs = num(opts.timeoutMs, 0);
-
-  let controller = null;
-  let timer = null;
-
-  if (timeoutMs > 0) {
-    controller = new AbortController();
-    const onAbort = () => controller.abort(new Error("AI_ABORTED"));
-
-    if (externalSignal) {
-      if (externalSignal.aborted) onAbort();
-      else externalSignal.addEventListener("abort", onAbort, { once: true });
-    }
-
-    timer = setTimeout(() => controller.abort(new Error("AI_TIMEOUT")), timeoutMs);
+  let client;
+  try {
+    client = new OpenAI({
+      apiKey,
+      baseURL,
+      defaultHeaders: Object.keys(headers).length ? headers : undefined,
+      timeout: timeoutMs,
+      maxRetries,
+    });
+  } catch (e) {
+    return { output: "", error: `Failed to create OpenAI client: ${extractErr(e)}`, raw: e };
   }
 
-  const finalSignal = controller ? controller.signal : externalSignal;
-
   try {
-    const body = {
+    const resp = await client.chat.completions.create({
       model,
       temperature,
       max_tokens,
       messages: [{ role: "user", content: prompt }],
-    };
-
-    const resp = await client.chat.completions.create(body, finalSignal ? { signal: finalSignal } : undefined);
+    });
 
     const content = resp?.choices?.[0]?.message?.content ?? "";
-
-    // ✅ CRITICAL: treat empty output as error (prevents "ok:true but empty markdown")
-    if (!String(content).trim()) {
-      return { output: "", error: "Empty model output", raw: resp };
-    }
-
-    return { output: content, raw: resp };
+    if (!s(content).trim()) return { output: "", error: "Empty model output", raw: resp };
+    return { output: content, error: "", raw: resp };
   } catch (e) {
-    const isAbort =
-      e?.name === "AbortError" ||
-      String(e?.message || "").includes("AI_TIMEOUT") ||
-      String(e?.message || "").toLowerCase().includes("aborted");
-
-    const msg = isAbort
-      ? "AI request timed out (abort)"
-      : e?.response?.data?.error?.message || e?.message || String(e);
-
-    return { output: "", error: msg, raw: e };
-  } finally {
-    if (timer) clearTimeout(timer);
+    return { output: "", error: extractErr(e), raw: e };
   }
 }

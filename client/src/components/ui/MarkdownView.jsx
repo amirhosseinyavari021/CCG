@@ -4,7 +4,6 @@ import SectionedMarkdown from "./SectionedMarkdown";
 /**
  * Compatibility wrapper used by pages.
  * - Accepts md / markdown / content
- * - Always passes BOTH markdown & content
  * - Forces rerender by key to avoid stale UI
  */
 export default function MarkdownView(props) {
