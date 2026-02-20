@@ -1,33 +1,68 @@
 /**
- * server.js (CCG_STABLE_V3.2.0)
- * نسخه پایدار با لاگینگ کامل و مدیریت خطا
+ * server.js (CCG_STABLE_V3.2.0+) - FINAL
+ * نسخه نهایی با لاگینگ واضح‌تر، requestId استاندارد، و مدیریت خطای کامل
  */
 import "dotenv/config";
 import express from "express";
-import ccgRoutes from "./server/routes/ccgRoutes.js";
-console.log("[server] ccgRoutes typeof =", typeof ccgRoutes);
-import domainGuard from "./server/middleware/domainGuard.js";
-import chatRoutes from "./server/routes/chatRoutes.js";
 import fs from "fs";
 import path from "path";
 
-// لاگ فایل
+import ccgRoutes from "./server/routes/ccgRoutes.js";
+import domainGuard from "./server/middleware/domainGuard.js";
+import chatRoutes from "./server/routes/chatRoutes.js";
+
+/* =========================
+   CONFIG
+========================= */
+const VERSION = process.env.VERSION || "3.2.0";
+const SERVICE = "ccg";
+const port = Number(process.env.PORT || 50000);
+const host = process.env.HOST || "0.0.0.0";
+
+const MAX_LOG_BODY = Number(process.env.LOG_BODY_MAX || 1200);
+const MAX_LOG_TEXT = Number(process.env.LOG_TEXT_MAX || 900);
+
+/* =========================
+   LOG FILE SETUP
+========================= */
 const logDir = path.join(process.cwd(), "logs");
-if (!fs.existsSync(logDir)) {
-  fs.mkdirSync(logDir, { recursive: true });
-}
+if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });
+
 const logFile = path.join(logDir, "server-debug.log");
 
-function log(...args) {
-  const timestamp = new Date().toISOString();
-  const message = `[${timestamp}] ${args.join(" ")}`;
-  console.log(message);
-  fs.appendFileSync(logFile, message + "\n", { flag: "a" });
+function safeWrite(line) {
+  try {
+    fs.appendFileSync(logFile, line + "\n", { flag: "a" });
+  } catch {}
+}
+
+function ts() {
+  return new Date().toISOString();
+}
+
+function toOneLine(x) {
+  return String(x ?? "").replace(/\s+/g, " ").trim();
+}
+
+function makeRequestId() {
+  // sortable-ish + random
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function redactSensitive(obj) {
-  // Redact common sensitive fields (nested-safe)
-  const SENSITIVE_KEYS = ["key", "token", "password", "secret", "authorization", "apikey", "api_key", "access_token"];
+  const SENSITIVE_KEYS = [
+    "key",
+    "token",
+    "password",
+    "secret",
+    "authorization",
+    "apikey",
+    "api_key",
+    "access_token",
+    "openai_api_key",
+    "openrouter_api_key",
+  ];
+
   const seen = new WeakSet();
 
   function walk(x) {
@@ -41,8 +76,7 @@ function redactSensitive(obj) {
     for (const [k, v] of Object.entries(x)) {
       const lk = String(k).toLowerCase();
       const isSensitive = SENSITIVE_KEYS.some((s) => lk.includes(s));
-      if (isSensitive) out[k] = "[REDACTED]";
-      else out[k] = walk(v);
+      out[k] = isSensitive ? "[REDACTED]" : walk(v);
     }
     return out;
   }
@@ -50,67 +84,136 @@ function redactSensitive(obj) {
   return walk(obj);
 }
 
-log("=".repeat(60));
-log("🚀 STARTING CCG SERVER v3.2.0");
-log("=".repeat(60));
+function logLine(level, msg, meta = {}) {
+  // 1) human readable
+  const human = `[${ts()}] ${level.toUpperCase()} ${msg}`;
+  console.log(human);
+
+  // 2) structured JSON line (easy grep + parse)
+  const evt = {
+    ts: ts(),
+    level,
+    service: SERVICE,
+    version: VERSION,
+    msg,
+    ...meta,
+  };
+
+  safeWrite(`${human} | ${JSON.stringify(evt)}`);
+}
+
+function getIp(req) {
+  // behind proxy/cdn: x-forwarded-for could exist
+  const xf = req.headers["x-forwarded-for"];
+  if (typeof xf === "string" && xf.trim()) return xf.split(",")[0].trim();
+  return req.ip;
+}
+
+/* =========================
+   APP INIT
+========================= */
+logLine("info", "============================================================");
+logLine("info", `🚀 STARTING CCG SERVER v${VERSION}`);
+logLine("info", "============================================================");
 
 const app = express();
-
 app.disable("x-powered-by");
 
-// ✅ Body parsers should run BEFORE logging middleware if we want req.body
-app.use(express.json({ limit: "2mb" }));
-app.use(express.urlencoded({ extended: true }));
+// اگر پشت پروکسی/کلاودفلر هستی، این باعث میشه req.ip درست‌تر بشه
+// (اگر نمی‌خوای، کامنت کن)
+app.set("trust proxy", true);
 
-// Middlewareهای اصلی
-app.use(domainGuard);
+/* =========================
+   BODY PARSERS (قبل از لاگ)
+========================= */
+app.use(express.json({ limit: process.env.MAX_REQUEST_SIZE || "2mb" }));
+app.use(express.urlencoded({ extended: true, limit: process.env.MAX_REQUEST_SIZE || "2mb" }));
+app.use(express.text({ type: "*/*", limit: process.env.MAX_REQUEST_SIZE || "2mb" }));
 
-// Middleware لاگینگ برای تمام درخواست‌ها
-app.use((req, res, next) => {
-  const start = Date.now();
-  const requestId = Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-
-  log(`[${requestId}] → ${req.method} ${req.originalUrl} from ${req.ip}`);
-
-  // Log body safely (redact sensitive)
-  if (req.body && typeof req.body === "object" && Object.keys(req.body).length > 0) {
-    try {
-      const safeBody = redactSensitive(req.body);
-      const bodyStr = JSON.stringify(safeBody);
-
-      // keep logs bounded
-      if (bodyStr.length < 1200) log(`[${requestId}] Body: ${bodyStr}`);
-      else log(`[${requestId}] Body (truncated): ${bodyStr.substring(0, 700)}...`);
-    } catch {
-      log(`[${requestId}] Body: [unserializable]`);
+// اگر req.body رشته بود و شبیه JSON بود، تبدیلش کن
+app.use((req, _res, next) => {
+  if (typeof req.body === "string") {
+    const t = req.body.trim();
+    if (t.startsWith("{") && t.endsWith("}")) {
+      try {
+        req.body = JSON.parse(t);
+      } catch {
+        // keep as string
+      }
     }
   }
+  next();
+});
 
-  const originalSend = res.send;
-  res.send = function (body) {
-    const duration = Date.now() - start;
-    let size = 0;
-    try {
-      size = typeof body === "string" ? body.length : JSON.stringify(body).length;
-    } catch {
-      size = 0;
+/* =========================
+   REQUEST LOGGER + REQUEST ID
+========================= */
+app.use((req, res, next) => {
+  const start = Date.now();
+  const requestId = req.headers["x-request-id"] ? String(req.headers["x-request-id"]) : makeRequestId();
+
+  req.requestId = requestId;
+  res.setHeader("X-Request-Id", requestId);
+
+  const ip = getIp(req);
+  const ua = toOneLine(req.headers["user-agent"] || "");
+  const ct = toOneLine(req.headers["content-type"] || "");
+  const cl = toOneLine(req.headers["content-length"] || "");
+
+  logLine("info", "REQ", {
+    rid: requestId,
+    method: req.method,
+    path: req.originalUrl,
+    ip,
+    ct: ct || null,
+    cl: cl || null,
+    ua: ua || null,
+  });
+
+  // body preview (safe + bounded)
+  try {
+    if (req.body && typeof req.body === "object" && Object.keys(req.body).length) {
+      const safeBody = redactSensitive(req.body);
+      let bodyStr = JSON.stringify(safeBody);
+      if (bodyStr.length > MAX_LOG_BODY) bodyStr = bodyStr.slice(0, MAX_LOG_BODY) + "...[truncated]";
+      logLine("debug", "REQ_BODY", { rid: requestId, body: bodyStr });
+    } else if (typeof req.body === "string" && req.body.trim()) {
+      let preview = req.body.trim();
+      if (preview.length > MAX_LOG_TEXT) preview = preview.slice(0, MAX_LOG_TEXT) + "...[truncated]";
+      logLine("debug", "REQ_BODY_TEXT", { rid: requestId, body: preview });
     }
-    log(`[${requestId}] ← ${req.method} ${req.originalUrl} - ${res.statusCode} (${duration}ms, ${size} bytes)`);
-    return originalSend.call(this, body);
-  };
+  } catch (e) {
+    logLine("warn", "REQ_BODY_LOG_FAIL", { rid: requestId, err: String(e?.message || e) });
+  }
+
+  // capture response finish
+  res.on("finish", () => {
+    const ms = Date.now() - start;
+    logLine("info", "RES", {
+      rid: requestId,
+      method: req.method,
+      path: req.originalUrl,
+      status: res.statusCode,
+      ms,
+    });
+  });
 
   next();
 });
 
-// ========== ROUTES ==========
+/* =========================
+   MAIN MIDDLEWARES
+========================= */
+app.use(domainGuard);
 
-// Health endpoint
-app.get("/api/health", (req, res) => {
-  log("[HEALTH] Health check requested");
+/* =========================
+   ROUTES
+========================= */
+app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
-    service: "ccg",
-    version: "3.2.0",
+    service: SERVICE,
+    version: VERSION,
     ts: Date.now(),
     pid: process.pid,
     env: process.env.NODE_ENV,
@@ -119,27 +222,23 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// ✅ Main API routes (FIXED)
 app.use("/api/ccg", ccgRoutes);
 app.use("/api/chat", chatRoutes);
 
-// Simple test endpoint
 app.post("/api/test", (req, res) => {
-  log("[TEST] Test endpoint called");
   res.json({
     ok: true,
     message: "✅ CCG API is working properly",
     received: redactSensitive(req.body || {}),
     timestamp: new Date().toISOString(),
-    server: "CCG v3.2.0",
+    server: `CCG v${VERSION}`,
   });
 });
 
-// API info endpoint
-app.get("/api/info", (req, res) => {
-  const info = {
+app.get("/api/info", (_req, res) => {
+  res.json({
     service: "Cando Command Generator (CCG)",
-    version: "3.2.0",
+    version: VERSION,
     status: "operational",
     endpoints: {
       health: "GET /api/health",
@@ -155,32 +254,40 @@ app.get("/api/info", (req, res) => {
       multilingual: true,
     },
     timestamp: new Date().toISOString(),
-  };
-  res.json(info);
+  });
 });
 
-// 404 handler for API routes (keep this LAST)
+/* =========================
+   404 FOR API
+========================= */
 app.use("/api", (req, res) => {
-  log(`[404] API route not found: ${req.method} ${req.originalUrl}`);
+  logLine("warn", "API_ROUTE_NOT_FOUND", {
+    rid: req.requestId,
+    method: req.method,
+    path: req.originalUrl,
+  });
+
   res.status(404).json({
     ok: false,
     error: {
       code: "API_ROUTE_NOT_FOUND",
       userMessage: "مسیر API پیدا نشد",
       hint: "آدرس درخواست را بررسی کن.",
+      requestId: req.requestId,
     },
     path: req.originalUrl,
     timestamp: new Date().toISOString(),
   });
 });
 
-// Root endpoint
-app.get("/", (req, res) => {
+/* =========================
+   ROOT
+========================= */
+app.get("/", (_req, res) => {
   res.json({
     service: "CCG API",
-    version: "3.2.0",
+    version: VERSION,
     description: "Cando Command Generator Backend API",
-    documentation: "https://ccg.cando.ac/docs",
     endpoints: {
       api: "/api",
       health: "/api/health",
@@ -189,114 +296,130 @@ app.get("/", (req, res) => {
   });
 });
 
-// ========== SERVER STARTUP ==========
+/* =========================
+   GLOBAL ERROR HANDLER
+========================= */
+app.use((err, req, res, _next) => {
+  const msg = String(err?.message || "Internal server error");
+  const code = err?.code || "INTERNAL_ERROR";
 
-const port = Number(process.env.PORT || 50000);
-const host = process.env.HOST || "0.0.0.0";
+  logLine("error", "UNHANDLED_ROUTE_ERROR", {
+    rid: req?.requestId,
+    code,
+    msg,
+    stack: process.env.NODE_ENV === "production" ? undefined : String(err?.stack || ""),
+  });
 
-// نمایش اطلاعات startup
-log("=".repeat(60));
-log("📊 STARTUP INFORMATION");
-log("=".repeat(60));
-log(`PID: ${process.pid}`);
-log(`Port: ${port}`);
-log(`Host: ${host}`);
-log(`NODE_ENV: ${process.env.NODE_ENV || "development"}`);
-log(`Working Directory: ${process.cwd()}`);
-log(`Start Time: ${new Date().toISOString()}`);
-log(`Node Version: ${process.version}`);
-log(`Platform: ${process.platform}/${process.arch}`);
+  res.status(err?.status || 500).json({
+    ok: false,
+    error: {
+      code,
+      userMessage: "خطای داخلی سرور رخ داد.",
+      message: msg,
+      requestId: req?.requestId,
+    },
+  });
+});
 
-// نمایش متغیرهای محیطی (بدون اطلاعات حساس)
-log("-".repeat(40));
-log("ENVIRONMENT VARIABLES:");
+/* =========================
+   STARTUP INFO
+========================= */
+logLine("info", "============================================================");
+logLine("info", "📊 STARTUP INFORMATION");
+logLine("info", "============================================================");
+logLine("info", `PID=${process.pid}`);
+logLine("info", `Host=${host}`);
+logLine("info", `Port=${port}`);
+logLine("info", `NODE_ENV=${process.env.NODE_ENV || "development"}`);
+logLine("info", `WorkingDir=${process.cwd()}`);
+logLine("info", `Node=${process.version}`);
+logLine("info", `Platform=${process.platform}/${process.arch}`);
+
+logLine("info", "----------------------------------------");
+logLine("info", "ENVIRONMENT VARIABLES (safe view):");
 const envToShow = [
   "NODE_ENV",
   "PORT",
   "LICENSE",
   "VERSION",
-  "AI_PROVIDER",
-  "AI_PRIMARY_MODEL",
   "LANG",
   "BASE_URL",
   "FRONTEND_URL",
   "ENABLE_CHAT",
   "ENABLE_COMPARATOR",
+
+  // AI routing
+  "AI_PROVIDER",
+  "AI_PRIMARY_MODEL",
+  "AI_FALLBACK_PROVIDER",
+  "AI_FALLBACK_MODEL",
+
+  // timeouts/limits
+  "CHAT_ROUTE_TIMEOUT_MS",
+  "AI_HTTP_TIMEOUT_MS",
+  "AI_HTTP_MAX_RETRIES",
+  "AI_MAX_CONCURRENCY",
 ];
 
-envToShow.forEach((key) => {
-  if (process.env[key]) log(`  ${key}: ${process.env[key]}`);
-});
+for (const key of envToShow) {
+  if (process.env[key]) logLine("info", `ENV ${key}=${process.env[key]}`);
+}
 
-// بررسی سرویس‌ها
-log("-".repeat(40));
-log("SERVICE STATUS:");
-if (process.env.MONGO_URI) log("  ✅ MongoDB URI is configured");
-else log("  ⚠️ MongoDB URI is NOT configured");
+logLine("info", "----------------------------------------");
+logLine("info", "SERVICE STATUS:");
+logLine("info", process.env.MONGO_URI ? "✅ MongoDB URI is configured" : "⚠️ MongoDB URI is NOT configured");
+logLine("info", process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.length > 30 ? "✅ OpenAI API Key is configured" : "⚠️ OpenAI API Key is NOT properly configured");
+logLine("info", process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY.length > 20 ? "✅ OpenRouter API Key is configured" : "⚠️ OpenRouter API Key is NOT properly configured");
+logLine("info", "============================================================");
 
-if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.length > 30) log("  ✅ OpenAI API Key is configured");
-else log("  ⚠️ OpenAI API Key is NOT properly configured");
-
-log("=".repeat(60));
-
-// راه‌اندازی سرور
+/* =========================
+   START SERVER
+========================= */
 const server = app.listen(port, host, () => {
-  log(`🎉 SERVER STARTED SUCCESSFULLY`);
-  log(`🌐 Listening on: http://${host}:${port}`);
-  log(`📁 Logs are being saved to: ${logFile}`);
-  log("=".repeat(60));
-  console.log(`\n✅ CCG Server v3.2.0 is running on http://${host}:${port}`);
+  logLine("info", "🎉 SERVER STARTED SUCCESSFULLY", {
+    host,
+    port,
+    url: `http://${host}:${port}`,
+    logFile,
+  });
+  console.log(`\n✅ CCG Server v${VERSION} is running on http://${host}:${port}`);
   console.log(`📊 Check /api/health for status\n`);
 });
 
-// ========== GRACEFUL SHUTDOWN ==========
-
-const gracefulShutdown = (signal) => {
-  log(`\n${"-".repeat(40)}`);
-  log(`⚠️ Received ${signal}, initiating graceful shutdown...`);
+/* =========================
+   GRACEFUL SHUTDOWN
+========================= */
+function gracefulShutdown(signal) {
+  logLine("warn", `⚠️ Received ${signal}, initiating graceful shutdown...`);
 
   server.close(() => {
-    log("✅ HTTP server closed");
-    log(`📅 Server uptime: ${process.uptime().toFixed(2)} seconds`);
-    log("👋 Shutdown complete");
+    logLine("info", "✅ HTTP server closed");
+    logLine("info", `📅 Server uptime: ${process.uptime().toFixed(2)} seconds`);
+    logLine("info", "👋 Shutdown complete");
     process.exit(0);
   });
 
   setTimeout(() => {
-    log("⏰ Force shutdown after timeout");
+    logLine("error", "⛔ Force exit (timeout)...");
     process.exit(1);
-  }, 10000);
-};
+  }, 8000).unref?.();
+}
 
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 
-// ========== ERROR HANDLING ==========
-
-process.on("unhandledRejection", (error) => {
-  log("[CRITICAL] Unhandled Promise Rejection:");
-  log(`  Error: ${error.message}`);
-  log(`  Stack: ${error.stack}`);
+/* =========================
+   PROCESS-LEVEL SAFETY NET
+========================= */
+process.on("unhandledRejection", (reason) => {
+  logLine("error", "UNHANDLED_REJECTION", { reason: safeWrite ? toOneLine(String(reason)) : String(reason) });
 });
 
-process.on("uncaughtException", (error) => {
-  log("[CRITICAL] Uncaught Exception:");
-  log(`  Error: ${error.message}`);
-  log(`  Stack: ${error.stack}`);
-
-  setTimeout(() => {
-    log("🔄 Restarting server due to uncaught exception...");
-    process.exit(1);
-  }, 1000);
-});
-
-process.on("SIGUSR1", () => {
-  log("[DEBUG] SIGUSR1 received - Dumping status:");
-  log(`  Memory: ${JSON.stringify(process.memoryUsage())}`);
-  log(`  Uptime: ${process.uptime()}s`);
-  log(`  Active connections: ${server._connections}`);
-});
-
-process.on("SIGHUP", () => {
-  log("[INFO] SIGHUP received - Reloading configuration...");
+process.on("uncaughtException", (err) => {
+  logLine("error", "UNCAUGHT_EXCEPTION", {
+    msg: String(err?.message || err),
+    stack: process.env.NODE_ENV === "production" ? undefined : String(err?.stack || ""),
+  });
+  // بهتره بعد از uncaughtException خروج کنی
+  gracefulShutdown("UNCAUGHT_EXCEPTION");
 });

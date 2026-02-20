@@ -7,30 +7,35 @@ function makeAbortable(opts = {}) {
 
   let controller = null;
   let timer = null;
+  let abortCode = "";
 
   if (timeoutMs > 0) {
     controller = new AbortController();
 
-    const abortFromExternal = () => {
+    const abortWith = (code) => {
+      abortCode = code;
       try {
-        controller.abort(new Error("REQUEST_ABORTED"));
-      } catch {}
+        controller.abort(new Error(code));
+      } catch {
+        try {
+          controller.abort();
+        } catch {}
+      }
     };
+
+    const abortFromExternal = () => abortWith("REQUEST_ABORTED");
 
     if (externalSignal) {
       if (externalSignal.aborted) abortFromExternal();
       else externalSignal.addEventListener("abort", abortFromExternal, { once: true });
     }
 
-    timer = setTimeout(() => {
-      try {
-        controller.abort(new Error("REQUEST_TIMEOUT"));
-      } catch {}
-    }, timeoutMs);
+    timer = setTimeout(() => abortWith("REQUEST_TIMEOUT"), timeoutMs);
   }
 
   return {
     signal: controller ? controller.signal : externalSignal,
+    getAbortCode: () => abortCode,
     cleanup: () => {
       if (timer) clearTimeout(timer);
     },
@@ -38,7 +43,7 @@ function makeAbortable(opts = {}) {
 }
 
 async function fetchJson(path, payload, opts = {}) {
-  const { signal, cleanup } = makeAbortable(opts);
+  const { signal, cleanup, getAbortCode } = makeAbortable(opts);
   const url = withBase(path);
 
   try {
@@ -87,6 +92,7 @@ async function fetchJson(path, payload, opts = {}) {
   } catch (e) {
     const name = e?.name || "";
     const msg = String(e?.message || "");
+    const reason = getAbortCode?.() || "";
 
     const isAbort =
       name === "AbortError" ||
@@ -95,8 +101,12 @@ async function fetchJson(path, payload, opts = {}) {
       msg.toLowerCase().includes("aborted");
 
     if (isAbort) {
-      const err = new Error("REQUEST_TIMEOUT");
-      err.code = "REQUEST_TIMEOUT";
+      const code =
+        msg.includes("REQUEST_ABORTED") || reason === "REQUEST_ABORTED"
+          ? "REQUEST_ABORTED"
+          : "REQUEST_TIMEOUT";
+      const err = new Error(code);
+      err.code = code;
       throw err;
     }
 
@@ -111,6 +121,7 @@ export async function callCCG(payload, opts = {}) {
 }
 
 export async function callChat(payload, opts = {}) {
-  const timeoutMs = Number.isFinite(Number(opts?.timeoutMs)) ? Number(opts.timeoutMs) : 60_000;
+  // ✅ chat may take longer on primary models
+  const timeoutMs = Number.isFinite(Number(opts?.timeoutMs)) ? Number(opts.timeoutMs) : 180_000; // 3 min
   return fetchJson("/api/chat", payload, { ...opts, timeoutMs });
 }

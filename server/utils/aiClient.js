@@ -1,4 +1,4 @@
-// /home/cando/CCG/server/utils/aiClient.js
+// server/utils/aiClient.js
 import fs from "fs";
 import path from "path";
 import { callOpenAICompat } from "./openaiCompat.js";
@@ -37,38 +37,58 @@ function logProviderEvent(evt) {
 }
 /** --------------------------------------------------------------------------- */
 
-function pickProvider(ctx) {
-  const p = s(ctx.aiProvider || process.env.AI_PROVIDER || "openai").toLowerCase().trim();
-  return p === "openrouter" ? "openrouter" : "openai";
+function normProvider(p) {
+  const x = s(p).toLowerCase().trim();
+  return x === "openrouter" ? "openrouter" : "openai";
 }
 
-function getCompatConfig(provider, ctx) {
-  if (provider === "openrouter") {
-    const apiKey = s(process.env.OPENROUTER_API_KEY).trim();
-    const model =
-      s(ctx.model).trim() ||
-      s(process.env.OPENROUTER_MODEL).trim() ||
-      s(process.env.AI_PRIMARY_MODEL).trim() ||
-      "openrouter/auto";
+function getPrimaryProvider(ctx) {
+  return normProvider(ctx.aiProvider || process.env.AI_PROVIDER || "openai");
+}
 
-    const baseUrl = s(process.env.OPENROUTER_BASE_URL).trim() || "https://openrouter.ai/api/v1";
+function getFallbackProvider(ctx) {
+  const fb = s(ctx.fallbackProvider || process.env.AI_FALLBACK_PROVIDER || "").trim();
+  return fb ? normProvider(fb) : "";
+}
 
-    const extraHeaders = {};
-    if (process.env.OPENROUTER_HTTP_REFERER) extraHeaders["HTTP-Referer"] = process.env.OPENROUTER_HTTP_REFERER;
-    if (process.env.OPENROUTER_APP_TITLE) extraHeaders["X-Title"] = process.env.OPENROUTER_APP_TITLE;
+function getProviderApiKey(provider) {
+  return provider === "openrouter" ? s(process.env.OPENROUTER_API_KEY).trim() : s(process.env.OPENAI_API_KEY).trim();
+}
 
-    return { apiKey, model, baseUrl, extraHeaders };
+function getProviderBaseUrl(provider) {
+  if (provider === "openrouter") return s(process.env.OPENROUTER_BASE_URL).trim() || "https://openrouter.ai/api/v1";
+  return s(process.env.OPENAI_BASE_URL).trim() || "https://api.openai.com/v1";
+}
+
+function getProviderModel(provider, ctx, isFallback) {
+  if (!isFallback) {
+    const m = s(ctx.model).trim() || s(process.env.AI_PRIMARY_MODEL).trim();
+    if (m) return m;
+    return provider === "openrouter" ? (s(process.env.OPENROUTER_MODEL).trim() || "openrouter/auto") : "gpt-4.1";
   }
 
-  const apiKey = s(process.env.OPENAI_API_KEY).trim();
-  const model = s(ctx.model).trim() || s(process.env.AI_PRIMARY_MODEL).trim() || "gpt-4.1";
-  const baseUrl = s(process.env.OPENAI_BASE_URL).trim() || "https://api.openai.com/v1";
-  return { apiKey, model, baseUrl, extraHeaders: {} };
+  const m = s(ctx.fallbackModel).trim() || s(process.env.AI_FALLBACK_MODEL).trim();
+  if (m) return m;
+  return provider === "openrouter" ? (s(process.env.OPENROUTER_MODEL).trim() || "openrouter/auto") : "gpt-4.1";
+}
+
+function getProviderExtraHeaders(provider) {
+  if (provider !== "openrouter") return {};
+  const extraHeaders = {};
+  if (process.env.OPENROUTER_HTTP_REFERER) extraHeaders["HTTP-Referer"] = process.env.OPENROUTER_HTTP_REFERER;
+  if (process.env.OPENROUTER_APP_TITLE) extraHeaders["X-Title"] = process.env.OPENROUTER_APP_TITLE;
+  return extraHeaders;
 }
 
 function buildPromptByMode(ctx) {
   const mode = s(ctx.mode || "generate").toLowerCase();
   if (mode === "compare") return buildComparatorPrompt(ctx);
+
+  if (mode === "chat") {
+    const msg = s(ctx.user_request || ctx.userRequest || ctx.message || "").trim();
+    if (msg) return `You are a technical assistant.\n\nUser:\n${msg}\n\nAssistant:\n`;
+  }
+
   return buildGeneratorPrompt(ctx);
 }
 
@@ -108,6 +128,10 @@ function isRetryableError(err) {
   );
 }
 
+function isEmptyOutput(out) {
+  return !s(out).trim();
+}
+
 function fallbackCompareMarkdown({ lang = "fa", compareOutputMode = "advice" } = {}) {
   const fa = lang !== "en";
   if (String(compareOutputMode).toLowerCase() === "merge") {
@@ -125,12 +149,9 @@ function fallbackCompareMarkdown({ lang = "fa", compareOutputMode = "advice" } =
           "- Suggestion: review tests, error handling, and IO/memory optimizations.",
         ].join("\n");
 
-    return [h1, "", diff, "", h2, "", "```txt\n" + (fa ? "کد نهایی در این تلاش تولید نشد." : "Final code was not produced in this attempt.") + "\n```"].join(
-      "\n"
-    );
+    return [h1, "", diff, "", h2, "", "```txt\n" + (fa ? "کد نهایی در این تلاش تولید نشد." : "Final code was not produced in this attempt.") + "\n```"].join("\n");
   }
 
-  // advice
   const hDiff = fa ? "## تفاوت‌های فنی" : "## Technical Differences";
   const hA = fa ? "## پیشنهادهای بهبود برای کد A" : "## Improvement Suggestions for Code A";
   const hB = fa ? "## پیشنهادهای بهبود برای کد B" : "## Improvement Suggestions for Code B";
@@ -157,7 +178,7 @@ function fallbackCompareMarkdown({ lang = "fa", compareOutputMode = "advice" } =
 }
 
 /**
- * runAI({ variables, fallbackPrompt, temperature, requestId, ... })
+ * runAI({ variables, fallbackPrompt, temperature, requestId, signal, ... })
  * - NEVER throws (returns { error } instead)
  */
 export async function runAI(vars = {}) {
@@ -168,133 +189,178 @@ export async function runAI(vars = {}) {
   const ctx = { ...v, ...base };
 
   const mode = s(ctx.mode || "generate").toLowerCase();
-  const provider = pickProvider(ctx);
-  const { apiKey, model, baseUrl, extraHeaders } = getCompatConfig(provider, ctx);
-
   const rid = s(ctx.requestId || ctx.request_id || ctx.rid || "").trim() || undefined;
 
-  // hard fail if key is missing
-  if (provider === "openrouter" && !apiKey) {
-    const err = "OPENROUTER_API_KEY is not configured (AI_PROVIDER=openrouter).";
-    logProviderEvent({ rid, provider, model: s(model || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(err) });
+  const primaryProvider = getPrimaryProvider(ctx);
+  const fallbackProvider = getFallbackProvider(ctx);
+
+  const primaryModel = getProviderModel(primaryProvider, ctx, false);
+  const fallbackModel = fallbackProvider ? getProviderModel(fallbackProvider, ctx, true) : "";
+
+  const primaryKey = getProviderApiKey(primaryProvider);
+  const fallbackKey = fallbackProvider ? getProviderApiKey(fallbackProvider) : "";
+
+  const primaryBaseUrl = getProviderBaseUrl(primaryProvider);
+  const fallbackBaseUrl = fallbackProvider ? getProviderBaseUrl(fallbackProvider) : "";
+
+  const primaryHeaders = getProviderExtraHeaders(primaryProvider);
+  const fallbackHeaders = fallbackProvider ? getProviderExtraHeaders(fallbackProvider) : {};
+
+  const signal = ctx.signal;
+
+  if (!primaryKey) {
+    const err =
+      primaryProvider === "openrouter"
+        ? "OPENROUTER_API_KEY is not configured (AI_PROVIDER=openrouter)."
+        : "OPENAI_API_KEY is not configured (AI_PROVIDER=openai).";
+    logProviderEvent({ rid, provider: primaryProvider, model: s(primaryModel || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(err), tier: "primary" });
     return { error: err, output: "" };
   }
-  if (provider === "openai" && !apiKey) {
-    const err = "OPENAI_API_KEY is not configured (AI_PROVIDER=openai).";
-    logProviderEvent({ rid, provider, model: s(model || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(err) });
-    return { error: err, output: "" };
+
+  if (fallbackProvider && !fallbackKey) {
+    logProviderEvent({
+      rid,
+      provider: fallbackProvider,
+      model: s(fallbackModel || "unknown"),
+      mode,
+      ok: false,
+      ms: Date.now() - t0,
+      err: "AI_FALLBACK_PROVIDER is set but its API key is missing.",
+      tier: "fallback",
+    });
   }
 
   const prompt = s(ctx.prompt).trim() || buildPromptByMode(ctx);
   const fallbackPrompt = s(ctx.fallbackPrompt || base.fallbackPrompt || "").trim();
 
-  // timeouts/retries
   const timeoutMs = toInt(process.env.AI_HTTP_TIMEOUT_MS, mode === "compare" ? 35_000 : 55_000);
   const maxRetries = toInt(process.env.AI_HTTP_MAX_RETRIES, 1);
 
-  await acquire();
-  try {
-    const res = await callOpenAICompat({
-      prompt,
+  async function callProvider({ provider, apiKey, model, baseUrl, headers, usePrompt, temperature }) {
+    return callOpenAICompat({
+      prompt: usePrompt,
       model,
-      temperature: typeof ctx.temperature === "number" ? ctx.temperature : 0.25,
+      temperature,
       apiKey,
       baseUrl,
-      headers: extraHeaders,
+      headers,
       provider,
       timeoutMs,
       maxRetries,
+      signal,
+    });
+  }
+
+  await acquire();
+  try {
+    // PRIMARY
+    const res = await callProvider({
+      provider: primaryProvider,
+      apiKey: primaryKey,
+      model: primaryModel,
+      baseUrl: primaryBaseUrl,
+      headers: primaryHeaders,
+      usePrompt: prompt,
+      temperature: typeof ctx.temperature === "number" ? ctx.temperature : 0.25,
     });
 
-    // If error and fallbackPrompt exists => try fallback once
-    if (res?.error && fallbackPrompt) {
-      const retry = await callOpenAICompat({
-        prompt: fallbackPrompt,
-        model,
+    const primaryOk = !res?.error && !isEmptyOutput(res?.output);
+    if (primaryOk) {
+      logProviderEvent({ rid, provider: primaryProvider, model: s(primaryModel || "unknown"), mode, ok: true, ms: Date.now() - t0, tier: "primary" });
+      return { output: s(res.output), raw: res };
+    }
+
+    if (mode === "compare") {
+      const err = res?.error || "Empty model output";
+      logProviderEvent({ rid, provider: primaryProvider, model: s(primaryModel || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(err), tier: "primary" });
+      return {
+        output: fallbackCompareMarkdown({
+          lang: ctx.lang || "fa",
+          compareOutputMode: ctx.compareOutputMode || ctx.modeStyle || "advice",
+        }),
+        raw: res,
+      };
+    }
+
+    // primary retry with fallbackPrompt (same provider)
+    if (fallbackPrompt) {
+      const retryPrompt = await callProvider({
+        provider: primaryProvider,
+        apiKey: primaryKey,
+        model: primaryModel,
+        baseUrl: primaryBaseUrl,
+        headers: primaryHeaders,
+        usePrompt: fallbackPrompt,
         temperature: typeof ctx.temperature === "number" ? ctx.temperature : 0.2,
-        apiKey,
-        baseUrl,
-        headers: extraHeaders,
-        provider,
-        timeoutMs,
-        maxRetries,
       });
 
-      if (retry?.error) {
-        // compare should not die hard => return fallback markdown for stability
-        if (mode === "compare") {
-          logProviderEvent({ rid, provider, model: s(model || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(retry.error) });
-          return {
-            output: fallbackCompareMarkdown({ lang: ctx.lang || "fa", compareOutputMode: ctx.compareOutputMode || ctx.modeStyle || "advice" }),
-            raw: retry,
-          };
-        }
-
-        logProviderEvent({ rid, provider, model: s(model || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(retry.error) });
-        return { error: retry.error, output: "" };
+      if (!retryPrompt?.error && !isEmptyOutput(retryPrompt?.output)) {
+        logProviderEvent({ rid, provider: primaryProvider, model: s(primaryModel || "unknown"), mode, ok: true, ms: Date.now() - t0, tier: "primary_fallbackPrompt" });
+        return { output: s(retryPrompt.output), raw: retryPrompt };
       }
-
-      logProviderEvent({ rid, provider, model: s(model || "unknown"), mode, ok: true, ms: Date.now() - t0 });
-      return { output: s(retry?.output || ""), raw: retry };
     }
 
-    if (res?.error) {
-      // retry one more time if retryable (even without fallbackPrompt)
-      if (isRetryableError(res.error)) {
-        const retry2 = await callOpenAICompat({
-          prompt: fallbackPrompt || prompt,
-          model,
-          temperature: typeof ctx.temperature === "number" ? Math.max(0.15, ctx.temperature - 0.1) : 0.2,
-          apiKey,
-          baseUrl,
-          headers: extraHeaders,
-          provider,
-          timeoutMs,
-          maxRetries,
-        });
+    // FALLBACK PROVIDER
+    if (fallbackProvider && fallbackKey) {
+      const fb = await callProvider({
+        provider: fallbackProvider,
+        apiKey: fallbackKey,
+        model: fallbackModel,
+        baseUrl: fallbackBaseUrl,
+        headers: fallbackHeaders,
+        usePrompt: prompt,
+        temperature: 0.2,
+      });
 
-        if (!retry2?.error && s(retry2?.output).trim()) {
-          logProviderEvent({ rid, provider, model: s(model || "unknown"), mode, ok: true, ms: Date.now() - t0 });
-          return { output: s(retry2.output), raw: retry2 };
-        }
-
-        if (mode === "compare") {
-          logProviderEvent({ rid, provider, model: s(model || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(retry2?.error || res.error) });
-          return {
-            output: fallbackCompareMarkdown({ lang: ctx.lang || "fa", compareOutputMode: ctx.compareOutputMode || ctx.modeStyle || "advice" }),
-            raw: retry2 || res,
-          };
-        }
-
-        logProviderEvent({ rid, provider, model: s(model || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(retry2?.error || res.error) });
-        return { error: retry2?.error || res.error, output: "" };
+      if (!fb?.error && !isEmptyOutput(fb?.output)) {
+        logProviderEvent({ rid, provider: fallbackProvider, model: s(fallbackModel || "unknown"), mode, ok: true, ms: Date.now() - t0, tier: "fallback" });
+        return { output: s(fb.output), raw: fb };
       }
 
-      if (mode === "compare") {
-        logProviderEvent({ rid, provider, model: s(model || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(res.error) });
-        return {
-          output: fallbackCompareMarkdown({ lang: ctx.lang || "fa", compareOutputMode: ctx.compareOutputMode || ctx.modeStyle || "advice" }),
-          raw: res,
-        };
-      }
-
-      logProviderEvent({ rid, provider, model: s(model || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(res.error) });
-      return { error: res.error, output: "" };
+      const err = fb?.error || "Empty model output";
+      logProviderEvent({ rid, provider: fallbackProvider, model: s(fallbackModel || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(err), tier: "fallback" });
+      return { error: err, output: "" };
     }
 
-    logProviderEvent({ rid, provider, model: s(model || "unknown"), mode, ok: true, ms: Date.now() - t0 });
-    return { output: s(res?.output || ""), raw: res };
+    // last retry on retryable
+    const err0 = res?.error || "Empty model output";
+    if (res?.error && isRetryableError(res.error)) {
+      const retry2 = await callProvider({
+        provider: primaryProvider,
+        apiKey: primaryKey,
+        model: primaryModel,
+        baseUrl: primaryBaseUrl,
+        headers: primaryHeaders,
+        usePrompt: fallbackPrompt || prompt,
+        temperature: typeof ctx.temperature === "number" ? Math.max(0.15, ctx.temperature - 0.1) : 0.2,
+      });
+
+      if (!retry2?.error && !isEmptyOutput(retry2?.output)) {
+        logProviderEvent({ rid, provider: primaryProvider, model: s(primaryModel || "unknown"), mode, ok: true, ms: Date.now() - t0, tier: "primary_retry" });
+        return { output: s(retry2.output), raw: retry2 };
+      }
+
+      const err = retry2?.error || err0;
+      logProviderEvent({ rid, provider: primaryProvider, model: s(primaryModel || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(err), tier: "primary_retry" });
+      return { error: err, output: "" };
+    }
+
+    logProviderEvent({ rid, provider: primaryProvider, model: s(primaryModel || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(err0), tier: "primary" });
+    return { error: err0, output: "" };
   } catch (e) {
     const err = e?.message ? e.message : String(e);
 
     if (mode === "compare") {
-      logProviderEvent({ rid, provider, model: s(model || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(err) });
+      logProviderEvent({ rid, provider: primaryProvider, model: s(primaryModel || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(err) });
       return {
-        output: fallbackCompareMarkdown({ lang: ctx.lang || "fa", compareOutputMode: ctx.compareOutputMode || ctx.modeStyle || "advice" }),
+        output: fallbackCompareMarkdown({
+          lang: ctx.lang || "fa",
+          compareOutputMode: ctx.compareOutputMode || ctx.modeStyle || "advice",
+        }),
       };
     }
 
-    logProviderEvent({ rid, provider, model: s(model || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(err) });
+    logProviderEvent({ rid, provider: primaryProvider, model: s(primaryModel || "unknown"), mode, ok: false, ms: Date.now() - t0, err: safeShort(err) });
     return { error: err, output: "" };
   } finally {
     release();

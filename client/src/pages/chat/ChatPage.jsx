@@ -1,5 +1,5 @@
 // client/src/pages/chat/ChatPage.jsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLanguage } from "../../context/LanguageContext";
 import { usePersistState } from "../../hooks/usePersistState";
 import { callChat } from "../../services/aiService";
@@ -18,8 +18,8 @@ const CHAT_MODES = [
       en: "Send error/log/terminal output/stack trace and we'll fix it step-by-step.",
     },
     placeholder: {
-      fa: "ارور/لاگ را اینجا وارد کن… (ترجیحاً داخل ```)",
-      en: "Paste error/log here… (preferably inside ```)",
+      fa: "ارور/لاگ را اینجا وارد کن… (ترجیحاً داخل ```) ",
+      en: "Paste error/log here… (preferably inside ```) ",
     },
   },
   {
@@ -99,9 +99,38 @@ function streamText({ fullText, onChunk, onDone, chunkMs = 8, chunkSize = 4 }) {
   };
 }
 
+/** ---- ChatGPT-like rules (behavior) but keep CCG theme (visual) ---- */
+function looksLikeTinySnippet(code) {
+  const t = String(code || "").trim();
+  if (!t) return true;
+  const lines = t.split("\n").filter(Boolean);
+  if (lines.length > 2) return false;
+  if (t.length > 120) return false;
+  return true;
+}
+
+function clamp(n, a, b) {
+  return Math.max(a, Math.min(b, n));
+}
+
+/** ✅ NEW: user messages render as plain text (no markdown -> no <hr> from '---') */
+function UserText({ text, lang }) {
+  return (
+    <div
+      className={[
+        "whitespace-pre-wrap break-words overflow-x-hidden",
+        "text-sm leading-7",
+        lang === "fa" ? "rtl-text" : "ltr-text",
+      ].join(" ")}
+      dir="auto"
+    >
+      {String(text || "")}
+    </div>
+  );
+}
+
 export default function ChatPage() {
   const { lang } = useLanguage();
-  const messagesEndRef = useRef(null);
 
   const [messages, setMessages] = useState(INITIAL_MESSAGES[lang] || INITIAL_MESSAGES.en);
   const [input, setInput] = usePersistState("chat_input", "");
@@ -112,14 +141,56 @@ export default function ChatPage() {
 
   const activeStreamCancelRef = useRef(null);
 
+  // Scroll behavior
+  const scrollRef = useRef(null);
+  const messagesEndRef = useRef(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [showNavBtn, setShowNavBtn] = useState(false);
+
   const currentMode = useMemo(
     () => CHAT_MODES.find((m) => m.id === chatMode) || CHAT_MODES[0],
     [chatMode]
   );
 
+  const computeScrollState = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const threshold = 140; // px
+    const distanceToBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
+    const atBottom = distanceToBottom <= threshold;
+
+    setIsAtBottom(atBottom);
+
+    // show button when user scrolled a bit or not at bottom
+    const scrolledEnough = el.scrollTop >= 220;
+    setShowNavBtn(scrolledEnough || !atBottom);
+  }, []);
+
+  const scrollToBottom = useCallback((behavior = "smooth") => {
+    messagesEndRef.current?.scrollIntoView({ behavior, block: "end" });
+  }, []);
+
+  const scrollToTop = useCallback((behavior = "smooth") => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: 0, behavior });
+  }, []);
+
+  // Initial compute
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    computeScrollState();
+  }, [computeScrollState]);
+
+  // Auto-scroll like ChatGPT: only if user is near bottom
+  useEffect(() => {
+    if (isAtBottom) scrollToBottom("smooth");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages]);
+
+  const onScroll = () => {
+    computeScrollState();
+  };
 
   const sendMessage = async () => {
     if (!input.trim() || loading) return;
@@ -144,6 +215,8 @@ export default function ChatPage() {
       activeStreamCancelRef.current = null;
     }
 
+    // When user sends, we should go to bottom
+    setIsAtBottom(true);
     setInput("");
     setLoading(true);
 
@@ -168,6 +241,9 @@ export default function ChatPage() {
         streaming: false,
       },
     ]);
+
+    // Ensure UI goes bottom
+    setTimeout(() => scrollToBottom("smooth"), 30);
 
     try {
       const payload = {
@@ -197,14 +273,28 @@ export default function ChatPage() {
         prev.map((m) => (m.id === botId ? { ...m, isThinking: false, streaming: true, content: "" } : m))
       );
 
+      // streaming: while streaming, keep autoscroll ONLY if user is at bottom
       activeStreamCancelRef.current = streamText({
         fullText: finalText,
         onChunk: (partial) => {
           setMessages((prev) => prev.map((m) => (m.id === botId ? { ...m, content: partial, streaming: true } : m)));
+          // keep at bottom while streaming if user hasn't moved away
+          const el = scrollRef.current;
+          if (el) {
+            const dist = el.scrollHeight - (el.scrollTop + el.clientHeight);
+            if (dist <= 180) scrollToBottom("auto");
+          }
         },
         onDone: () => {
           setMessages((prev) => prev.map((m) => (m.id === botId ? { ...m, content: finalText, streaming: false } : m)));
           activeStreamCancelRef.current = null;
+          // final snap if user is at bottom
+          setTimeout(() => {
+            const el = scrollRef.current;
+            if (!el) return;
+            const dist = el.scrollHeight - (el.scrollTop + el.clientHeight);
+            if (dist <= 200) scrollToBottom("smooth");
+          }, 30);
         },
       });
     } catch (e) {
@@ -261,29 +351,100 @@ export default function ChatPage() {
     setInput("");
     setSessionId("");
     setErrorText("");
+    setTimeout(() => scrollToBottom("auto"), 0);
   };
 
-  const MarkdownView = ({ text }) => {
+  /** Chat markdown renderer:
+   * - Keeps CCG theme
+   * - Prevents "everything becomes copy-block"
+   * - Code fences:
+   *   - tiny => inline-highlight
+   *   - normal => CodeBlock + copy
+   */
+  const ChatMarkdown = ({ text, isBot }) => {
     const content = String(text || "");
+
+    // Slightly different prose sizing per bubble type
+    const prose =
+      "prose prose-invert max-w-none prose-p:leading-7 prose-li:leading-7 " +
+      "prose-pre:p-0 prose-pre:m-0 prose-code:before:content-none prose-code:after:content-none";
+
     return (
-      <div className="prose prose-invert max-w-none prose-p:leading-7 prose-li:leading-7 prose-pre:p-0">
+      <div
+        className={[
+          prose,
+          // critical: no horizontal scroll in normal text
+          "overflow-x-hidden break-words",
+          // keep rtl/ltr readability
+          lang === "fa" ? "rtl-text" : "ltr-text",
+        ].join(" ")}
+      >
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
+            // Inline & block code handling
             code({ inline, className, children }) {
+              const raw = String(children || "").replace(/\n$/, "");
               const match = /language-(\w+)/.exec(className || "");
               const language = match?.[1] || "bash";
+
               if (inline) {
-                return <code className="px-1 rounded bg-white/10">{children}</code>;
+                return (
+                  <code
+                    dir="ltr"
+                    className={[
+                      "px-1 py-0.5 rounded-md",
+                      // keep CCG glass vibe
+                      isBot ? "bg-white/10 border border-white/10" : "bg-black/20 border border-white/10",
+                      "text-[0.95em] whitespace-nowrap",
+                    ].join(" ")}
+                  >
+                    {children}
+                  </code>
+                );
               }
+
+              // If fenced block is very small, don't turn it into a big copy-card
+              if (looksLikeTinySnippet(raw)) {
+                return (
+                  <code
+                    dir="ltr"
+                    className={[
+                      "px-1 py-0.5 rounded-md",
+                      isBot ? "bg-white/10 border border-white/10" : "bg-black/20 border border-white/10",
+                      "text-[0.95em] whitespace-pre-wrap break-words",
+                    ].join(" ")}
+                  >
+                    {raw}
+                  </code>
+                );
+              }
+
+              // Normal block code => CodeBlock with copy (only where it makes sense)
               return (
-                <CodeBlock
-                  code={String(children || "").replace(/\n$/, "")}
-                  language={language}
-                  showCopy={true}
-                  maxHeight="300px"
-                />
+                <div className="my-3">
+                  <CodeBlock code={raw} language={language} showCopy={true} maxHeight="340px" />
+                </div>
               );
+            },
+
+            // Links: prevent overflow
+            a({ href, children }) {
+              return (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="break-all underline underline-offset-4 hover:opacity-90"
+                >
+                  {children}
+                </a>
+              );
+            },
+
+            // Pre: keep it safe (in case of nested pre)
+            pre({ children }) {
+              return <div className="overflow-x-auto">{children}</div>;
             },
           }}
         >
@@ -313,18 +474,23 @@ export default function ChatPage() {
 
         <div className={`flex-1 ${isBot ? "" : "text-right"}`}>
           <div
-            className={`inline-block max-w-[88%] rounded-2xl px-4 py-3 shadow-sm ${
+            className={[
+              "inline-block rounded-2xl px-4 py-3 shadow-sm",
+              // Slightly tighter max-width for readability like popular chats (no super-wide paragraphs)
+              "max-w-[92%] md:max-w-[78%] lg:max-w-[72ch]",
               isBot
                 ? isError
                   ? "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
                   : "bg-gray-100 dark:bg-gray-800"
-                : "bg-gradient-to-r from-blue-500 to-purple-600 text-white"
-            }`}
+                : "bg-gradient-to-r from-blue-500 to-purple-600 text-white",
+            ].join(" ")}
           >
             {isBot && message.isThinking ? (
               <TypingDots text={lang === "fa" ? "در حال فکر کردن" : "Thinking"} />
+            ) : isBot ? (
+              <ChatMarkdown text={message.content} isBot />
             ) : (
-              <MarkdownView text={message.content} />
+              <UserText text={message.content} lang={lang} />
             )}
 
             {message.timestamp && (
@@ -341,6 +507,16 @@ export default function ChatPage() {
     );
   };
 
+  const navBtnLabel = lang === "fa" ? (isAtBottom ? "بالا" : "پایین") : isAtBottom ? "Top" : "Bottom";
+
+  const onNavClick = () => {
+    if (isAtBottom) scrollToTop("smooth");
+    else scrollToBottom("smooth");
+  };
+
+  // Icon: up/down
+  const arrow = isAtBottom ? "⬆️" : "⬇️";
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="ccg-container">
@@ -354,9 +530,7 @@ export default function ChatPage() {
               {lang === "fa" ? "💬 دستیار فنی CCG" : "💬 CCG Technical Assistant"}
             </h1>
             <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
-              {lang === "fa"
-                ? "فقط تحلیل ارور/لاگ و تحلیل کد/اسکریپت"
-                : "Only error/log analysis and code/script analysis"}
+              {lang === "fa" ? "فقط تحلیل ارور/لاگ و تحلیل کد/اسکریپت" : "Only error/log analysis and code/script analysis"}
             </p>
           </div>
 
@@ -400,11 +574,39 @@ export default function ChatPage() {
       ) : null}
 
       <div className="ccg-container">
-        <div className="ccg-card p-4">
-          <div className="max-h-[62vh] md:max-h-[68vh] overflow-y-auto space-y-4 pr-1">
+        <div className="ccg-card p-4 relative">
+          <div
+            ref={scrollRef}
+            onScroll={onScroll}
+            className="max-h-[62vh] md:max-h-[68vh] overflow-y-auto overflow-x-hidden space-y-4 pr-1"
+          >
             {messages.map(renderMessage)}
             <div ref={messagesEndRef} />
           </div>
+
+          {/* Smart scroll button (Bottom when away, Top when at bottom) */}
+          {showNavBtn ? (
+            <button
+              type="button"
+              onClick={onNavClick}
+              className={[
+                "absolute z-10",
+                // position near bottom-right inside card
+                "right-4 bottom-24 md:bottom-28",
+                "rounded-full px-3 py-2",
+                // keep CCG look
+                "bg-black/30 hover:bg-black/40 dark:bg-white/10 dark:hover:bg-white/15",
+                "border border-white/10",
+                "backdrop-blur-xl shadow-lg",
+                "text-xs md:text-sm flex items-center gap-2",
+                "transition",
+              ].join(" ")}
+              title={navBtnLabel}
+            >
+              <span>{arrow}</span>
+              <span className="opacity-90">{navBtnLabel}</span>
+            </button>
+          ) : null}
 
           <div className="mt-4 flex gap-2">
             <textarea

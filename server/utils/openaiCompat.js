@@ -1,4 +1,4 @@
-// /home/cando/CCG/server/utils/openaiCompat.js
+// server/utils/openaiCompat.js
 import dotenv from "dotenv";
 import OpenAI from "openai";
 
@@ -42,11 +42,7 @@ function getModel(provider, optsModel) {
 function extractErr(e) {
   const status = e?.status || e?.response?.status || e?.response?.statusCode || "";
   const code = e?.code || e?.response?.data?.error?.code || "";
-  const message =
-    e?.response?.data?.error?.message ||
-    e?.error?.message ||
-    e?.message ||
-    String(e);
+  const message = e?.response?.data?.error?.message || e?.error?.message || e?.message || String(e);
 
   const parts = [];
   if (status) parts.push(`HTTP ${status}`);
@@ -68,9 +64,10 @@ export async function callOpenAICompat(opts = {}) {
   if (!apiKey) {
     return {
       output: "",
-      error: provider === "openrouter"
-        ? "OPENROUTER_API_KEY is not configured (AI_PROVIDER=openrouter)."
-        : "OPENAI_API_KEY is not configured (AI_PROVIDER=openai).",
+      error:
+        provider === "openrouter"
+          ? "OPENROUTER_API_KEY is not configured (AI_PROVIDER=openrouter)."
+          : "OPENAI_API_KEY is not configured (AI_PROVIDER=openai).",
     };
   }
 
@@ -81,16 +78,13 @@ export async function callOpenAICompat(opts = {}) {
   const max_tokens = typeof opts.max_tokens === "number" ? opts.max_tokens : undefined;
 
   const timeoutMs =
-    typeof opts.timeoutMs === "number"
-      ? opts.timeoutMs
-      : toInt(process.env.AI_HTTP_TIMEOUT_MS, 35_000);
+    typeof opts.timeoutMs === "number" ? opts.timeoutMs : toInt(process.env.AI_HTTP_TIMEOUT_MS, 35_000);
 
   const maxRetries =
-    typeof opts.maxRetries === "number"
-      ? opts.maxRetries
-      : toInt(process.env.AI_HTTP_MAX_RETRIES, 1);
+    typeof opts.maxRetries === "number" ? opts.maxRetries : toInt(process.env.AI_HTTP_MAX_RETRIES, 1);
 
   const headers = opts.headers && typeof opts.headers === "object" ? opts.headers : {};
+  const signal = opts.signal;
 
   let client;
   try {
@@ -106,12 +100,15 @@ export async function callOpenAICompat(opts = {}) {
   }
 
   try {
-    const resp = await client.chat.completions.create({
-      model,
-      temperature,
-      max_tokens,
-      messages: [{ role: "user", content: prompt }],
-    });
+    const resp = await client.chat.completions.create(
+      {
+        model,
+        temperature,
+        max_tokens,
+        messages: [{ role: "user", content: prompt }],
+      },
+      signal ? { signal } : undefined
+    );
 
     const content = resp?.choices?.[0]?.message?.content ?? "";
     if (!s(content).trim()) return { output: "", error: "Empty model output", raw: resp };
