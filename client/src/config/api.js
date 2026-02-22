@@ -13,5 +13,3 @@ export function withBase(path) {
   if (!path.startsWith("/")) path = "/" + path;
   return base ? base + path : path;
 }
-document.body.classList.add("night-mode");
-document.body.classList.add("day-mode");

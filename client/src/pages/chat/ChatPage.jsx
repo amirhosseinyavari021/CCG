@@ -1,70 +1,46 @@
 // client/src/pages/chat/ChatPage.jsx
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useLanguage } from "../../context/LanguageContext";
 import { usePersistState } from "../../hooks/usePersistState";
-import { callChat } from "../../services/aiService";
+
+import {
+  getChatRetention,
+  listChatThreads,
+  createChatThread,
+  getChatMessages,
+  renameChatThread,
+  deleteChatThread,
+  sendChatMessage,
+} from "../../services/aiService";
+
 import CodeBlock from "../../components/ui/CodeBlock";
+import CopyButton from "../../components/ui/CopyButton";
+import Tooltip from "../../components/ui/Tooltip";
 import FeedbackButton from "../../components/ui/FeedbackButton";
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-const CHAT_MODES = [
-  {
-    id: "debug",
-    title: { fa: "🐛 تحلیل ارور/لاگ", en: "🐛 Error/Log Analysis" },
-    description: {
-      fa: "ارور، لاگ، خروجی ترمینال یا StackTrace رو بفرست تا مرحله‌به‌مرحله حل کنیم.",
-      en: "Send error/log/terminal output/stack trace and we'll fix it step-by-step.",
-    },
-    placeholder: {
-      fa: "ارور/لاگ را اینجا وارد کن… (ترجیحاً داخل ```) ",
-      en: "Paste error/log here… (preferably inside ```) ",
-    },
-  },
-  {
-    id: "analyze",
-    title: { fa: "🔎 تحلیل کد/اسکریپت", en: "🔎 Code/Script Analysis" },
-    description: {
-      fa: "کد یا اسکریپتت رو بفرست تا مشکل‌ها/بهینه‌سازی/امنیت رو پیشنهاد بدم.",
-      en: "Send your code/script for review, fixes, optimization and security notes.",
-    },
-    placeholder: {
-      fa: "کد/اسکریپت را اینجا وارد کن… (داخل ``` بهتره)",
-      en: "Paste code/script here… (``` recommended)",
-    },
-  },
-];
+function s(v) {
+  return v === null || v === undefined ? "" : String(v);
+}
 
-const INITIAL_MESSAGES = {
-  fa: [
-    {
-      id: "init-fa",
-      type: "bot",
-      content:
-        "سلام! 👋\n\nمن **دستیار فنی CCG** هستم.\n\n✅ فقط این دو کار را انجام می‌دهم:\n- 🐛 تحلیل **ارور/لاگ**\n- 🔎 تحلیل **کد/اسکریپت**\n\nلطفاً ارور/لاگ یا کد را ارسال کن (ترجیحاً داخل ```).",
-      timestamp: new Date().toISOString(),
-    },
-  ],
-  en: [
-    {
-      id: "init-en",
-      type: "bot",
-      content:
-        "Hi 👋\n\nI'm **CCG Technical Assistant**.\n\n✅ I only do:\n- 🐛 **Error/log** analysis\n- 🔎 **Code/script** analysis\n\nPlease send an error/log or code (preferably inside ```).",
-      timestamp: new Date().toISOString(),
-    },
-  ],
-};
+function looksLikeTinySnippet(code) {
+  const t = String(code || "").trim();
+  if (!t) return true;
+  const lines = t.split("\n").filter(Boolean);
+  if (lines.length > 2) return false;
+  if (t.length > 120) return false;
+  return true;
+}
 
-function isLikelyCodeOrLog(text) {
-  const t = String(text || "");
-  if (!t.trim()) return false;
-  if (t.includes("```")) return true;
-  if (/(exception|traceback|stack trace|error:|fatal:|permission denied|panic:)/i.test(t)) return true;
-  if (/[{}()[\]=<>]|=>|::|->/.test(t) && t.length > 30) return true;
-  if (/(sudo|apt|yum|dnf|pacman|systemctl|journalctl|docker|kubectl|npm|node|python|pip|git)\b/i.test(t)) return true;
-  return false;
+function fmtTime(ts) {
+  try {
+    return new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
 }
 
 function TypingDots({ text }) {
@@ -99,21 +75,6 @@ function streamText({ fullText, onChunk, onDone, chunkMs = 8, chunkSize = 4 }) {
   };
 }
 
-/** ---- ChatGPT-like rules (behavior) but keep CCG theme (visual) ---- */
-function looksLikeTinySnippet(code) {
-  const t = String(code || "").trim();
-  if (!t) return true;
-  const lines = t.split("\n").filter(Boolean);
-  if (lines.length > 2) return false;
-  if (t.length > 120) return false;
-  return true;
-}
-
-function clamp(n, a, b) {
-  return Math.max(a, Math.min(b, n));
-}
-
-/** ✅ NEW: user messages render as plain text (no markdown -> no <hr> from '---') */
 function UserText({ text, lang }) {
   return (
     <div
@@ -129,260 +90,436 @@ function UserText({ text, lang }) {
   );
 }
 
+function IconBtn({ title, onClick, children, disabled, className = "" }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={[
+        "rounded-xl px-2.5 py-1.5 text-xs",
+        "border border-white/10",
+        "bg-black/20 hover:bg-black/30 dark:bg-white/10 dark:hover:bg-white/15",
+        "backdrop-blur-xl transition",
+        disabled ? "opacity-50 cursor-not-allowed" : "opacity-95",
+        className,
+      ].join(" ")}
+      title={title}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Modal({ open, title, children, lang, onClose }) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999]" onMouseDown={onClose}>
+      <div className="absolute inset-0 bg-black/50" />
+      <div className="absolute inset-0 flex items-center justify-center p-4" dir={lang === "fa" ? "rtl" : "ltr"}>
+        <div
+          className="w-full max-w-md rounded-2xl border border-white/10 bg-black/70 dark:bg-white/10 backdrop-blur-2xl shadow-2xl"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between gap-3">
+            <div className="text-sm font-semibold text-[var(--text)] truncate">{title}</div>
+            <button
+              type="button"
+              className="rounded-xl border border-white/10 bg-black/20 dark:bg-white/10 px-3 py-1.5 text-xs hover:opacity-90"
+              onClick={onClose}
+            >
+              {lang === "fa" ? "بستن" : "Close"}
+            </button>
+          </div>
+          <div className="px-4 py-4">{children}</div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function ThreadMenuPortal({ open, x, y, lang, pinned, onClose, onRename, onTogglePin, onDelete }) {
+  useEffect(() => {
+    if (!open) return;
+
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose?.();
+    };
+
+    const onMouse = (e) => {
+      const el = document.getElementById("ccg-thread-menu");
+      if (el && !el.contains(e.target)) onClose?.();
+    };
+
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("mousedown", onMouse);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("mousedown", onMouse);
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+
+  const menuW = 220;
+  const menuH = 156;
+
+  const left = Math.max(12, Math.min(x, vw - menuW - 12));
+  const top = Math.max(12, Math.min(y, vh - menuH - 12));
+
+  const t = {
+    rename: lang === "fa" ? "تغییر نام" : "Rename",
+    pin: lang === "fa" ? "پین" : "Pin",
+    unpin: lang === "fa" ? "برداشتن پین" : "Unpin",
+    del: lang === "fa" ? "حذف" : "Delete",
+  };
+
+  return createPortal(
+    <div id="ccg-thread-menu" dir={lang === "fa" ? "rtl" : "ltr"} className="fixed z-[9999]" style={{ left, top }}>
+      <div className="w-[220px] rounded-2xl border border-white/10 bg-black/75 dark:bg-white/10 backdrop-blur-2xl shadow-xl overflow-hidden">
+        <button
+          type="button"
+          className="w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition"
+          onClick={() => {
+            onClose?.();
+            onRename?.();
+          }}
+        >
+          ✏️ {t.rename}
+        </button>
+
+        <button
+          type="button"
+          className="w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition"
+          onClick={() => {
+            onClose?.();
+            onTogglePin?.();
+          }}
+        >
+          📌 {pinned ? t.unpin : t.pin}
+        </button>
+
+        <div className="h-px bg-white/10" />
+
+        <button
+          type="button"
+          className="w-full text-left px-3 py-2 text-sm hover:bg-red-500/15 transition text-red-200"
+          onClick={() => {
+            onClose?.();
+            onDelete?.();
+          }}
+        >
+          🗑️ {t.del}
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function MobileSidebar({ open, lang, children, onClose }) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  return createPortal(
+    <div className={`fixed inset-0 z-[9998] ${open ? "" : "pointer-events-none"}`} dir={lang === "fa" ? "rtl" : "ltr"}>
+      <div className={`absolute inset-0 bg-black/50 transition-opacity ${open ? "opacity-100" : "opacity-0"}`} onMouseDown={onClose} />
+      <div
+        className={[
+          "absolute top-0 bottom-0 w-[86%] max-w-[320px]",
+          lang === "fa" ? "right-0" : "left-0",
+          "transition-transform duration-200",
+          open ? "translate-x-0" : lang === "fa" ? "translate-x-full" : "-translate-x-full",
+        ].join(" ")}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="h-full border border-white/10 bg-black/70 dark:bg-white/10 backdrop-blur-2xl">{children}</div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 export default function ChatPage() {
   const { lang } = useLanguage();
 
-  const [messages, setMessages] = useState(INITIAL_MESSAGES[lang] || INITIAL_MESSAGES.en);
+  const [activeThreadId, setActiveThreadId] = usePersistState("chat_thread_id", "");
   const [input, setInput] = usePersistState("chat_input", "");
+  const [pinnedIds, setPinnedIds] = usePersistState("ccg_chat_pins", []);
+  const [sidebarOpen, setSidebarOpen] = usePersistState("ccg_chat_sidebar_open", true);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  const [threads, setThreads] = useState([]);
+  const [threadsQuery, setThreadsQuery] = useState("");
+  const [messages, setMessages] = useState([]);
+  const [retentionDays, setRetentionDays] = useState(14);
+
   const [loading, setLoading] = useState(false);
-  const [sessionId, setSessionId] = usePersistState("chat_session_id", "");
-  const [chatMode, setChatMode] = usePersistState("chat_mode", "debug");
-  const [errorText, setErrorText] = useState("");
 
+  const [editTargetMessageId, setEditTargetMessageId] = useState(null);
+  const [editMode, setEditMode] = useState(false);
+
+  const [regenCount, setRegenCount] = useState(0);
+
+  const inFlightAbortRef = useRef(null);
   const activeStreamCancelRef = useRef(null);
+  const stopByUserRef = useRef(false); // ✅ مهم
 
-  // Scroll behavior
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
-  const [showNavBtn, setShowNavBtn] = useState(false);
 
-  const currentMode = useMemo(
-    () => CHAT_MODES.find((m) => m.id === chatMode) || CHAT_MODES[0],
-    [chatMode]
-  );
+  const [threadMenu, setThreadMenu] = useState({ open: false, x: 0, y: 0, threadId: "" });
+  const [renameModal, setRenameModal] = useState({ open: false, threadId: "", value: "" });
+  const [deleteModal, setDeleteModal] = useState({ open: false, threadId: "" });
+
+  const pinnedSet = useMemo(() => new Set((pinnedIds || []).map(String)), [pinnedIds]);
 
   const computeScrollState = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-
-    const threshold = 140; // px
+    const threshold = 140;
     const distanceToBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
-    const atBottom = distanceToBottom <= threshold;
-
-    setIsAtBottom(atBottom);
-
-    // show button when user scrolled a bit or not at bottom
-    const scrolledEnough = el.scrollTop >= 220;
-    setShowNavBtn(scrolledEnough || !atBottom);
+    setIsAtBottom(distanceToBottom <= threshold);
   }, []);
 
   const scrollToBottom = useCallback((behavior = "smooth") => {
     messagesEndRef.current?.scrollIntoView({ behavior, block: "end" });
   }, []);
 
-  const scrollToTop = useCallback((behavior = "smooth") => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollTo({ top: 0, behavior });
-  }, []);
+  useEffect(() => computeScrollState(), [computeScrollState]);
 
-  // Initial compute
-  useEffect(() => {
-    computeScrollState();
-  }, [computeScrollState]);
-
-  // Auto-scroll like ChatGPT: only if user is near bottom
   useEffect(() => {
     if (isAtBottom) scrollToBottom("smooth");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages]);
 
-  const onScroll = () => {
-    computeScrollState();
-  };
+  const onScroll = () => computeScrollState();
 
-  const sendMessage = async () => {
-    if (!input.trim() || loading) return;
+  const filteredThreads = useMemo(() => {
+    const q = threadsQuery.trim().toLowerCase();
+    const list = !q ? threads : threads.filter((t) => s(t.title).toLowerCase().includes(q));
 
-    setErrorText("");
+    const pinned = [];
+    const normal = [];
+    for (const t of list) {
+      if (pinnedSet.has(String(t._id))) pinned.push(t);
+      else normal.push(t);
+    }
+    return [...pinned, ...normal];
+  }, [threads, threadsQuery, pinnedSet]);
 
-    const currentInput = input.trim();
+  const activeThread = useMemo(() => threads.find((t) => String(t._id) === String(activeThreadId)), [threads, activeThreadId]);
 
-    // Client-side guard for UX (server also blocks)
-    if (!isLikelyCodeOrLog(currentInput)) {
-      const msg =
-        lang === "fa"
-          ? "این چت فقط برای تحلیل ارور/لاگ یا تحلیل کد/اسکریپت است. لطفاً ارور/لاگ یا کد را ارسال کن (داخل ``` بهتره)."
-          : "This chat only supports error/log or code/script analysis. Please paste error/log or code (``` recommended).";
-      setErrorText(msg);
+  async function refreshThreads(nextActiveId) {
+    const r = await listChatThreads({ lang });
+    const list = r?.threads || [];
+    setThreads(list);
+
+    if (nextActiveId) {
+      setActiveThreadId(nextActiveId);
       return;
     }
+    if (!activeThreadId && list.length) setActiveThreadId(list[0]._id);
+  }
 
-    // stop any previous stream
+  async function loadRetention() {
+    try {
+      const r = await getChatRetention();
+      if (r?.retentionDays) setRetentionDays(Number(r.retentionDays) || 14);
+    } catch {}
+  }
+
+  async function loadMessages(threadId) {
+    if (!threadId) return;
+    const r = await getChatMessages({ threadId });
+    const msgs = r?.messages || [];
+    setMessages(
+      msgs.map((m) => ({
+        id: m._id,
+        role: m.role,
+        content: m.content,
+        ts: m.createdAt || m.ts || new Date().toISOString(),
+        editedFromMessageId: m.editedFromMessageId || null,
+      }))
+    );
+    setRegenCount(Number(r?.thread?.regenCount || 0));
+  }
+
+  useEffect(() => {
+    loadRetention();
+    refreshThreads();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang]);
+
+  useEffect(() => {
+    if (activeThreadId) loadMessages(activeThreadId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeThreadId]);
+
+  const stopAll = () => {
+    stopByUserRef.current = true;
+
+    if (inFlightAbortRef.current) {
+      try {
+        inFlightAbortRef.current.abort();
+      } catch {}
+      inFlightAbortRef.current = null;
+    }
+
     if (typeof activeStreamCancelRef.current === "function") {
       activeStreamCancelRef.current();
       activeStreamCancelRef.current = null;
     }
 
-    // When user sends, we should go to bottom
-    setIsAtBottom(true);
-    setInput("");
-    setLoading(true);
+    // ✅ اگر پیام در حال فکر کردن است، تبدیلش کن به "متوقف شد"
+    setMessages((prev) => {
+      const next = [...prev];
+      for (let i = next.length - 1; i >= 0; i--) {
+        if (next[i]?.role === "assistant" && (next[i]?.isThinking || next[i]?.streaming)) {
+          next[i] = { ...next[i], isThinking: false, streaming: false, content: lang === "fa" ? "⛔ متوقف شد" : "⛔ Stopped", isError: false };
+          break;
+        }
+      }
+      return next;
+    });
 
-    const userMessage = {
-      id: `u-${Date.now()}`,
-      type: "user",
-      content: currentInput,
-      timestamp: new Date().toISOString(),
-    };
+    setLoading(false);
+  };
 
-    const botId = `b-${Date.now() + 1}`;
+  const newChat = async () => {
+    stopByUserRef.current = false;
+    stopAll();
+    const r = await createChatThread({ lang });
+    const id = r?.thread?._id;
+    if (id) {
+      await refreshThreads(id);
+      await loadMessages(id);
+      setMobileSidebarOpen(false);
+      setInput("");
+      setEditMode(false);
+      setEditTargetMessageId(null);
+    } else {
+      setMessages((prev) => [
+        ...prev,
+        { id: `a-${Date.now()}`, role: "assistant", content: lang === "fa" ? "❌ ساخت چت جدید ناموفق بود." : "❌ Failed to create a new chat.", ts: new Date().toISOString(), isError: true },
+      ]);
+    }
+  };
 
-    setMessages((prev) => [
-      ...prev,
-      userMessage,
-      {
-        id: botId,
-        type: "bot",
-        content: "",
-        timestamp: new Date().toISOString(),
-        isThinking: true,
-        streaming: false,
-      },
-    ]);
+  const togglePin = (threadId) => {
+    const id = String(threadId);
+    setPinnedIds((prev) => {
+      const arr = Array.isArray(prev) ? prev.map(String) : [];
+      if (arr.includes(id)) return arr.filter((x) => x !== id);
+      return [id, ...arr].slice(0, 50);
+    });
+  };
 
-    // Ensure UI goes bottom
-    setTimeout(() => scrollToBottom("smooth"), 30);
+  const openThreadMenu = (e, threadId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setThreadMenu({
+      open: true,
+      x: rect.left + rect.width - 220,
+      y: rect.bottom + 8,
+      threadId: String(threadId),
+    });
+  };
+
+  const closeThreadMenu = () => setThreadMenu((p) => ({ ...p, open: false }));
+
+  const openRenameModal = (threadId) => {
+    const t = threads.find((x) => String(x._id) === String(threadId));
+    const title = String(t?.title || "").trim() || (lang === "fa" ? "چت جدید" : "New chat");
+    setRenameModal({ open: true, threadId: String(threadId), value: title });
+  };
+
+  const submitRename = async () => {
+    const tid = renameModal.threadId;
+    const title = String(renameModal.value || "").trim().slice(0, 44);
+    if (!tid || !title) return;
 
     try {
-      const payload = {
-        sessionId: sessionId || undefined,
-        lang,
-        chat_mode: chatMode, // debug | analyze
-        message: currentInput,
-        profile: {
-          lang,
-          os: "linux",
-          cli: "bash",
-          chat_mode: chatMode,
-        },
-      };
+      await renameChatThread({ threadId: tid, title, lang }); // ✅ lang هم پاس می‌دیم
+      setRenameModal({ open: false, threadId: "", value: "" });
+      await refreshThreads();
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        { id: `a-${Date.now()}`, role: "assistant", content: lang === "fa" ? "❌ تغییر نام ناموفق بود." : "❌ Rename failed.", ts: new Date().toISOString(), isError: true },
+      ]);
+    }
+  };
 
-      const result = await callChat(payload, { timeoutMs: 60_000 });
+  const openDeleteModal = (threadId) => setDeleteModal({ open: true, threadId: String(threadId) });
 
-      if (result?.sessionId && result.sessionId !== sessionId) setSessionId(result.sessionId);
+  const confirmDelete = async () => {
+    const threadId = deleteModal.threadId;
+    if (!threadId) return;
 
-      const finalText =
-        result?.markdown ||
-        result?.output ||
-        result?.result?.markdown ||
-        (lang === "fa" ? "پاسخی دریافت نشد. دوباره تلاش کن." : "No response received. Please try again.");
+    stopByUserRef.current = false;
+    stopAll();
 
-      setMessages((prev) =>
-        prev.map((m) => (m.id === botId ? { ...m, isThinking: false, streaming: true, content: "" } : m))
-      );
+    try {
+      await deleteChatThread({ threadId });
 
-      // streaming: while streaming, keep autoscroll ONLY if user is at bottom
-      activeStreamCancelRef.current = streamText({
-        fullText: finalText,
-        onChunk: (partial) => {
-          setMessages((prev) => prev.map((m) => (m.id === botId ? { ...m, content: partial, streaming: true } : m)));
-          // keep at bottom while streaming if user hasn't moved away
-          const el = scrollRef.current;
-          if (el) {
-            const dist = el.scrollHeight - (el.scrollTop + el.clientHeight);
-            if (dist <= 180) scrollToBottom("auto");
-          }
-        },
-        onDone: () => {
-          setMessages((prev) => prev.map((m) => (m.id === botId ? { ...m, content: finalText, streaming: false } : m)));
-          activeStreamCancelRef.current = null;
-          // final snap if user is at bottom
-          setTimeout(() => {
-            const el = scrollRef.current;
-            if (!el) return;
-            const dist = el.scrollHeight - (el.scrollTop + el.clientHeight);
-            if (dist <= 200) scrollToBottom("smooth");
-          }, 30);
-        },
-      });
-    } catch (e) {
-      const status = e?.status;
-      const data = e?.data;
-      const code = data?.error?.code;
-
-      // OUT_OF_SCOPE from server (no token burn)
-      if (status === 400 && code === "OUT_OF_SCOPE") {
-        const msg = data?.error?.userMessage || (lang === "fa" ? "خارج از محدوده." : "Out of scope.");
-        setErrorText(msg);
-
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === botId ? { ...m, content: msg, streaming: false, isThinking: false, isError: true } : m
-          )
-        );
-      } else {
-        const msg =
-          String(e?.message || "") === "REQUEST_TIMEOUT"
-            ? lang === "fa"
-              ? "⏳ زمان پاسخ‌دهی طولانی شد. دوباره تلاش کن."
-              : "⏳ Request timed out. Please retry."
-            : lang === "fa"
-            ? "❌ در پردازش درخواست مشکلی پیش آمد. دوباره تلاش کن."
-            : "❌ Error processing request. Please retry.";
-
-        setErrorText(msg);
-
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === botId ? { ...m, content: msg, streaming: false, isThinking: false, isError: true } : m
-          )
-        );
+      if (pinnedSet.has(String(threadId))) {
+        setPinnedIds((prev) => (Array.isArray(prev) ? prev.filter((x) => String(x) !== String(threadId)) : []));
       }
-    } finally {
-      setLoading(false);
+
+      setDeleteModal({ open: false, threadId: "" });
+      await refreshThreads();
+
+      const remaining = threads.filter((t) => String(t._id) !== String(threadId));
+      setActiveThreadId(remaining[0]?._id || "");
+      setMobileSidebarOpen(false);
+    } catch {
+      setDeleteModal({ open: false, threadId: "" });
+      setMessages((prev) => [
+        ...prev,
+        { id: `a-${Date.now()}`, role: "assistant", content: lang === "fa" ? "❌ حذف گفتگو ناموفق بود." : "❌ Delete failed.", ts: new Date().toISOString(), isError: true },
+      ]);
     }
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
+  const canRegen = useMemo(() => {
+    const last = messages[messages.length - 1];
+    return !loading && last?.role === "assistant" && regenCount < 3;
+  }, [messages, loading, regenCount]);
 
-  const clearChat = () => {
-    if (typeof activeStreamCancelRef.current === "function") {
-      activeStreamCancelRef.current();
-      activeStreamCancelRef.current = null;
-    }
-    setMessages(INITIAL_MESSAGES[lang] || INITIAL_MESSAGES.en);
-    setInput("");
-    setSessionId("");
-    setErrorText("");
-    setTimeout(() => scrollToBottom("auto"), 0);
-  };
-
-  /** Chat markdown renderer:
-   * - Keeps CCG theme
-   * - Prevents "everything becomes copy-block"
-   * - Code fences:
-   *   - tiny => inline-highlight
-   *   - normal => CodeBlock + copy
-   */
   const ChatMarkdown = ({ text, isBot }) => {
     const content = String(text || "");
-
-    // Slightly different prose sizing per bubble type
     const prose =
       "prose prose-invert max-w-none prose-p:leading-7 prose-li:leading-7 " +
       "prose-pre:p-0 prose-pre:m-0 prose-code:before:content-none prose-code:after:content-none";
 
     return (
-      <div
-        className={[
-          prose,
-          // critical: no horizontal scroll in normal text
-          "overflow-x-hidden break-words",
-          // keep rtl/ltr readability
-          lang === "fa" ? "rtl-text" : "ltr-text",
-        ].join(" ")}
-      >
+      <div className={[prose, "overflow-x-hidden break-words", lang === "fa" ? "rtl-text" : "ltr-text"].join(" ")}>
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
-            // Inline & block code handling
             code({ inline, className, children }) {
               const raw = String(children || "").replace(/\n$/, "");
               const match = /language-(\w+)/.exec(className || "");
@@ -394,7 +531,6 @@ export default function ChatPage() {
                     dir="ltr"
                     className={[
                       "px-1 py-0.5 rounded-md",
-                      // keep CCG glass vibe
                       isBot ? "bg-white/10 border border-white/10" : "bg-black/20 border border-white/10",
                       "text-[0.95em] whitespace-nowrap",
                     ].join(" ")}
@@ -404,7 +540,6 @@ export default function ChatPage() {
                 );
               }
 
-              // If fenced block is very small, don't turn it into a big copy-card
               if (looksLikeTinySnippet(raw)) {
                 return (
                   <code
@@ -420,31 +555,11 @@ export default function ChatPage() {
                 );
               }
 
-              // Normal block code => CodeBlock with copy (only where it makes sense)
               return (
                 <div className="my-3">
                   <CodeBlock code={raw} language={language} showCopy={true} maxHeight="340px" />
                 </div>
               );
-            },
-
-            // Links: prevent overflow
-            a({ href, children }) {
-              return (
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="break-all underline underline-offset-4 hover:opacity-90"
-                >
-                  {children}
-                </a>
-              );
-            },
-
-            // Pre: keep it safe (in case of nested pre)
-            pre({ children }) {
-              return <div className="overflow-x-auto">{children}</div>;
             },
           }}
         >
@@ -454,196 +569,569 @@ export default function ChatPage() {
     );
   };
 
-  const renderMessage = (message) => {
-    const isBot = message.type === "bot";
-    const isError = message.isError;
+  const renderMessage = (m, idx) => {
+    const isBot = m.role === "assistant";
+    const isLast = idx === messages.length - 1;
 
     return (
-      <div key={message.id} className={`flex gap-3 ${isBot ? "" : "flex-row-reverse"}`}>
+      <div key={m.id || idx} className={`flex gap-3 ${isBot ? "" : "flex-row-reverse"}`}>
         <div
           className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-            isBot
-              ? isError
-                ? "bg-red-500"
-                : "bg-gradient-to-br from-blue-500 to-cyan-500"
-              : "bg-gradient-to-br from-purple-500 to-pink-500"
+            isBot ? (m.isError ? "bg-gradient-to-br from-red-500 to-rose-500" : "bg-gradient-to-br from-blue-500 to-cyan-500")
+                 : "bg-gradient-to-br from-purple-500 to-pink-500"
           }`}
         >
-          <span className="text-white text-sm">{isBot ? (isError ? "❌" : "🤖") : "👤"}</span>
+          <span className="text-white text-sm">{isBot ? "🤖" : "👤"}</span>
         </div>
 
         <div className={`flex-1 ${isBot ? "" : "text-right"}`}>
           <div
             className={[
               "inline-block rounded-2xl px-4 py-3 shadow-sm",
-              // Slightly tighter max-width for readability like popular chats (no super-wide paragraphs)
-              "max-w-[92%] md:max-w-[78%] lg:max-w-[72ch]",
+              "max-w-[96%] md:max-w-[80%] lg:max-w-[76ch]",
               isBot
-                ? isError
-                  ? "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800"
-                  : "bg-gray-100 dark:bg-gray-800"
-                : "bg-gradient-to-r from-blue-500 to-purple-600 text-white",
+                ? m.isError
+                  ? "bg-red-500/10 border border-red-500/25"
+                  : "bg-gray-100 dark:bg-gray-800 border border-white/5"
+                : "bg-gradient-to-r from-blue-500 to-purple-600 text-white border border-white/5",
             ].join(" ")}
           >
-            {isBot && message.isThinking ? (
+            {m.isThinking ? (
               <TypingDots text={lang === "fa" ? "در حال فکر کردن" : "Thinking"} />
             ) : isBot ? (
-              <ChatMarkdown text={message.content} isBot />
+              <ChatMarkdown text={m.content} isBot />
             ) : (
-              <UserText text={message.content} lang={lang} />
+              <UserText text={m.content} lang={lang} />
             )}
 
-            {message.timestamp && (
-              <div className={`mt-2 text-xs ${isBot ? "text-gray-500 dark:text-gray-400" : "text-blue-100"}`}>
-                {new Date(message.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                {isBot && message.streaming ? (
-                  <span className="ml-2 opacity-70">{lang === "fa" ? "در حال تایپ…" : "typing…"}</span>
+            <div className={`mt-3 flex items-center justify-between gap-2 ${isBot ? "text-gray-500 dark:text-gray-400" : "text-blue-100"}`}>
+              <div className="text-xs">{fmtTime(m.ts)}</div>
+
+              <div className="flex items-center gap-2">
+                <div className="hidden sm:block">
+                  <CopyButton text={m.content} lang={lang} />
+                </div>
+
+                {!isBot ? (
+                  <Tooltip text={lang === "fa" ? "ویرایش و ادامه از اینجا" : "Edit and continue from here"} position="top">
+                    <span>
+                      <IconBtn
+                        title={lang === "fa" ? "ویرایش" : "Edit"}
+                        onClick={() => {
+                          setEditMode(true);
+                          setEditTargetMessageId(m.id);
+                          setInput(m.content || "");
+                          setTimeout(() => scrollToBottom("smooth"), 50);
+                        }}
+                        disabled={loading}
+                      >
+                        ✏️
+                      </IconBtn>
+                    </span>
+                  </Tooltip>
+                ) : null}
+
+                {isBot && isLast ? (
+                  <Tooltip
+                    text={lang === "fa" ? `ریجنریت (باقی‌مانده: ${Math.max(0, 3 - regenCount)})` : `Regenerate (left: ${Math.max(0, 3 - regenCount)})`}
+                    position="top"
+                  >
+                    <span>
+                      <IconBtn title={lang === "fa" ? "ریجنریت" : "Regenerate"} onClick={() => doRegenerate()} disabled={!canRegen}>
+                        🔁
+                      </IconBtn>
+                    </span>
+                  </Tooltip>
                 ) : null}
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>
     );
   };
 
-  const navBtnLabel = lang === "fa" ? (isAtBottom ? "بالا" : "پایین") : isAtBottom ? "Top" : "Bottom";
-
-  const onNavClick = () => {
-    if (isAtBottom) scrollToTop("smooth");
-    else scrollToBottom("smooth");
+  const ensureThread = async () => {
+    if (activeThreadId) return activeThreadId;
+    const r = await createChatThread({ lang });
+    const id = r?.thread?._id;
+    if (id) {
+      await refreshThreads(id);
+      return id;
+    }
+    return "";
   };
 
-  // Icon: up/down
-  const arrow = isAtBottom ? "⬆️" : "⬇️";
+  const doSend = async () => {
+    if (!input.trim() || loading) return;
+
+    stopByUserRef.current = false;
+
+    const text = input.trim();
+    setLoading(true);
+
+    const threadId = await ensureThread();
+    if (!threadId) {
+      setLoading(false);
+      setMessages((prev) => [
+        ...prev,
+        { id: `a-${Date.now()}`, role: "assistant", content: lang === "fa" ? "❌ ساخت چت جدید ناموفق بود." : "❌ Failed to create chat thread.", ts: new Date().toISOString(), isError: true },
+      ]);
+      return;
+    }
+
+    if (typeof activeStreamCancelRef.current === "function") {
+      activeStreamCancelRef.current();
+      activeStreamCancelRef.current = null;
+    }
+
+    const controller = new AbortController();
+    inFlightAbortRef.current = controller;
+
+    const userLocalId = `u-${Date.now()}`;
+    const botLocalId = `b-${Date.now() + 1}`;
+    const editedFrom = editMode ? editTargetMessageId : null;
+
+    setMessages((prev) => [
+      ...prev,
+      { id: userLocalId, role: "user", content: text, ts: new Date().toISOString() },
+      { id: botLocalId, role: "assistant", content: "", ts: new Date().toISOString(), isThinking: true },
+    ]);
+
+    setInput("");
+    setEditMode(false);
+    setEditTargetMessageId(null);
+
+    setTimeout(() => scrollToBottom("smooth"), 30);
+
+    try {
+      const result = await sendChatMessage(
+        { threadId, lang, message: text, regenerate: false, editedFromMessageId: editedFrom },
+        { timeoutMs: 120_000, signal: controller.signal }
+      );
+
+      await refreshThreads(threadId);
+
+      const finalText =
+        result?.markdown ||
+        result?.output ||
+        (lang === "fa" ? "پاسخی دریافت نشد. دوباره تلاش کن." : "No response received. Please try again.");
+
+      setRegenCount(Number(result?.regenCount || 0));
+
+      setMessages((prev) => prev.map((m) => (m.id === botLocalId ? { ...m, isThinking: false, content: "", streaming: true } : m)));
+
+      activeStreamCancelRef.current = streamText({
+        fullText: finalText,
+        onChunk: (partial) => {
+          setMessages((prev) => prev.map((m) => (m.id === botLocalId ? { ...m, content: partial, streaming: true } : m)));
+          const el = scrollRef.current;
+          if (el) {
+            const dist = el.scrollHeight - (el.scrollTop + el.clientHeight);
+            if (dist <= 180) scrollToBottom("auto");
+          }
+        },
+        onDone: async () => {
+          setMessages((prev) => prev.map((m) => (m.id === botLocalId ? { ...m, content: finalText, streaming: false } : m)));
+          activeStreamCancelRef.current = null;
+          inFlightAbortRef.current = null;
+          await loadMessages(threadId);
+        },
+      });
+    } catch (e) {
+      // ✅ اگر کاربر stop زده، هیچ اروری نشان نده
+      const aborted = stopByUserRef.current || inFlightAbortRef.current?.signal?.aborted || e?.name === "AbortError";
+      if (aborted) {
+        setMessages((prev) => prev.map((m) => (m.id === botLocalId ? { ...m, isThinking: false, content: lang === "fa" ? "⛔ متوقف شد" : "⛔ Stopped" } : m)));
+        setLoading(false);
+        inFlightAbortRef.current = null;
+        return;
+      }
+
+      let msg = lang === "fa" ? "❌ خطا در پردازش درخواست. دوباره تلاش کن." : "❌ Error processing request. Please retry.";
+      if (String(e?.message || "") === "REQUEST_TIMEOUT") msg = lang === "fa" ? "⏳ زمان پاسخ‌دهی طولانی شد. دوباره تلاش کن." : "⏳ Request timed out. Please retry.";
+
+      setMessages((prev) => prev.map((m) => (m.id === botLocalId ? { ...m, isThinking: false, content: msg, isError: true } : m)));
+    } finally {
+      setLoading(false);
+      inFlightAbortRef.current = null;
+      stopByUserRef.current = false;
+    }
+  };
+
+  const doRegenerate = async () => {
+    if (!activeThreadId || loading) return;
+
+    stopByUserRef.current = false;
+    setLoading(true);
+
+    if (typeof activeStreamCancelRef.current === "function") {
+      activeStreamCancelRef.current();
+      activeStreamCancelRef.current = null;
+    }
+
+    const controller = new AbortController();
+    inFlightAbortRef.current = controller;
+
+    const botLocalId = `b-${Date.now() + 1}`;
+    setMessages((prev) => [...prev, { id: botLocalId, role: "assistant", content: "", ts: new Date().toISOString(), isThinking: true }]);
+    setTimeout(() => scrollToBottom("smooth"), 30);
+
+    try {
+      const result = await sendChatMessage(
+        { threadId: activeThreadId, lang, message: "", regenerate: true },
+        { timeoutMs: 120_000, signal: controller.signal }
+      );
+
+      await refreshThreads(activeThreadId);
+
+      const finalText =
+        result?.markdown ||
+        result?.output ||
+        (lang === "fa" ? "پاسخی دریافت نشد. دوباره تلاش کن." : "No response received. Please try again.");
+
+      setRegenCount(Number(result?.regenCount || 0));
+      setMessages((prev) => prev.map((m) => (m.id === botLocalId ? { ...m, isThinking: false, content: "", streaming: true } : m)));
+
+      activeStreamCancelRef.current = streamText({
+        fullText: finalText,
+        onChunk: (partial) => {
+          setMessages((prev) => prev.map((m) => (m.id === botLocalId ? { ...m, content: partial, streaming: true } : m)));
+        },
+        onDone: async () => {
+          setMessages((prev) => prev.map((m) => (m.id === botLocalId ? { ...m, content: finalText, streaming: false } : m)));
+          activeStreamCancelRef.current = null;
+          inFlightAbortRef.current = null;
+          await loadMessages(activeThreadId);
+        },
+      });
+    } catch (e) {
+      const aborted = stopByUserRef.current || inFlightAbortRef.current?.signal?.aborted || e?.name === "AbortError";
+      if (aborted) {
+        setMessages((prev) => prev.map((m) => (m.id === botLocalId ? { ...m, isThinking: false, content: lang === "fa" ? "⛔ متوقف شد" : "⛔ Stopped" } : m)));
+        setLoading(false);
+        inFlightAbortRef.current = null;
+        return;
+      }
+
+      let msg = lang === "fa" ? "❌ خطا در ریجنریت. دوباره تلاش کن." : "❌ Regenerate failed. Please retry.";
+      setMessages((prev) => prev.map((m) => (m.id === botLocalId ? { ...m, isThinking: false, content: msg, isError: true } : m)));
+    } finally {
+      setLoading(false);
+      inFlightAbortRef.current = null;
+      stopByUserRef.current = false;
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      doSend();
+    }
+  };
+
+  // ✅ پیشنهاد نام‌گذاری بعد از اولین رفت‌وبرگشت (بدون AI-call)
+  const shouldSuggestRename = useMemo(() => {
+    if (!activeThread) return false;
+    if (!messages || messages.length < 2) return false; // حداقل یک user + یک assistant
+    const t = String(activeThread.title || "").trim();
+    if (!t) return true;
+    // اگر عنوان خیلی شبیه عنوان خودکار کوتاه باشد، پیشنهاد بده
+    if (t.length <= 12) return true;
+    return false;
+  }, [activeThread, messages]);
+
+  const sidebarContent = (
+    <div className="h-full flex flex-col">
+      <div className="p-3 border-b border-white/10 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-[var(--text)] truncate">{lang === "fa" ? "گفتگوها" : "Chats"}</div>
+          <div className="text-[11px] text-[var(--muted)] truncate">
+            {lang === "fa" ? `نگه‌داری تا ${retentionDays} روز` : `Retained up to ${retentionDays} days`}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <IconBtn title={lang === "fa" ? "چت جدید" : "New chat"} onClick={newChat} disabled={loading}>
+            ➕
+          </IconBtn>
+          <IconBtn title={lang === "fa" ? "بستن فهرست" : "Collapse"} onClick={() => setSidebarOpen(false)} className="hidden md:inline-flex">
+            ⟨
+          </IconBtn>
+        </div>
+      </div>
+
+      <div className="p-3">
+        <input
+          value={threadsQuery}
+          onChange={(e) => setThreadsQuery(e.target.value)}
+          placeholder={lang === "fa" ? "جستجو…" : "Search…"}
+          className="w-full rounded-xl px-3 py-2 text-sm bg-gray-100 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 outline-none focus:ring-1 focus:ring-blue-500"
+        />
+      </div>
+
+      <div className="flex-1 overflow-auto px-3 pb-3 space-y-2">
+        {filteredThreads.map((t) => {
+          const isActive = String(t._id) === String(activeThreadId);
+          const title = String(t.title || "").trim() || (lang === "fa" ? "چت جدید" : "New chat");
+          const isPinned = pinnedSet.has(String(t._id));
+
+          return (
+            <div
+              key={t._id}
+              className={[
+                "rounded-2xl border border-white/10 p-3",
+                "bg-black/10 dark:bg-white/5 backdrop-blur-xl",
+                isActive ? "ring-1 ring-blue-500/60" : "hover:bg-black/15 dark:hover:bg-white/10",
+                "transition cursor-pointer",
+              ].join(" ")}
+              onClick={() => {
+                setActiveThreadId(t._id);
+                setMobileSidebarOpen(false);
+              }}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-[var(--text)] truncate flex items-center gap-2">
+                    {isPinned ? <span title={lang === "fa" ? "پین شده" : "Pinned"}>📌</span> : null}
+                    <span className="truncate">{title}</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="shrink-0 rounded-xl px-2 py-1 text-xs border border-white/10 bg-black/20 hover:bg-black/30 dark:bg-white/10 dark:hover:bg-white/15 transition"
+                  onClick={(e) => openThreadMenu(e, t._id)}
+                  title={lang === "fa" ? "گزینه‌ها" : "Options"}
+                >
+                  ⋯
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const collapsedSidebar = (
+    <div className="h-full flex flex-col items-center py-3 gap-3">
+      <IconBtn title={lang === "fa" ? "باز کردن فهرست" : "Open sidebar"} onClick={() => setSidebarOpen(true)}>
+        ⟩
+      </IconBtn>
+      <IconBtn title={lang === "fa" ? "چت جدید" : "New chat"} onClick={newChat} disabled={loading}>
+        ➕
+      </IconBtn>
+      <IconBtn title={lang === "fa" ? "فهرست" : "Menu"} onClick={() => setMobileSidebarOpen(true)} className="md:hidden">
+        ☰
+      </IconBtn>
+    </div>
+  );
+
+  const headerBar = (
+    <div className="ccg-card px-4 py-3 flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <div className="text-sm md:text-base font-bold truncate">{lang === "fa" ? "💬 دستیار فنی CCG" : "💬 CCG Technical Assistant"}</div>
+        <div className="text-[11px] md:text-xs text-gray-600 dark:text-gray-400 truncate">
+          {lang === "fa" ? "تحلیل ارور/لاگ و تحلیل/بهبود کد — کنترل مصرف و تمرکز روی حل مسئله" : "Logs/errors + code analysis — cost-controlled & focused"}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setMobileSidebarOpen(true)}
+          className="md:hidden rounded-xl px-3 py-2 text-xs border border-white/10 bg-black/10 dark:bg-white/5 hover:opacity-90 transition"
+        >
+          {lang === "fa" ? "فهرست" : "Menu"}
+        </button>
+
+        <IconBtn title={lang === "fa" ? "توقف" : "Stop"} onClick={stopAll} disabled={!loading}>
+          ⛔ {lang === "fa" ? "توقف" : "Stop"}
+        </IconBtn>
+      </div>
+    </div>
+  );
+
+  const placeholder =
+    editMode && editTargetMessageId
+      ? lang === "fa"
+        ? "در حال ویرایش… (ارسال = ادامه از این نقطه)"
+        : "Editing… (Send = continue from here)"
+      : lang === "fa"
+      ? "پیامت را بنویس…"
+      : "Type your message…";
 
   return (
     <div className="space-y-4 md:space-y-6">
+      <ThreadMenuPortal
+        open={threadMenu.open}
+        x={threadMenu.x}
+        y={threadMenu.y}
+        lang={lang}
+        pinned={pinnedSet.has(threadMenu.threadId)}
+        onClose={closeThreadMenu}
+        onRename={() => openRenameModal(threadMenu.threadId)}
+        onTogglePin={() => togglePin(threadMenu.threadId)}
+        onDelete={() => openDeleteModal(threadMenu.threadId)}
+      />
+
+      <Modal open={renameModal.open} lang={lang} title={lang === "fa" ? "تغییر نام گفتگو" : "Rename chat"} onClose={() => setRenameModal({ open: false, threadId: "", value: "" })}>
+        <div className="space-y-3">
+          <input
+            autoFocus
+            value={renameModal.value}
+            onChange={(e) => setRenameModal((p) => ({ ...p, value: e.target.value }))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submitRename();
+            }}
+            className="w-full rounded-xl px-3 py-2 text-sm bg-gray-100 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 outline-none focus:ring-1 focus:ring-blue-500"
+            placeholder={lang === "fa" ? "عنوان گفتگو…" : "Chat title…"}
+          />
+          <div className="flex items-center justify-end gap-2">
+            <button type="button" className="rounded-xl px-3 py-2 text-xs border border-white/10 bg-black/20 dark:bg-white/10 hover:opacity-90" onClick={() => setRenameModal({ open: false, threadId: "", value: "" })}>
+              {lang === "fa" ? "لغو" : "Cancel"}
+            </button>
+            <button type="button" className="rounded-xl px-3 py-2 text-xs font-semibold bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:opacity-90" onClick={submitRename}>
+              {lang === "fa" ? "ذخیره" : "Save"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={deleteModal.open} lang={lang} title={lang === "fa" ? "حذف گفتگو" : "Delete chat"} onClose={() => setDeleteModal({ open: false, threadId: "" })}>
+        <div className="space-y-3">
+          <div className="text-sm text-[var(--text)]">
+            {lang === "fa" ? "آیا از حذف این گفتگو مطمئن هستی؟ این عمل قابل بازگشت نیست." : "Are you sure? This action cannot be undone."}
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <button type="button" className="rounded-xl px-3 py-2 text-xs border border-white/10 bg-black/20 dark:bg-white/10 hover:opacity-90" onClick={() => setDeleteModal({ open: false, threadId: "" })}>
+              {lang === "fa" ? "لغو" : "Cancel"}
+            </button>
+            <button type="button" className="rounded-xl px-3 py-2 text-xs font-semibold bg-red-500/80 text-white hover:bg-red-500" onClick={confirmDelete}>
+              {lang === "fa" ? "حذف" : "Delete"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <MobileSidebar open={mobileSidebarOpen} lang={lang} onClose={() => setMobileSidebarOpen(false)}>
+        {sidebarContent}
+      </MobileSidebar>
+
       <div className="ccg-container">
         <FeedbackButton />
       </div>
 
-      <div className="ccg-container">
-        <div className="ccg-card p-4 flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-lg md:text-xl font-bold mb-1">
-              {lang === "fa" ? "💬 دستیار فنی CCG" : "💬 CCG Technical Assistant"}
-            </h1>
-            <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
-              {lang === "fa" ? "فقط تحلیل ارور/لاگ و تحلیل کد/اسکریپت" : "Only error/log analysis and code/script analysis"}
-            </p>
-          </div>
+      <div className="ccg-container">{headerBar}</div>
 
-          <button
-            onClick={clearChat}
-            className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition text-xs md:text-sm"
-          >
-            {lang === "fa" ? "پاک‌کردن" : "Clear"}
-          </button>
-        </div>
-      </div>
-
-      {/* Modes (only 2) */}
       <div className="ccg-container">
-        <div className="ccg-card p-4">
-          <div className="grid grid-cols-2 gap-2">
-            {CHAT_MODES.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => setChatMode(m.id)}
-                className={`p-3 rounded-xl text-sm transition ${
-                  chatMode === m.id
-                    ? "bg-gradient-to-r from-blue-500 to-purple-600 text-white"
-                    : "bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700"
-                }`}
-              >
-                <div className="font-semibold">{m.title[lang] || m.title.en}</div>
-                <div className={`mt-1 text-xs ${chatMode === m.id ? "text-white/90" : "text-gray-500 dark:text-gray-400"}`}>
-                  {m.description[lang] || m.description.en}
+        <div className="ccg-card h-[78vh] md:h-[80vh] overflow-hidden">
+          <div className="h-full flex">
+            <div className="hidden md:block h-full border-r border-white/10">
+              <div className={sidebarOpen ? "w-[320px] h-full" : "w-[56px] h-full"}>{sidebarOpen ? sidebarContent : collapsedSidebar}</div>
+            </div>
+
+            <div className="flex-1 h-full flex flex-col">
+              <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold truncate">
+                    {activeThread ? activeThread.title || (lang === "fa" ? "چت جدید" : "New chat") : lang === "fa" ? "بدون چت" : "No chat"}
+                  </div>
+                  <div className="text-xs text-[var(--muted)] mt-1">{lang === "fa" ? `ریجنریت: ${regenCount}/3` : `Regenerate: ${regenCount}/3`}</div>
                 </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
 
-      {errorText ? (
-        <div className="ccg-container">
-          <div className="ccg-card p-3 border border-red-500/30 bg-red-500/10 text-red-200 text-sm">{errorText}</div>
-        </div>
-      ) : null}
+                <div className="flex items-center gap-2">
+                  <IconBtn title={lang === "fa" ? "چت جدید" : "New chat"} onClick={newChat} disabled={loading}>
+                    ➕
+                  </IconBtn>
+                  <IconBtn title={lang === "fa" ? "ریجنریت" : "Regenerate"} onClick={doRegenerate} disabled={!canRegen}>
+                    🔁
+                  </IconBtn>
+                </div>
+              </div>
 
-      <div className="ccg-container">
-        <div className="ccg-card p-4 relative">
-          <div
-            ref={scrollRef}
-            onScroll={onScroll}
-            className="max-h-[62vh] md:max-h-[68vh] overflow-y-auto overflow-x-hidden space-y-4 pr-1"
-          >
-            {messages.map(renderMessage)}
-            <div ref={messagesEndRef} />
-          </div>
+              {/* ✅ پیشنهاد نام‌گذاری */}
+              {shouldSuggestRename ? (
+                <div className="px-4 pt-3">
+                  <div className="rounded-2xl border border-white/10 bg-black/10 dark:bg-white/5 backdrop-blur-xl px-4 py-3 flex items-center justify-between gap-3">
+                    <div className="text-xs text-[var(--muted)]">
+                      {lang === "fa" ? "برای نظم بهتر، یک نام برای این گفتگو انتخاب کن." : "For better organization, choose a name for this chat."}
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-xl px-3 py-2 text-xs font-semibold bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:opacity-90"
+                      onClick={() => openRenameModal(activeThreadId)}
+                    >
+                      {lang === "fa" ? "تغییر نام" : "Rename"}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
 
-          {/* Smart scroll button (Bottom when away, Top when at bottom) */}
-          {showNavBtn ? (
-            <button
-              type="button"
-              onClick={onNavClick}
-              className={[
-                "absolute z-10",
-                // position near bottom-right inside card
-                "right-4 bottom-24 md:bottom-28",
-                "rounded-full px-3 py-2",
-                // keep CCG look
-                "bg-black/30 hover:bg-black/40 dark:bg-white/10 dark:hover:bg-white/15",
-                "border border-white/10",
-                "backdrop-blur-xl shadow-lg",
-                "text-xs md:text-sm flex items-center gap-2",
-                "transition",
-              ].join(" ")}
-              title={navBtnLabel}
-            >
-              <span>{arrow}</span>
-              <span className="opacity-90">{navBtnLabel}</span>
-            </button>
-          ) : null}
+              <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-y-auto overflow-x-hidden space-y-4 px-4 py-4">
+                {messages.length ? (
+                  messages.map(renderMessage)
+                ) : (
+                  <div className="text-sm text-[var(--muted)]">{lang === "fa" ? "شروع کن؛ هر سوالی داری بپرس." : "Start — ask anything."}</div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
 
-          <div className="mt-4 flex gap-2">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              rows={2}
-              placeholder={currentMode.placeholder[lang] || currentMode.placeholder.en}
-              className="flex-1 rounded-xl px-4 py-3 bg-gray-100 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 outline-none focus:ring-1 focus:ring-blue-500"
-              disabled={loading}
-            />
+              <div className="px-4 py-3 border-t border-white/10">
+                <div className="flex gap-2 items-end">
+                  <textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    rows={2}
+                    placeholder={placeholder}
+                    className="flex-1 rounded-xl px-4 py-3 bg-gray-100 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 outline-none focus:ring-1 focus:ring-blue-500"
+                    disabled={loading}
+                  />
 
-            <button
-              onClick={sendMessage}
-              disabled={loading || !input.trim()}
-              className={`px-4 py-3 rounded-xl font-medium text-sm transition flex items-center justify-center gap-2 ${
-                loading || !input.trim()
-                  ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed"
-                  : "bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:opacity-90"
-              }`}
-            >
-              {loading ? (
-                <>
-                  <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>{lang === "fa" ? "ارسال…" : "Sending…"}</span>
-                </>
-              ) : (
-                <>
-                  <span>🚀</span>
-                  <span>{lang === "fa" ? "ارسال" : "Send"}</span>
-                </>
-              )}
-            </button>
-          </div>
+                  {editMode ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditMode(false);
+                        setEditTargetMessageId(null);
+                        setInput("");
+                      }}
+                      className="px-4 py-3 rounded-xl text-sm border border-white/10 bg-black/20 dark:bg-white/10 hover:opacity-90"
+                      disabled={loading}
+                    >
+                      {lang === "fa" ? "لغو" : "Cancel"}
+                    </button>
+                  ) : null}
 
-          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            {lang === "fa" ? "Enter برای ارسال • Shift+Enter برای خط جدید" : "Enter to send • Shift+Enter for new line"}
+                  <button
+                    onClick={doSend}
+                    disabled={loading || !input.trim()}
+                    className={`px-4 py-3 rounded-xl font-medium text-sm transition flex items-center justify-center gap-2 ${
+                      loading || !input.trim() ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed" : "bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:opacity-90"
+                    }`}
+                  >
+                    {loading ? (
+                      <>
+                        <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        <span>{lang === "fa" ? "ارسال…" : "Sending…"}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>🚀</span>
+                        <span>{lang === "fa" ? "ارسال" : "Send"}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between gap-2">
+                  <span>{lang === "fa" ? "Enter برای ارسال • Shift+Enter برای خط جدید" : "Enter to send • Shift+Enter for new line"}</span>
+                  <span className="opacity-80">{lang === "fa" ? "درخواستت را دقیق‌تر بگو تا هزینه کمتر شود." : "Be specific to reduce cost."}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

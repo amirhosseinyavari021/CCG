@@ -1,30 +1,54 @@
+/* =========================================================
+   CCG Global Modern UI v3.2.0
+   ========================================================= */
+
 /* ===== Fonts ===== */
 @import "@fontsource/inter/400.css";
 @import "@fontsource/inter/600.css";
 @import "@fontsource/vazirmatn/400.css";
 @import "@fontsource/vazirmatn/600.css";
 
-/* ===== Base ===== */
+/* =========================================================
+   THEME VARIABLES
+   ========================================================= */
+
 :root {
   --bg-main: #020617;
-  --bg-panel: #020617;
-  --bg-soft: #020617;
+  --bg-panel: rgba(15, 23, 42, 0.75);
+  --bg-soft: rgba(15, 23, 42, 0.6);
   --text: #e5e7eb;
-  --muted: #9ca3af;
-  --border: rgba(255,255,255,0.14);
+  --muted: #94a3b8;
+  --border: rgba(255,255,255,0.08);
+
+  --primary: #3b82f6;
+  --primary-soft: rgba(59,130,246,0.15);
+
+  --assistant-bg: rgba(30, 41, 59, 0.75);
+  --user-bg: rgba(59,130,246,0.18);
+
+  --danger: #ef4444;
 }
 
+/* Light */
 [data-theme="light"] {
   --bg-main: #f8fafc;
-  --bg-panel: #ffffff;
+  --bg-panel: rgba(255,255,255,0.85);
   --bg-soft: #f1f5f9;
   --text: #0f172a;
   --muted: #475569;
   --border: #e2e8f0;
+
+  --assistant-bg: #ffffff;
+  --user-bg: #e0f2fe;
 }
+
+/* =========================================================
+   BASE
+   ========================================================= */
 
 html {
   background: var(--bg-main);
+  transition: background 0.3s ease;
 }
 
 html[dir="rtl"] {
@@ -35,68 +59,216 @@ html[dir="ltr"] {
   font-family: "Inter", system-ui, sans-serif;
 }
 
-/* ===== Panels ===== */
+body {
+  background: var(--bg-main);
+  color: var(--text);
+}
+
+/* =========================================================
+   PANELS & CARDS
+   ========================================================= */
+
 .panel,
 .card {
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: 20px;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  transition: all 0.25s ease;
 }
 
-/* ===== Shadows (modern, soft) ===== */
+.panel:hover,
+.card:hover {
+  border-color: rgba(59,130,246,0.35);
+}
+
+/* =========================================================
+   SHADOWS
+   ========================================================= */
+
 .panel,
 .card {
-  box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.25);
 }
 
 [data-theme="light"] .panel,
 [data-theme="light"] .card {
-  box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.08);
 }
 
-/* ===== Inputs ===== */
+/* =========================================================
+   INPUTS
+   ========================================================= */
+
 input,
 select,
 textarea {
   background: var(--bg-soft);
   color: var(--text);
   border: 1px solid var(--border);
+  border-radius: 14px;
+  transition: all 0.2s ease;
 }
 
-select option {
-  background: var(--bg-panel);
-  color: var(--text);
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
-/* ===== Errors ===== */
-.error-box {
-  background: rgba(220,38,38,0.12);
-  border: 1px solid rgba(220,38,38,0.35);
-  color: #fecaca;
+/* =========================================================
+   CHAT BUBBLES
+   ========================================================= */
+
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
 
-[data-theme="light"] .error-box {
-  background: #fff1f2;
-  border-color: #fecdd3;
-  color: #9f1239;
+.chat-message {
+  max-width: 78%;
+  padding: 14px 18px;
+  border-radius: 18px;
+  line-height: 1.6;
+  word-break: break-word;
+  transition: all 0.2s ease;
 }
 
-/* ===== Markdown ===== */
+.chat-message.assistant {
+  background: var(--assistant-bg);
+  border: 1px solid var(--border);
+  align-self: flex-start;
+}
+
+.chat-message.user {
+  background: var(--user-bg);
+  border: 1px solid rgba(59,130,246,0.35);
+  align-self: flex-end;
+}
+
+.chat-message:hover {
+  transform: translateY(-2px);
+}
+
+/* =========================================================
+   MARKDOWN
+   ========================================================= */
+
 .prose {
   color: var(--text);
 }
 
 .prose code {
   background: rgba(148,163,184,0.15);
-  padding: 2px 6px;
-  border-radius: 6px;
+  padding: 3px 7px;
+  border-radius: 8px;
+  font-size: 0.9em;
 }
 
 .prose pre {
-  background: #020617;
+  background: #0f172a;
   border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  overflow-x: auto;
 }
 
 [data-theme="light"] .prose pre {
   background: #0f172a;
+  color: #e5e7eb;
+}
+
+/* =========================================================
+   SIDEBAR (THREAD LIST)
+   ========================================================= */
+
+.chat-sidebar {
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
+  backdrop-filter: blur(16px);
+}
+
+.chat-thread-item {
+  padding: 12px 16px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chat-thread-item:hover {
+  background: var(--primary-soft);
+}
+
+.chat-thread-item.active {
+  background: var(--primary-soft);
+  border: 1px solid rgba(59,130,246,0.35);
+}
+
+/* =========================================================
+   BUTTONS
+   ========================================================= */
+
+.ccg-btn {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  padding: 8px 14px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+}
+
+.ccg-btn:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+
+/* Primary Button */
+.ccg-btn.primary {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.ccg-btn.primary:hover {
+  opacity: 0.9;
+}
+
+/* Danger */
+.ccg-btn.danger {
+  background: rgba(239,68,68,0.15);
+  border-color: rgba(239,68,68,0.4);
+  color: var(--danger);
+}
+
+/* =========================================================
+   ERROR BOX
+   ========================================================= */
+
+.error-box {
+  background: rgba(239,68,68,0.15);
+  border: 1px solid rgba(239,68,68,0.4);
+  color: #fecaca;
+  padding: 12px;
+  border-radius: 14px;
+}
+
+/* =========================================================
+   SCROLLBAR
+   ========================================================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148,163,184,0.4);
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(59,130,246,0.6);
 }

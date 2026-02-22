@@ -1,8 +1,11 @@
 // client/src/main.jsx
 import React from "react";
 import ReactDOM from "react-dom/client";
-import "./index.css";
 import App from "./App";
+
+// ✅ Theme boot (no "double class" bug)
+import { bootTheme } from "./utils/themeBoot";
+bootTheme();
 
 // ✅ fonts (no CSS @import warnings)
 import "@fontsource/inter/300.css";

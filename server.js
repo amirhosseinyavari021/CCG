@@ -10,6 +10,7 @@ import path from "path";
 import ccgRoutes from "./server/routes/ccgRoutes.js";
 import domainGuard from "./server/middleware/domainGuard.js";
 import chatRoutes from "./server/routes/chatRoutes.js";
+import { connectMongo } from "./server/config/mongo.js";
 
 /* =========================
    CONFIG
@@ -45,7 +46,6 @@ function toOneLine(x) {
 }
 
 function makeRequestId() {
-  // sortable-ish + random
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
@@ -85,11 +85,9 @@ function redactSensitive(obj) {
 }
 
 function logLine(level, msg, meta = {}) {
-  // 1) human readable
   const human = `[${ts()}] ${level.toUpperCase()} ${msg}`;
   console.log(human);
 
-  // 2) structured JSON line (easy grep + parse)
   const evt = {
     ts: ts(),
     level,
@@ -103,7 +101,6 @@ function logLine(level, msg, meta = {}) {
 }
 
 function getIp(req) {
-  // behind proxy/cdn: x-forwarded-for could exist
   const xf = req.headers["x-forwarded-for"];
   if (typeof xf === "string" && xf.trim()) return xf.split(",")[0].trim();
   return req.ip;
@@ -118,9 +115,6 @@ logLine("info", "============================================================");
 
 const app = express();
 app.disable("x-powered-by");
-
-// اگر پشت پروکسی/کلاودفلر هستی، این باعث میشه req.ip درست‌تر بشه
-// (اگر نمی‌خوای، کامنت کن)
 app.set("trust proxy", true);
 
 /* =========================
@@ -130,16 +124,13 @@ app.use(express.json({ limit: process.env.MAX_REQUEST_SIZE || "2mb" }));
 app.use(express.urlencoded({ extended: true, limit: process.env.MAX_REQUEST_SIZE || "2mb" }));
 app.use(express.text({ type: "*/*", limit: process.env.MAX_REQUEST_SIZE || "2mb" }));
 
-// اگر req.body رشته بود و شبیه JSON بود، تبدیلش کن
 app.use((req, _res, next) => {
   if (typeof req.body === "string") {
     const t = req.body.trim();
     if (t.startsWith("{") && t.endsWith("}")) {
       try {
         req.body = JSON.parse(t);
-      } catch {
-        // keep as string
-      }
+      } catch {}
     }
   }
   next();
@@ -170,7 +161,6 @@ app.use((req, res, next) => {
     ua: ua || null,
   });
 
-  // body preview (safe + bounded)
   try {
     if (req.body && typeof req.body === "object" && Object.keys(req.body).length) {
       const safeBody = redactSensitive(req.body);
@@ -186,7 +176,6 @@ app.use((req, res, next) => {
     logLine("warn", "REQ_BODY_LOG_FAIL", { rid: requestId, err: String(e?.message || e) });
   }
 
-  // capture response finish
   res.on("finish", () => {
     const ms = Date.now() - start;
     logLine("info", "RES", {
@@ -257,9 +246,6 @@ app.get("/api/info", (_req, res) => {
   });
 });
 
-/* =========================
-   404 FOR API
-========================= */
 app.use("/api", (req, res) => {
   logLine("warn", "API_ROUTE_NOT_FOUND", {
     rid: req.requestId,
@@ -280,9 +266,6 @@ app.use("/api", (req, res) => {
   });
 });
 
-/* =========================
-   ROOT
-========================= */
 app.get("/", (_req, res) => {
   res.json({
     service: "CCG API",
@@ -296,9 +279,6 @@ app.get("/", (_req, res) => {
   });
 });
 
-/* =========================
-   GLOBAL ERROR HANDLER
-========================= */
 app.use((err, req, res, _next) => {
   const msg = String(err?.message || "Internal server error");
   const code = err?.code || "INTERNAL_ERROR";
@@ -347,24 +327,22 @@ const envToShow = [
   "FRONTEND_URL",
   "ENABLE_CHAT",
   "ENABLE_COMPARATOR",
-
-  // AI routing
   "AI_PROVIDER",
   "AI_PRIMARY_MODEL",
   "AI_FALLBACK_PROVIDER",
   "AI_FALLBACK_MODEL",
-
-  // timeouts/limits
   "CHAT_ROUTE_TIMEOUT_MS",
   "AI_HTTP_TIMEOUT_MS",
   "AI_HTTP_MAX_RETRIES",
   "AI_MAX_CONCURRENCY",
+  "CHAT_RETENTION_DAYS",
+  "CHAT_MAX_HISTORY_MESSAGES",
+  "MONGO_URI",
 ];
 
 for (const key of envToShow) {
-  if (process.env[key]) logLine("info", `ENV ${key}=${process.env[key]}`);
+  if (process.env[key] && key !== "MONGO_URI") logLine("info", `ENV ${key}=${process.env[key]}`);
 }
-
 logLine("info", "----------------------------------------");
 logLine("info", "SERVICE STATUS:");
 logLine("info", process.env.MONGO_URI ? "✅ MongoDB URI is configured" : "⚠️ MongoDB URI is NOT configured");
@@ -373,8 +351,12 @@ logLine("info", process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY
 logLine("info", "============================================================");
 
 /* =========================
-   START SERVER
+   CONNECT MONGO + START SERVER
 ========================= */
+await connectMongo({
+  log: (level, msg, meta) => logLine(level, msg, meta),
+});
+
 const server = app.listen(port, host, () => {
   logLine("info", "🎉 SERVER STARTED SUCCESSFULLY", {
     host,
@@ -408,9 +390,6 @@ function gracefulShutdown(signal) {
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 
-/* =========================
-   PROCESS-LEVEL SAFETY NET
-========================= */
 process.on("unhandledRejection", (reason) => {
   logLine("error", "UNHANDLED_REJECTION", { reason: safeWrite ? toOneLine(String(reason)) : String(reason) });
 });
@@ -420,6 +399,5 @@ process.on("uncaughtException", (err) => {
     msg: String(err?.message || err),
     stack: process.env.NODE_ENV === "production" ? undefined : String(err?.stack || ""),
   });
-  // بهتره بعد از uncaughtException خروج کنی
   gracefulShutdown("UNCAUGHT_EXCEPTION");
 });

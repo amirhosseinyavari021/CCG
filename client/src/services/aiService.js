@@ -1,127 +1,112 @@
 // client/src/services/aiService.js
 import { withBase } from "../config/api";
 
-function makeAbortable(opts = {}) {
-  const externalSignal = opts?.signal;
-  const timeoutMs = Number.isFinite(Number(opts?.timeoutMs)) ? Number(opts.timeoutMs) : 0;
-
-  let controller = null;
-  let timer = null;
-  let abortCode = "";
-
-  if (timeoutMs > 0) {
-    controller = new AbortController();
-
-    const abortWith = (code) => {
-      abortCode = code;
-      try {
-        controller.abort(new Error(code));
-      } catch {
-        try {
-          controller.abort();
-        } catch {}
-      }
-    };
-
-    const abortFromExternal = () => abortWith("REQUEST_ABORTED");
-
-    if (externalSignal) {
-      if (externalSignal.aborted) abortFromExternal();
-      else externalSignal.addEventListener("abort", abortFromExternal, { once: true });
-    }
-
-    timer = setTimeout(() => abortWith("REQUEST_TIMEOUT"), timeoutMs);
-  }
-
-  return {
-    signal: controller ? controller.signal : externalSignal,
-    getAbortCode: () => abortCode,
-    cleanup: () => {
-      if (timer) clearTimeout(timer);
-    },
-  };
+function toError(status, data) {
+  const e = new Error(data?.error?.message || data?.message || "REQUEST_FAILED");
+  e.status = status;
+  e.data = data;
+  return e;
 }
 
-async function fetchJson(path, payload, opts = {}) {
-  const { signal, cleanup, getAbortCode } = makeAbortable(opts);
-  const url = withBase(path);
+async function fetchJSON(url, { method = "GET", body, timeoutMs = 60_000, signal } = {}) {
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort("timeout"), timeoutMs);
+
+  const sig = signal
+    ? (function mergeSignals(a, b) {
+        // ساده‌ترین حالت: اگر یکی abort شد، اون یکی رو هم abort کنیم
+        const c = new AbortController();
+        const onAbort = () => c.abort();
+        a.addEventListener("abort", onAbort, { once: true });
+        b.addEventListener("abort", onAbort, { once: true });
+        return c.signal;
+      })(signal, controller.signal)
+    : controller.signal;
 
   try {
     const res = await fetch(url, {
-      method: "POST",
+      method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload || {}),
-      signal,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: sig,
     });
 
-    if (res.status === 204) return {};
-
-    const contentType = res.headers.get("content-type") || "";
-    const isJson = contentType.includes("application/json");
-
-    let data = null;
-    try {
-      data = isJson ? await res.json() : await res.text();
-    } catch {
-      data = null;
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw toError(res.status, data);
+    return data;
+  } catch (err) {
+    if (String(err?.name || "") === "AbortError" || String(err) === "timeout") {
+      const e = new Error("REQUEST_TIMEOUT");
+      e.status = 0;
+      throw e;
     }
-
-    if (!res.ok) {
-      const rawText = typeof data === "string" ? data.trim() : "";
-      const isGatewayHtml =
-        rawText.startsWith("<!DOCTYPE html") ||
-        rawText.startsWith("<html") ||
-        /<h1>\s*(502|504)\s+/i.test(rawText);
-
-      const msg =
-        (data &&
-          typeof data === "object" &&
-          (data?.error?.userMessage || data?.error?.message || data?.message || data?.error)) ||
-        (isGatewayHtml
-          ? "Gateway Timeout/Bad Gateway (Reverse Proxy)"
-          : (typeof data === "string" && data.trim()) || `Request failed (${res.status})`);
-
-      const err = new Error(msg);
-      err.status = res.status;
-      err.data = data;
-      throw err;
-    }
-
-    if (typeof data === "string") return { output: data };
-    return data || {};
-  } catch (e) {
-    const name = e?.name || "";
-    const msg = String(e?.message || "");
-    const reason = getAbortCode?.() || "";
-
-    const isAbort =
-      name === "AbortError" ||
-      msg.includes("REQUEST_TIMEOUT") ||
-      msg.includes("REQUEST_ABORTED") ||
-      msg.toLowerCase().includes("aborted");
-
-    if (isAbort) {
-      const code =
-        msg.includes("REQUEST_ABORTED") || reason === "REQUEST_ABORTED"
-          ? "REQUEST_ABORTED"
-          : "REQUEST_TIMEOUT";
-      const err = new Error(code);
-      err.code = code;
-      throw err;
-    }
-
-    throw e;
+    throw err;
   } finally {
-    cleanup();
+    clearTimeout(t);
   }
 }
 
+/* =========================
+   CCG (Generator / Compare)
+========================= */
+
 export async function callCCG(payload, opts = {}) {
-  return fetchJson("/api/ccg", payload, opts);
+  return fetchJSON(withBase("/api/ccg"), { method: "POST", body: payload, timeoutMs: opts.timeoutMs || 60_000, signal: opts.signal });
 }
 
-export async function callChat(payload, opts = {}) {
-  // ✅ chat may take longer on primary models
-  const timeoutMs = Number.isFinite(Number(opts?.timeoutMs)) ? Number(opts.timeoutMs) : 180_000; // 3 min
-  return fetchJson("/api/chat", payload, { ...opts, timeoutMs });
+/* =========================
+   CHAT APIs
+========================= */
+
+export async function getChatRetention(opts = {}) {
+  // چون سرور retention را همراه list threads هم می‌دهد، این را minimal نگه می‌داریم
+  const r = await listChatThreads({ lang: "fa" }, opts).catch(() => null);
+  return r?.retention || { retentionDays: 14 };
+}
+
+export async function listChatThreads({ lang } = {}, opts = {}) {
+  const q = lang ? `?lang=${encodeURIComponent(lang)}` : "";
+  return fetchJSON(withBase(`/api/chat/threads${q}`), { method: "GET", timeoutMs: opts.timeoutMs || 30_000, signal: opts.signal });
+}
+
+export async function createChatThread({ lang = "fa", title = "" } = {}, opts = {}) {
+  return fetchJSON(withBase("/api/chat/threads"), { method: "POST", body: { lang, title }, timeoutMs: opts.timeoutMs || 30_000, signal: opts.signal });
+}
+
+export async function getChatMessages({ threadId } = {}, opts = {}) {
+  if (!threadId) throw new Error("MISSING_THREAD_ID");
+  return fetchJSON(withBase(`/api/chat/threads/${threadId}/messages`), { method: "GET", timeoutMs: opts.timeoutMs || 30_000, signal: opts.signal });
+}
+
+export async function renameChatThread({ threadId, title } = {}, opts = {}) {
+  if (!threadId) throw new Error("MISSING_THREAD_ID");
+  return fetchJSON(withBase(`/api/chat/threads/${threadId}`), {
+    method: "PATCH",
+    body: { title },
+    timeoutMs: opts.timeoutMs || 30_000,
+    signal: opts.signal,
+  });
+}
+
+export async function pinChatThread({ threadId, pinned } = {}, opts = {}) {
+  if (!threadId) throw new Error("MISSING_THREAD_ID");
+  return fetchJSON(withBase(`/api/chat/threads/${threadId}`), {
+    method: "PATCH",
+    body: { pinned: Boolean(pinned) },
+    timeoutMs: opts.timeoutMs || 30_000,
+    signal: opts.signal,
+  });
+}
+
+export async function deleteChatThread({ threadId } = {}, opts = {}) {
+  if (!threadId) throw new Error("MISSING_THREAD_ID");
+  return fetchJSON(withBase(`/api/chat/threads/${threadId}`), { method: "DELETE", timeoutMs: opts.timeoutMs || 30_000, signal: opts.signal });
+}
+
+export async function sendChatMessage(payload, opts = {}) {
+  return fetchJSON(withBase("/api/chat"), { method: "POST", body: payload, timeoutMs: opts.timeoutMs || 120_000, signal: opts.signal });
+}
+
+export async function editChatMessage(payload, opts = {}) {
+  return fetchJSON(withBase("/api/chat/edit"), { method: "POST", body: payload, timeoutMs: opts.timeoutMs || 120_000, signal: opts.signal });
 }
