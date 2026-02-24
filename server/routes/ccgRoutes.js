@@ -1,7 +1,12 @@
 // /home/cando/CCG/server/routes/ccgRoutes.js
 import express from "express";
 import { runAI } from "../utils/aiClient.js";
-import { formatAIOutput, normalizeCompareMarkdown } from "../utils/outputFormatter.js";
+import {
+  formatAIOutput,
+  normalizeCompareMarkdown,
+  extractFirstFencedCode,
+  postProcessMergeCode,
+} from "../utils/outputFormatter.js";
 
 const router = express.Router();
 
@@ -26,12 +31,6 @@ router.use((req, _res, next) => {
   if (req.url && !req.url.startsWith("/")) req.url = "/" + req.url;
   next();
 });
-
-/**
- * ✅ IMPORTANT:
- * بعضی وقت‌ها به‌خاطر mount یا proxy، داخل router مسیر "/" درست match نمی‌شود.
- * پس GET/POST را با regex می‌گیریم تا هر چی زیر /api/ccg آمد، به handler اصلی برسد.
- */
 
 // GET anything under /api/ccg  => info
 router.get(/.*/, (_req, res) => {
@@ -176,19 +175,13 @@ router.post(/.*/, async (req, res) => {
 
     let out = s(ai?.output || "");
 
-    // ✅ CRITICAL FIX:
-    // normalizeCompareMarkdown is async -> MUST await.
-    // Otherwise you return raw model output (inline one-liner) and waste time forever.
+    // ✅ normalizeCompareMarkdown is async -> MUST await.
     try {
       if (typeof normalizeCompareMarkdown === "function") {
         out = await normalizeCompareMarkdown(out, {
           lang,
-          // for normalizer: tell desired mode
           compareOutputMode,
           mode: compareOutputMode,
-
-          // help fence language selection
-          fenceLang: sameLang ? codeLangA : "txt",
           codeLangA,
           codeLangB,
           sameLang,
@@ -196,7 +189,26 @@ router.post(/.*/, async (req, res) => {
       }
     } catch (e) {
       console.warn("[ccgRoutes] normalizeCompareMarkdown failed:", e?.message || e);
-      // keep raw out if normalizer crashes
+    }
+
+    // ✅ MERGE: extract code and make it copy-ready (all languages)
+    let plainMergeCode = "";
+    if (compareOutputMode === "merge") {
+      const ex = extractFirstFencedCode(out);
+
+      // Hint priority:
+      // 1) if sameLang -> trust codeLangA
+      // 2) else use fence language if present
+      // 3) else sniff from code itself inside postProcess
+      const hinted = sameLang ? codeLangA : (ex?.fenceLang || "txt");
+
+      const rawCode = ex?.code || "";
+      if (rawCode && rawCode.trim()) {
+        plainMergeCode = await postProcessMergeCode(rawCode, hinted);
+      } else {
+        // fallback: if model didn't send a fence, try processing the whole out
+        plainMergeCode = await postProcessMergeCode(out, hinted);
+      }
     }
 
     if (!out.trim()) {
@@ -208,8 +220,13 @@ router.post(/.*/, async (req, res) => {
 
     return res.json({
       ok: true,
-      output: out,
+
+      // ✅ For merge: send only clean code to UI so copy works
+      output: plainMergeCode || out,
+
+      // keep markdown for debugging / future UI rendering improvements
       markdown: out,
+
       requestId,
       ms: Date.now() - t0,
       lang,

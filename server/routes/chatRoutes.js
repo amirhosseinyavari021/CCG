@@ -12,7 +12,6 @@ import {
   getMessages,
   appendMessage,
   setThreadTitleIfEmpty,
-  truncateAfterMessage,
   popTrailingAssistant,
   bumpRegen,
   resetRegen,
@@ -26,9 +25,20 @@ function s(v) {
   return v === null || v === undefined ? "" : String(v);
 }
 
-const MAX_INPUT_CHARS = Number(process.env.CHAT_MAX_CHARS || 32000);
+function normLang(x) {
+  return s(x).toLowerCase() === "en" ? "en" : "fa";
+}
 
-// کاهش هوشمند history (نامرئی)
+// Safe-call wrapper (تا اگر signature توی store فرق داشت، کمتر بشکنه)
+async function callMaybe(fn, argsObj, argsAlt) {
+  try {
+    return await fn(argsObj);
+  } catch {
+    return await fn(argsAlt);
+  }
+}
+
+const MAX_INPUT_CHARS = Number(process.env.CHAT_MAX_CHARS || 32000);
 const MAX_HISTORY_MESSAGES = Number(process.env.CHAT_MAX_HISTORY_MESSAGES || 20);
 
 const chatLimiter = rateLimit({
@@ -36,6 +46,9 @@ const chatLimiter = rateLimit({
   max: Number(process.env.CHAT_RATE_MAX || 30),
 });
 
+/* =========================
+   PROMPT BUILDER
+========================= */
 function buildChatPrompt({ lang = "fa", messages = [] } = {}) {
   const fa = lang !== "en";
 
@@ -83,9 +96,107 @@ Output pure Markdown.
   return `SYSTEM:\n${system}\n\nCONVERSATION:\n${convo}\n\nAssistant:\n`;
 }
 
+/* =========================
+   META / RETENTION
+========================= */
+router.get("/retention", (_req, res) => {
+  return res.json({
+    ok: true,
+    ...retentionInfo(),
+  });
+});
+
+/* =========================
+   THREADS API (برای UI)
+   مطابق aiService.js:
+   GET    /api/chat/threads
+   POST   /api/chat/threads
+   GET    /api/chat/threads/:id/messages
+   PATCH  /api/chat/threads/:id
+   DELETE /api/chat/threads/:id
+========================= */
+
+// list threads
+router.get("/threads", async (req, res) => {
+  const lang = normLang(req.query.lang);
+
+  try {
+    // بعضی storeها listThreads({lang}) دارند، بعضی listThreads(lang)
+    const r = await callMaybe(listThreads, { lang }, lang);
+
+    const threads = Array.isArray(r?.threads) ? r.threads : Array.isArray(r) ? r : [];
+    return res.json({ ok: true, threads });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: { code: "THREADS_LIST_FAILED", requestId: req.requestId } });
+  }
+});
+
+// create thread
+router.post("/threads", async (req, res) => {
+  const body = req.body || {};
+  const lang = normLang(body.lang);
+  const title = s(body.title).trim();
+
+  try {
+    const thread = await createThread({ lang, title });
+    return res.json({ ok: true, thread });
+  } catch {
+    return res.status(500).json({ ok: false, error: { code: "THREAD_CREATE_FAILED", requestId: req.requestId } });
+  }
+});
+
+// get messages
+router.get("/threads/:threadId/messages", async (req, res) => {
+  const threadId = s(req.params.threadId).trim();
+  if (!threadId) return res.status(400).json({ ok: false });
+
+  try {
+    const thread = await getThread(threadId);
+    if (!thread) return res.status(404).json({ ok: false });
+
+    const messages = await getMessages(threadId, { limit: 500 });
+    return res.json({ ok: true, thread, messages: messages || [] });
+  } catch {
+    return res.status(500).json({ ok: false, error: { code: "MESSAGES_GET_FAILED", requestId: req.requestId } });
+  }
+});
+
+// rename thread
+router.patch("/threads/:threadId", async (req, res) => {
+  const threadId = s(req.params.threadId).trim();
+  const title = s(req.body?.title).trim().slice(0, 80);
+
+  if (!threadId || !title) return res.status(400).json({ ok: false });
+
+  try {
+    const r = await renameThread(threadId, title);
+    const thread = r?.thread || (await getThread(threadId));
+    return res.json({ ok: true, thread });
+  } catch {
+    return res.status(500).json({ ok: false, error: { code: "THREAD_RENAME_FAILED", requestId: req.requestId } });
+  }
+});
+
+// delete thread
+router.delete("/threads/:threadId", async (req, res) => {
+  const threadId = s(req.params.threadId).trim();
+  if (!threadId) return res.status(400).json({ ok: false });
+
+  try {
+    await deleteThread(threadId);
+    return res.json({ ok: true });
+  } catch {
+    return res.status(500).json({ ok: false, error: { code: "THREAD_DELETE_FAILED", requestId: req.requestId } });
+  }
+});
+
+/* =========================
+   MAIN CHAT ENDPOINT
+   POST /api/chat
+========================= */
 router.post("/", chatLimiter, async (req, res) => {
   const body = req.body || {};
-  const lang = s(body.lang).toLowerCase() === "en" ? "en" : "fa";
+  const lang = normLang(body.lang);
 
   const message = s(body.message).trim();
   const regenerate = body.regenerate === true;
@@ -105,16 +216,17 @@ router.post("/", chatLimiter, async (req, res) => {
 
   if (regenerate) {
     const rr = await bumpRegen(threadId);
-    if (!rr.ok) return res.status(429).json({ ok: false });
+    if (!rr?.ok) return res.status(429).json({ ok: false });
 
     await popTrailingAssistant(threadId);
   } else {
     if (!message) return res.status(400).json({ ok: false });
+
     await appendMessage(threadId, "user", message);
     await resetRegen(threadId);
 
     const history0 = await getMessages(threadId, { limit: MAX_HISTORY_MESSAGES });
-    if (history0.filter((m) => m.role === "user").length === 1) {
+    if ((history0 || []).filter((m) => m.role === "user").length === 1) {
       await setThreadTitleIfEmpty(threadId, message.slice(0, 44));
     }
   }
@@ -123,7 +235,7 @@ router.post("/", chatLimiter, async (req, res) => {
 
   const prompt = buildChatPrompt({
     lang,
-    messages: history.map((m) => ({ role: m.role, content: m.content })),
+    messages: (history || []).map((m) => ({ role: m.role, content: m.content })),
   });
 
   try {
@@ -153,7 +265,7 @@ router.post("/", chatLimiter, async (req, res) => {
       retention: retentionInfo(),
       threadTTL: {
         retentionDays: retentionInfo().retentionDays,
-        expiresAt: updatedTh.expiresAt,
+        expiresAt: updatedTh?.expiresAt,
       },
       regenCount: Number(updatedTh?.regenCount || 0),
     });

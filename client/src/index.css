@@ -1,178 +1,243 @@
-/* =========================
-   CCG PRO UI ADDONS
-   - glass
-   - split pane
-   - dark mobile fix
-========================= */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-.ccg-noselect {
-  user-select: none;
+/* =========================================================
+   CCG THEME SYSTEM
+   Light = Dim (comfortable)
+   Dark  = Deep (night)
+   ========================================================= */
+
+/* =======================
+   DIM LIGHT (default)
+   ======================= */
+:root {
+  --bg: 20 24 32;
+  --bg2: 26 31 41;
+
+  --card: 34 40 52;
+  --card2: 42 49 64;
+
+  --text: 245 248 255;
+  --muted: 200 210 230;
+  --hint: 170 185 210;
+
+  --border: 255 255 255 / 0.14;
+
+  --input-bg: 255 255 255 / 0.07;
+  --input-border: 255 255 255 / 0.18;
+
+  --brand1: 59 130 246;
+  --brand2: 168 85 247;
+
+  --shadow: 0 14px 46px rgba(0, 0, 0, 0.35);
+
+  --r-lg: 18px;
+  --r-xl: 24px;
 }
 
-/* Glass effect */
-.ccg-glass {
-  @apply bg-white/70 dark:bg-black/35 border border-gray-200/60 dark:border-white/10 shadow-sm backdrop-blur-xl;
+/* =======================
+   DEEP DARK
+   ======================= */
+html.dark {
+  --bg: 8 10 14;
+  --bg2: 12 15 21;
+
+  --card: 16 19 27;
+  --card2: 20 24 33;
+
+  --text: 243 246 255;
+  --muted: 186 196 215;
+  --hint: 155 165 190;
+
+  --border: 255 255 255 / 0.10;
+
+  --input-bg: 255 255 255 / 0.05;
+  --input-border: 255 255 255 / 0.12;
+
+  --shadow: 0 22px 70px rgba(0, 0, 0, 0.55);
 }
 
-.ccg-glass-soft {
-  @apply bg-white/50 dark:bg-black/25 border border-gray-200/50 dark:border-white/10 backdrop-blur-lg;
+/* =========================================================
+   BASE LAYER
+   ========================================================= */
+@layer base {
+  html,
+  body {
+    height: 100%;
+    background: rgb(var(--bg));
+    color: rgb(var(--text));
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background: rgba(59, 130, 246, 0.35);
+  }
 }
 
-.ccg-card-danger {
-  @apply border-red-400/40 dark:border-red-400/25;
+/* =========================================================
+   DIRECTION HELPERS
+   ========================================================= */
+.rtl-text {
+  direction: rtl;
+  text-align: right;
+  unicode-bidi: plaintext;
 }
 
-.ccg-card-info {
-  @apply border-sky-400/30 dark:border-sky-400/20;
-}
-
-/* Segmented control */
-.ccg-seg {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
-  padding: 4px;
-  border-radius: 16px;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(0,0,0,0.04);
-  backdrop-filter: blur(14px);
-}
-
-.dark .ccg-seg {
-  background: rgba(255,255,255,0.05);
-}
-
-.ccg-seg-item {
-  position: relative;
-  z-index: 2;
-  border-radius: 12px;
-  padding: 10px 10px;
+.ltr-text {
+  direction: ltr;
   text-align: left;
-  transition: transform 150ms ease, opacity 150ms ease;
+  unicode-bidi: plaintext;
 }
 
-.ccg-seg-item:hover {
-  opacity: 0.95;
+/* =========================================================
+   LAYOUT HELPERS
+   ========================================================= */
+.ccg-container {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-left: 16px;
+  padding-right: 16px;
 }
 
-.ccg-seg-item:active {
-  transform: scale(0.98);
+.ccg-card {
+  background: rgba(var(--card), 0.78);
+  border: 1px solid rgba(var(--border));
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(16px);
+  border-radius: var(--r-xl);
 }
 
-.ccg-seg-item.is-active {
-  color: white;
+.ccg-glass {
+  background: rgba(var(--card), 0.62);
+  border: 1px solid rgba(var(--border));
+  backdrop-filter: blur(18px);
+  border-radius: var(--r-xl);
 }
 
-.ccg-seg-indicator {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  height: calc(100% - 8px);
-  border-radius: 12px;
-  background: linear-gradient(90deg, rgba(34,197,94,0.95), rgba(16,185,129,0.95));
-  box-shadow: 0 10px 24px rgba(16,185,129,0.18);
-  transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  z-index: 1;
+/* =========================================================
+   INPUTS
+   ========================================================= */
+input,
+textarea,
+select {
+  color: rgb(var(--text));
+  background: rgba(var(--input-bg));
+  border: 1px solid rgba(var(--input-border));
 }
 
-/* Knobs active state (green) */
-.ccg-knob-active {
-  @apply border border-emerald-400/40 dark:border-emerald-300/20;
-  background: linear-gradient(135deg, rgba(16,185,129,0.18), rgba(34,197,94,0.10));
-}
-.dark .ccg-knob-active {
-  background: linear-gradient(135deg, rgba(16,185,129,0.22), rgba(34,197,94,0.10));
+input::placeholder,
+textarea::placeholder {
+  color: rgb(var(--hint));
 }
 
-/* Split pane */
-.ccg-split {
-  display: grid;
-  gap: 12px;
-  align-items: stretch;
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+  border-color: rgba(59, 130, 246, 0.35);
 }
 
-@media (min-width: 1024px) {
-  .ccg-split {
-    grid-template-columns: var(--split) 10px calc(100% - var(--split) - 10px);
-  }
-  .ccg-split.is-rtl {
-    grid-template-columns: calc(100% - var(--split) - 10px) 10px var(--split);
-  }
+/* =========================================================
+   CODE SURFACES
+   ========================================================= */
+pre,
+code {
+  direction: ltr !important;
+  text-align: left !important;
+  unicode-bidi: isolate !important;
 }
 
-@media (max-width: 1023px) {
-  .ccg-split {
-    grid-template-columns: 1fr;
-  }
-  .ccg-resizer {
-    display: none;
-  }
+/* =========================================================
+   TAILWIND LIGHT OVERRIDES
+   Prevent white backgrounds in light mode
+   ========================================================= */
+html:not(.dark) .bg-white,
+html:not(.dark) .bg-white\/80,
+html:not(.dark) .bg-gray-50,
+html:not(.dark) .bg-gray-100,
+html:not(.dark) .bg-gray-200 {
+  background-color: rgba(var(--card), 0.78) !important;
+  border-color: rgba(var(--border)) !important;
 }
 
+html:not(.dark) .text-gray-900,
+html:not(.dark) .text-gray-800,
+html:not(.dark) .text-gray-700,
+html:not(.dark) .text-gray-600 {
+  color: rgb(var(--text)) !important;
+}
+
+html:not(.dark) .border-gray-200,
+html:not(.dark) .border-gray-300 {
+  border-color: rgba(var(--border)) !important;
+}
+
+/* =========================================================
+   RESIZER (your existing)
+   ========================================================= */
 .ccg-resizer {
   position: relative;
-  border-radius: 999px;
-  background: rgba(0,0,0,0.06);
-  border: 1px solid rgba(0,0,0,0.08);
+  width: 10px;
+  min-width: 10px;
   cursor: col-resize;
   transition: background 150ms ease, transform 150ms ease;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .dark .ccg-resizer {
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .ccg-resizer:hover {
-  background: rgba(34,197,94,0.15);
+  background: rgba(34, 197, 94, 0.18);
 }
 
 .ccg-resizer:active {
   transform: scaleX(1.15);
 }
 
-.ccg-resizer-handle {
-  position: absolute;
-  inset: 20% 2px;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.0);
-}
-
-.ccg-danger-box {
-  @apply mt-3 p-3 rounded-xl border;
-  border-color: rgba(248,113,113,0.35);
-  background: rgba(248,113,113,0.10);
-  color: rgba(127,29,29,0.95);
-}
-
-.dark .ccg-danger-box {
-  background: rgba(248,113,113,0.10);
-  color: rgba(254,202,202,0.92);
-}
-
-/* Dark mode mobile fix (stronger) */
-@media (max-width: 640px) {
-  .dark body {
-    background: #05070d !important;
-  }
-
-  .dark .ccg-card {
-    @apply bg-black/45 border-white/10;
-  }
-
-  .dark textarea,
-  .dark select,
-  .dark input {
-    @apply bg-black/45 border-white/10 text-slate-100;
-  }
-}
-
-/* Better focus */
 .ccg-resizer:focus {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(34,197,94,0.25);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25);
 }
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+
+/* =========================================================
+   DANGER BOX
+   ========================================================= */
+.ccg-danger-box {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.12);
+  color: rgba(254, 202, 202, 0.95);
+}
+
+/* =========================================================
+   MOBILE FIX
+   ========================================================= */
+@media (max-width: 640px) {
+  body {
+    background: rgb(var(--bg)) !important;
+  }
+
+  .ccg-card {
+    background: rgba(var(--card), 0.75);
+  }
+
+  textarea,
+  select,
+  input {
+    background: rgba(var(--input-bg)) !important;
+    border: 1px solid rgba(var(--input-border)) !important;
+    color: rgb(var(--text)) !important;
+  }
+}
