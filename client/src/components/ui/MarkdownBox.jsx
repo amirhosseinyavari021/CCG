@@ -35,26 +35,33 @@ function looksLikeTinySnippet(code) {
   return true;
 }
 
+function normalizeChildrenToString(children) {
+  // react-markdown sometimes passes children as array
+  if (Array.isArray(children)) return children.map((x) => (x === null || x === undefined ? "" : String(x))).join("");
+  return children === null || children === undefined ? "" : String(children);
+}
+
 function CodeBlock({ inline, className, children, lang = "fa", allowCodeBlocks = true }) {
-  const code = String(children || "").replace(/\n$/, "");
+  const raw = normalizeChildrenToString(children);
+
+  // preserve newlines; only drop a single trailing newline that markdown often adds
+  const code = raw.endsWith("\n") ? raw.slice(0, -1) : raw;
+
   const language = (className || "").replace("language-", "").trim();
 
-  // inline code => بدون Copy و بدون Card
+  // inline code => بدون Copy و بدون Card (همان رفتار قبلی)
   if (inline) {
     return (
       <code dir="ltr" className="px-1 py-0.5 rounded bg-white/10 border border-white/10 text-[0.95em]">
-        {children}
+        {raw}
       </code>
     );
   }
 
-  // ✅ اگر در این بخش اجازه code-block نداریم:
-  // هر چیزی که markdown به صورت block داد را تبدیل می‌کنیم به inline-highlight
-  // تا “کارت CODE + کپی” اصلاً ظاهر نشود.
+  // ✅ اگر در این بخش اجازه code-block نداریم: همان رفتار قبلی
   if (!allowCodeBlocks) {
     const tiny = looksLikeTinySnippet(code);
 
-    // tiny => inline-highlight
     if (tiny) {
       return (
         <code dir="ltr" className="px-1 py-0.5 rounded bg-white/10 border border-white/10 text-[0.95em]">
@@ -63,8 +70,6 @@ function CodeBlock({ inline, className, children, lang = "fa", allowCodeBlocks =
       );
     }
 
-    // غیر tiny (اگر مدل واقعاً چند خط کد انداخت تو تفاوت‌ها) => به صورت متن ساده
-    // تا باز هم کارت CODE ساخته نشود
     return (
       <span dir="ltr" className="whitespace-pre-wrap font-mono text-[0.95em]">
         {code}
@@ -72,15 +77,32 @@ function CodeBlock({ inline, className, children, lang = "fa", allowCodeBlocks =
     );
   }
 
-  // ✅ حالت عادی: فقط برای Merge Final
+  // ✅ حالت Merge Final (فقط اینجا را سخت‌گیرانه multiline می‌کنیم)
+  // حتی اگر CSS کلی پروژه white-space را خراب کند، این styleها override می‌کنند.
   return (
     <div className="my-3 rounded-xl border border-white/10 bg-black/20 overflow-hidden">
       <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-black/30">
         <div className="text-xs opacity-80">{language ? language.toUpperCase() : "CODE"}</div>
         <CopyButton text={code} lang={lang} />
       </div>
-      <pre dir="ltr" className="p-3 overflow-auto text-sm leading-6">
-        <code>{code}</code>
+
+      <pre
+        dir="ltr"
+        className="p-3 overflow-auto text-sm leading-6"
+        style={{
+          whiteSpace: "pre", // CRITICAL: do not collapse newlines
+          tabSize: 2,
+        }}
+      >
+        <code
+          className="whitespace-pre"
+          style={{
+            whiteSpace: "pre", // CRITICAL: do not collapse newlines
+            display: "block",
+          }}
+        >
+          {code}
+        </code>
       </pre>
     </div>
   );

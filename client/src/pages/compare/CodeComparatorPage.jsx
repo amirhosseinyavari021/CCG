@@ -29,10 +29,6 @@ const LANGS = [
 const LS_CODE_A = "ccg_compare_code_a";
 const LS_CODE_B = "ccg_compare_code_b";
 
-function normalizeSpaces(s) {
-  return String(s || "").replace(/\s+/g, " ").trim();
-}
-
 function useDebouncedLocalStorage(key, value, delayMs = 250) {
   useEffect(() => {
     const t = setTimeout(() => {
@@ -49,27 +45,21 @@ function sniffLang(code) {
   const t = String(code || "");
   const s = t.slice(0, 8000);
 
-  // shebang
   if (/^\s*#!/.test(s) && /(bash|sh)/i.test(s)) return "bash";
   if (/^\s*#!/.test(s) && /python/i.test(s)) return "python";
   if (/^\s*#!/.test(s) && /(node|deno)/i.test(s)) return "javascript";
 
-  // strong JS/TS
   if (/\bimport\s+React\b|\bexport\s+default\b|\buseState\b/.test(s)) return "javascript";
   if (/\binterface\s+\w+|\btype\s+\w+\s*=|:\s*\w+(\[\])?;/.test(s)) return "typescript";
   if (/\bconst\b|\blet\b|\b=>\b|\bmodule\.exports\b|\brequire\(/.test(s)) return "javascript";
 
-  // python
   if (/\bdef\s+\w+\s*\(|\bfrom\s+\w+\s+import\b|\bprint\s*\(/.test(s)) return "python";
 
-  // json/yaml
   if (/^\s*[{[][\s\S]*[}\]]\s*$/.test(s) && /":\s*"/.test(s)) return "json";
   if (/^\s*---\s*$|^\s*\w+:\s+.+/m.test(s) && !/[;{}()]/.test(s)) return "yaml";
 
-  // sql
   if (/\bSELECT\b|\bINSERT\b|\bUPDATE\b|\bFROM\b|\bWHERE\b/i.test(s)) return "sql";
 
-  // go/java/c/cpp/csharp/rust
   if (/\bpackage\s+main\b|\bfmt\./.test(s)) return "go";
   if (/\bpublic\s+class\b|\bstatic\s+void\s+main\b/.test(s)) return "java";
   if (/#include\s+<\w+>|\bprintf\s*\(|\bint\s+main\s*\(/.test(s)) return "c";
@@ -77,7 +67,6 @@ function sniffLang(code) {
   if (/\busing\s+System;|\bnamespace\b|\bpublic\s+class\b/.test(s)) return "csharp";
   if (/\bfn\s+\w+\s*\(|\blet\s+mut\b|\buse\s+\w+::/.test(s)) return "rust";
 
-  // fallback: if it looks like JS but no strong tokens
   if (/[{}()[\];]/.test(s) && /function\s+\w+/.test(s)) return "javascript";
 
   return "";
@@ -144,8 +133,26 @@ export default function CodeComparatorPage() {
 
   const abortRef = useRef(null);
 
-  const inferredA = useMemo(() => (langA === "auto" ? sniffLang(codeA) : String(langA)), [langA, codeA]);
-  const inferredB = useMemo(() => (langB === "auto" ? sniffLang(codeB) : String(langB)), [langB, codeB]);
+  // always sniff, even if user chose a language (used for warnings + safe mode)
+  const detectedA = useMemo(() => sniffLang(codeA), [codeA]);
+  const detectedB = useMemo(() => sniffLang(codeB), [codeB]);
+
+  // inferred = what UI shows as "effective" language
+  const inferredA = useMemo(() => (langA === "auto" ? detectedA : String(langA)), [langA, detectedA]);
+  const inferredB = useMemo(() => (langB === "auto" ? detectedB : String(langB)), [langB, detectedB]);
+
+  // mismatch warnings (user selected explicit lang but sniff says otherwise)
+  const mismatchA = useMemo(() => {
+    if (langA === "auto") return false;
+    if (!detectedA) return false;
+    return String(langA) !== detectedA;
+  }, [langA, detectedA]);
+
+  const mismatchB = useMemo(() => {
+    if (langB === "auto") return false;
+    if (!detectedB) return false;
+    return String(langB) !== detectedB;
+  }, [langB, detectedB]);
 
   const sameLang = useMemo(() => {
     const a = String(inferredA || "").trim();
@@ -154,13 +161,20 @@ export default function CodeComparatorPage() {
     return a === b;
   }, [inferredA, inferredB]);
 
+  // ✅ Canonical output mode for comparator (frontend)
+  // safe default => advice if uncertain or mismatch detected
+  const effectiveCompareOutputMode = useMemo(() => {
+    if (mismatchA || mismatchB) return "advice";
+    return sameLang ? "merge" : "advice";
+  }, [sameLang, mismatchA, mismatchB]);
+
   const labels = useMemo(() => {
     const fa = lang === "fa";
     return {
       title: fa ? "🔍 مقایسه‌گر کد" : "🔍 Code Comparator",
       sub: fa
-        ? "کد A و B را وارد کن؛ Diff + تحلیل فنی + کد Merge نهایی می‌گیری."
-        : "Paste A & B; get Diff + technical analysis + final merged code.",
+        ? "کد A و B را وارد کن؛ حالت Merge (برای هم‌زبان) یا Advice (برای غیرهم‌زبان) می‌گیری."
+        : "Paste A & B; get Merge (same-language) or Advice (different-language).",
       codeA: fa ? "کد A" : "Code A",
       codeB: fa ? "کد B" : "Code B",
       language: fa ? "زبان" : "Language",
@@ -177,7 +191,12 @@ export default function CodeComparatorPage() {
       loading: fa ? "در حال پردازش..." : "Processing...",
       detectedA: fa ? "زبان تشخیص‌داده‌شده A" : "Detected language A",
       detectedB: fa ? "زبان تشخیص‌داده‌شده B" : "Detected language B",
-      diffHint: fa ? "برای Diff دقیق، زبان A و B یکی باشد (یا Auto درست تشخیص بدهد)." : "For accurate Diff, languages should match (or Auto should detect).",
+      diffHint: fa ? "Diff فقط وقتی فعال است که زبان A و B یکی باشد." : "Diff is enabled only when languages match.",
+      modeHintMerge: fa ? "حالت خروجی: Merge ✅" : "Output mode: Merge ✅",
+      modeHintAdvice: fa ? "حالت خروجی: Advice ✅" : "Output mode: Advice ✅",
+      mismatchWarn: fa
+        ? "⚠️ زبان انتخابی با تشخیص سیستم هم‌خوان نیست؛ برای جلوگیری از خروجی غلط، حالت Advice فعال شد."
+        : "⚠️ Selected language differs from detected language; Advice mode activated to prevent wrong output.",
       on: fa ? "فعال ✅" : "On ✅",
       off: fa ? "خاموش" : "Off",
     };
@@ -237,11 +256,13 @@ export default function CodeComparatorPage() {
       input_a: a,
       input_b: b,
 
-      // We keep these as hints only; backend comparator is fixed-structure
+      // user selection (hints)
       codeLangA: String(langA || "auto"),
       codeLangB: String(langB || "auto"),
 
-      // user_request removed intentionally
+      // ✅ canonical contract mode for backend + prompt + normalizer
+      compareOutputMode: effectiveCompareOutputMode,
+
       timestamp: new Date().toISOString(),
     };
 
@@ -269,7 +290,8 @@ export default function CodeComparatorPage() {
     }
   }
 
-  const diffEnabled = Boolean(showDiff && sameLang);
+  // Diff allowed ONLY in merge mode
+  const diffEnabled = Boolean(showDiff && effectiveCompareOutputMode === "merge" && sameLang);
 
   return (
     <div className={`space-y-4 md:space-y-6 ${dirClass}`}>
@@ -283,12 +305,25 @@ export default function CodeComparatorPage() {
 
               <div className="mt-2 text-[11px] text-gray-600 dark:text-gray-300 space-y-1">
                 <div>
-                  {labels.detectedA}: <b>{inferredA || "auto"}</b>
+                  {labels.detectedA}: <b>{detectedA || "unknown"}</b> — {lang === "fa" ? "انتخاب/موثر:" : "selected/effective:"}{" "}
+                  <b>{inferredA || "auto"}</b>
                 </div>
                 <div>
-                  {labels.detectedB}: <b>{inferredB || "auto"}</b>
+                  {labels.detectedB}: <b>{detectedB || "unknown"}</b> — {lang === "fa" ? "انتخاب/موثر:" : "selected/effective:"}{" "}
+                  <b>{inferredB || "auto"}</b>
                 </div>
-                {!sameLang ? <div className="opacity-90">{labels.diffHint}</div> : null}
+
+                {(mismatchA || mismatchB) ? (
+                  <div className="opacity-95">{labels.mismatchWarn}</div>
+                ) : null}
+
+                <div className="opacity-95">
+                  {effectiveCompareOutputMode === "merge" ? labels.modeHintMerge : labels.modeHintAdvice}
+                </div>
+
+                {effectiveCompareOutputMode !== "merge" ? (
+                  <div className="opacity-90">{labels.diffHint}</div>
+                ) : null}
               </div>
             </div>
 
@@ -430,20 +465,20 @@ export default function CodeComparatorPage() {
               className={`px-3 py-2 rounded-xl text-sm transition border border-gray-200/60 dark:border-white/10 ${
                 showDiff ? "bg-emerald-500 text-white hover:opacity-90" : "bg-white/70 dark:bg-white/[0.06]"
               }`}
-              title={!sameLang ? labels.diffHint : ""}
+              title={effectiveCompareOutputMode !== "merge" ? labels.diffHint : ""}
             >
               {showDiff ? labels.on : labels.off}
             </button>
           </div>
 
           <div className="mt-3 text-xs text-gray-600 dark:text-gray-300">
-            {sameLang
+            {effectiveCompareOutputMode === "merge"
               ? lang === "fa"
                 ? `Diff فعال است (زبان: ${inferredA || "auto"})`
                 : `Diff enabled (lang: ${inferredA || "auto"})`
               : lang === "fa"
-              ? "زبان‌ها متفاوت/نامشخص است؛ Diff ممکن است دقیق نباشد."
-              : "Languages differ/unknown; Diff may be less accurate."}
+              ? "حالت Advice فعال است؛ Diff نمایش داده نمی‌شود."
+              : "Advice mode active; Diff is hidden."}
           </div>
         </div>
       </div>
@@ -454,7 +489,7 @@ export default function CodeComparatorPage() {
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm font-semibold">Diff</div>
             <div className="text-[11px] opacity-70">
-              {sameLang ? inferredA || "" : lang === "fa" ? "زبان‌های متفاوت/نامشخص" : "Different/unknown"}
+              {effectiveCompareOutputMode === "merge" ? inferredA || "" : lang === "fa" ? "Advice Mode" : "Advice Mode"}
             </div>
           </div>
 
@@ -464,8 +499,8 @@ export default function CodeComparatorPage() {
             <div className="rounded-2xl border border-gray-200/60 dark:border-white/10 bg-white/60 dark:bg-white/[0.05] p-4 text-sm text-gray-700 dark:text-gray-200">
               {showDiff
                 ? lang === "fa"
-                  ? "Diff روشن است اما زبان‌ها یکی تشخیص داده نشد. زبان‌ها را دستی یکی کن یا کد را واضح‌تر وارد کن."
-                  : "Diff is ON but languages don't match. Set both languages to the same value or paste clearer code."
+                  ? "Diff فقط در حالت Merge فعال می‌شود (وقتی زبان‌ها یکی باشند)."
+                  : "Diff works only in Merge mode (when languages match)."
                 : lang === "fa"
                 ? "Diff خاموش است."
                 : "Diff is Off."}

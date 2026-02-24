@@ -145,7 +145,19 @@ router.post(/.*/, async (req, res) => {
     const codeLangA = s(body.codeLangA || "auto").toLowerCase().trim();
     const codeLangB = s(body.codeLangB || "auto").toLowerCase().trim();
     const modeStyle = s(body.modeStyle || "comparator").toLowerCase().trim();
-    const compareOutputMode = s(body.compareOutputMode || "").toLowerCase().trim();
+
+    // ✅ determine sameLang deterministically (do NOT trust UI)
+    const sameLang =
+      codeLangA &&
+      codeLangB &&
+      codeLangA !== "auto" &&
+      codeLangB !== "auto" &&
+      codeLangA === codeLangB;
+
+    // ✅ decide compareOutputMode server-side (hard rule)
+    const compareOutputMode =
+      s(body.compareOutputMode || "").toLowerCase().trim() ||
+      (sameLang ? "merge" : "advice");
 
     const ai = await runAI({
       requestId,
@@ -155,6 +167,7 @@ router.post(/.*/, async (req, res) => {
       input_b,
       codeLangA,
       codeLangB,
+      sameLang,
       modeStyle,
       compareOutputMode,
       temperature,
@@ -163,20 +176,34 @@ router.post(/.*/, async (req, res) => {
 
     let out = s(ai?.output || "");
 
+    // ✅ CRITICAL FIX:
+    // normalizeCompareMarkdown is async -> MUST await.
+    // Otherwise you return raw model output (inline one-liner) and waste time forever.
     try {
       if (typeof normalizeCompareMarkdown === "function") {
-        out = normalizeCompareMarkdown(out, {
+        out = await normalizeCompareMarkdown(out, {
           lang,
-          compareOutputMode: compareOutputMode || undefined,
-          mode: compareOutputMode || undefined,
+          // for normalizer: tell desired mode
+          compareOutputMode,
+          mode: compareOutputMode,
+
+          // help fence language selection
+          fenceLang: sameLang ? codeLangA : "txt",
+          codeLangA,
+          codeLangB,
+          sameLang,
         });
       }
-    } catch {}
+    } catch (e) {
+      console.warn("[ccgRoutes] normalizeCompareMarkdown failed:", e?.message || e);
+      // keep raw out if normalizer crashes
+    }
 
     if (!out.trim()) {
-      out = lang === "fa"
-        ? "## تفاوت‌های فنی\n\n- خروجی تولید نشد.\n"
-        : "## Technical Differences\n\n- No output.\n";
+      out =
+        lang === "fa"
+          ? "## تفاوت‌های فنی\n\n- خروجی تولید نشد.\n"
+          : "## Technical Differences\n\n- No output.\n";
     }
 
     return res.json({
@@ -189,9 +216,10 @@ router.post(/.*/, async (req, res) => {
       flags: {
         mode: "compare",
         modeStyle,
-        compareOutputMode: compareOutputMode || undefined,
+        compareOutputMode,
         codeLangA,
         codeLangB,
+        sameLang,
       },
     });
   } catch (e) {

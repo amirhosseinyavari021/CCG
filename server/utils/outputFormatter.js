@@ -229,19 +229,19 @@ function stripNoiseLines(md, { lang = "fa" } = {}) {
   const lines = s(md).replace(/\r\n/g, "\n").split("\n");
   const out = [];
 
-  // Lines that are UI labels / junk that should NEVER be inside markdown
   const isJunk = (line) => {
     const t = s(line).trim();
     if (!t) return false;
 
+    // UI labels leakage
     if (/^(CODE|Copy)$/i.test(t)) return true;
     if (fa && /^(کپی|کپي)$/u.test(t)) return true;
 
-    // Model sometimes prints language labels alone
-    if (/^(python|javascript|typescript|node|bash|zsh|sh|powershell|ps1|cmd|bat)$/i.test(t)) return true;
-    if (/^(c\#|csharp|c\+\+|cpp|java|go|rust|php|ruby|kotlin|swift|scala|dart)$/i.test(t)) return true;
+    // standalone language labels
+    if (/^(auto|python|javascript|typescript|node|bash|zsh|sh|powershell|ps1|cmd|bat)$/i.test(t)) return true;
+    if (/^(c\#|csharp|c\+\+|cpp|java|go|rust|php|ruby|kotlin|swift|scala|dart|txt)$/i.test(t)) return true;
 
-    // Very common "instruction leakage" words in fa/en
+    // prompt leakage
     if (fa && /(قرارکرد|قرارداد|مطابق.*قرارداد|سخت.?گیرانه)/u.test(t)) return true;
     if (!fa && /(contract|system prompt|strict contract|instructions)/i.test(t)) return true;
 
@@ -412,42 +412,351 @@ function enforceNoBlocks(md) {
   return t;
 }
 
-function looksLikeCode(line) {
-  const t = s(line);
-  if (!t.trim()) return false;
+function normalizeInlineFences(md) {
+  let t = s(md);
+  // ```python import x ...``` => ```python\nimport x ...\n```
+  t = t.replace(/```(\w+)([ \t]+)([^\n][\s\S]*?)```/g, (_full, lang, _sp, body) => {
+    const l = s(lang).trim();
+    const b = s(body).trim();
+    return "```" + (l || "") + "\n" + b + "\n```";
+  });
+  return t;
+}
 
-  // high-signal tokens across many languages
-  if (/[;{}]/.test(t)) return true;
-  if (/^\s*(using|namespace|class|public|private|static|void|int|string|var)\b/i.test(t)) return true; // C#/Java-ish
-  if (/^\s*(def|class|import|from|if\s+__name__)\b/i.test(t)) return true; // Python
-  if (/^\s*(function|const|let|var|import|export)\b/i.test(t)) return true; // JS/TS
-  if (/^\s*#include\b/.test(t)) return true; // C/C++
-  if (/^\s*(package|func)\b/i.test(t)) return true; // Go
-  if (/^\s*(fn|let|use|impl)\b/i.test(t)) return true; // Rust
-
-  // indentation with operators typical for code
-  if (/^\s{2,}\S/.test(t)) return true;
-
-  return false;
+function normalizeLangToken(lang) {
+  const l = String(lang || "").toLowerCase().trim();
+  const map = {
+    auto: "",
+    py: "python",
+    python3: "python",
+    js: "javascript",
+    node: "javascript",
+    ts: "typescript",
+    "c#": "csharp",
+    "c-sharp": "csharp",
+    cs: "csharp",
+    "c++": "cpp",
+    hpp: "cpp",
+    cc: "cpp",
+    sh: "bash",
+    shell: "bash",
+    zsh: "bash",
+    ps1: "powershell",
+    psm1: "powershell",
+    yml: "yaml",
+  };
+  return map[l] || l;
 }
 
 function chooseFenceLang(opts = {}) {
-  // prefer explicit opts, then detected language (passed from route), else "txt"
-  const c = s(opts.fenceLang || opts.detectedLang || opts.detectedLangA || opts.codeLangA || opts.codeLang || "").toLowerCase().trim();
+  const c = s(opts.fenceLang || opts.detectedLang || opts.detectedLangA || opts.codeLangA || opts.codeLang || "")
+    .toLowerCase()
+    .trim();
   if (!c) return "txt";
 
-  // normalize some common names
-  if (c === "csharp") return "csharp";
-  if (c === "cs") return "csharp";
+  if (c === "csharp" || c === "cs") return "csharp";
   if (c === "js") return "javascript";
   if (c === "ts") return "typescript";
   if (c === "py") return "python";
   if (c === "shell") return "bash";
+  if (c === "c++") return "cpp";
+  if (c === "auto") return "txt";
+  return c;
+}
+
+function sanitizeLeadingLangLabel(code, fenceLang) {
+  let c = s(code).replace(/\r/g, "").trim();
+  if (!c) return c;
+
+  const fl = normalizeLangToken(fenceLang);
+
+  const candidates = new Set([
+    fl,
+    "auto",
+    "python",
+    "javascript",
+    "typescript",
+    "java",
+    "go",
+    "rust",
+    "cpp",
+    "c",
+    "csharp",
+    "php",
+    "ruby",
+    "kotlin",
+    "swift",
+    "scala",
+    "dart",
+    "bash",
+    "powershell",
+    "sql",
+    "json",
+    "yaml",
+    "xml",
+    "html",
+    "css",
+    "txt",
+  ]);
+
+  const escaped = Array.from(candidates)
+    .filter(Boolean)
+    .map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
+
+  // "<lang> " OR "<lang>:" at start
+  const re = new RegExp(`^\\s*(?:${escaped})\\s*(?::)?\\s+`, "i");
+  c = c.replace(re, "").trim();
 
   return c;
 }
 
-function wrapMergeSectionIfMissingFence(md, { lang = "fa", fenceLang = "txt" } = {}) {
+/* ---------------------- formatters (optional deps) ---------------------- */
+
+async function tryPrettierFormat(code, fenceLang) {
+  const lang = normalizeLangToken(fenceLang);
+  let parser = "";
+
+  if (lang === "javascript") parser = "babel";
+  else if (lang === "typescript") parser = "typescript";
+  else if (lang === "json") parser = "json";
+  else if (lang === "yaml") parser = "yaml";
+  else return null;
+
+  try {
+    const prettier = await import("prettier");
+    const formatted = await prettier.format(s(code), { parser });
+    return s(formatted).trimEnd();
+  } catch {
+    return null;
+  }
+}
+
+async function trySqlFormat(code) {
+  try {
+    const mod = await import("sql-formatter");
+    const format = mod?.format || mod?.default?.format;
+    if (typeof format !== "function") return null;
+    return s(format(s(code), { language: "sql" })).trimEnd();
+  } catch {
+    return null;
+  }
+}
+
+function tryJsonFormat(code) {
+  const t = s(code).trim();
+  if (!t) return null;
+  try {
+    const obj = JSON.parse(t);
+    return JSON.stringify(obj, null, 2);
+  } catch {
+    return null;
+  }
+}
+
+/* ---------------------- fallback: brace-based pretty ---------------------- */
+
+function bracePretty(code) {
+  const src = s(code).replace(/\r/g, "").trim();
+  if (!src) return src;
+
+  const lines = src.split("\n").filter((x) => x.trim());
+  if (lines.length >= 6) return src;
+
+  let t = src.replace(/\s+/g, " ");
+
+  t = t.replace(/;/g, ";\n");
+  t = t.replace(/{/g, "{\n");
+  t = t.replace(/}/g, "\n}\n");
+
+  const out = [];
+  let indent = 0;
+  for (const raw of t.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+
+    if (line.startsWith("}")) indent = Math.max(0, indent - 1);
+    out.push("  ".repeat(indent) + line);
+    if (line.endsWith("{")) indent += 1;
+  }
+
+  const result = out.join("\n").trim();
+  return result.split("\n").length >= 4 ? result : src;
+}
+
+/* ---------------------- Python deterministic formatter (STRONGER) ---------------------- */
+
+/**
+ * هدف: اگر کد python "minified / one-line-ish" باشد، آن را multi-line + قابل اجرا کنیم.
+ * محدودیت: formatter کامل نیست، اما باید:
+ * - try/with/for/if/def/class و ... را multiline کند
+ * - indentation deterministic بدهد
+ * - حداقل برای خروجی‌های LLM که یک‌خطی می‌آیند، قابل کپی و اجرا شود
+ */
+function pythonForceMultiline(code) {
+  let t = s(code).replace(/\r/g, " ").trim();
+  if (!t) return t;
+
+  // unwrap whole-body inline ticks
+  if (/^`[\s\S]*`$/.test(t) && t.length >= 2) {
+    t = t.slice(1, -1).trim();
+  }
+
+  t = sanitizeLeadingLangLabel(t, "python");
+
+  // اگر همین الان multi-line و indent دارد، دست نزن (برای حفظ کیفیت)
+  const hasNewline = t.includes("\n");
+  const hasIndent = t.split("\n").some((x) => /^\s{2,}\S/.test(x));
+  if (hasNewline && hasIndent) return t.replace(/\n{3,}/g, "\n\n").trim();
+
+  // Normalize spaces
+  t = t.replace(/[ \t]+/g, " ").trim();
+
+  // 1) New line before major starters
+  const starters = [
+    "from __future__ import",
+    "from ",
+    "import ",
+    "class ",
+    "def ",
+    "if __name__ ==",
+    "try:",
+    "except ",
+    "finally:",
+    "with ",
+    "for ",
+    "while ",
+    "return ",
+    "raise ",
+    "break",
+    "continue",
+    "pass",
+  ];
+
+  for (const st of starters) {
+    const re = new RegExp(`\\s+(${st.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "g");
+    t = t.replace(re, "\n$1");
+  }
+
+  // 2) Split *real* block headers "X: <body>" into "X:\n<body>"
+  // Only for keywords that create blocks to avoid type hints like "path: Path | str"
+  t = t.replace(
+    /((?:def|class|if|elif|else|for|while|with|try|except|finally)\b[^\n]*?):\s+(?=\S)/g,
+    "$1:\n"
+  );
+
+  // 3) Also split chained blocks like "try:\nwith ...:\nfor ...:\n"
+  t = t.replace(/\n(try:)\s*(with\b)/g, "\n$1\n$2");
+  t = t.replace(/\n(with\b[^\n]*?):\s*(for\b)/g, "\n$1:\n$2");
+  t = t.replace(/\n(for\b[^\n]*?):\s*(if\b)/g, "\n$1:\n$2");
+  t = t.replace(/\n(except\b[^\n]*?):\s*(return\b|raise\b|pass\b|continue\b|break\b)/g, "\n$1:\n$2");
+
+  // 4) Turn "a b c d" long lines into multiple statements heuristically:
+  // we split before assignments and before common keywords when line is too long
+  const rawLines = t
+    .split("\n")
+    .map((x) => x.trim())
+    .filter(Boolean);
+
+  const lines2 = [];
+  for (const ln of rawLines) {
+    if (ln.length <= 120) {
+      lines2.push(ln);
+      continue;
+    }
+
+    // break before "name =" (simple)
+    let cur = ln;
+    // prevent infinite loops
+    for (let i = 0; i < 40; i++) {
+      const m = cur.match(/(.+?)(\s+[A-Za-z_]\w*\s*=\s+)([\s\S]+)/);
+      if (!m) break;
+      const left = m[1].trim();
+      const assign = (m[2] || "").trim();
+      const rest = (m[3] || "").trim();
+      if (left) lines2.push(left);
+      cur = (assign + rest).trim();
+      if (cur.length <= 120) break;
+    }
+    if (cur) lines2.push(cur);
+  }
+
+  // 5) Indent pass based on ":" blocks
+  const out = [];
+  let indent = 0;
+
+  const isDedentStarter = (line) => /^(elif\b|else:|except\b|finally:)/.test(line);
+  const isBlockStarter = (line) =>
+    /^(def\b|class\b|if\b|elif\b|else:|for\b|while\b|with\b|try:|except\b|finally:)/.test(line) && line.endsWith(":");
+
+  const isHardTopLevel = (line) => /^(def\b|class\b|if\s+__name__\b)/.test(line);
+
+  for (let i = 0; i < lines2.length; i++) {
+    let line = lines2[i].trim();
+    if (!line) continue;
+
+    // ensure block headers end with ":" when they should
+    if (/^(try|finally|else)\b/.test(line) && !line.endsWith(":")) line += ":";
+
+    if (isDedentStarter(line)) indent = Math.max(0, indent - 1);
+
+    out.push("    ".repeat(indent) + line);
+
+    if (isBlockStarter(line)) {
+      indent += 1;
+      continue;
+    }
+
+    const next = (lines2[i + 1] || "").trim();
+    if (isHardTopLevel(next)) indent = 0;
+  }
+
+  // 6) blank line after imports cluster
+  let lastImport = -1;
+  for (let i = 0; i < out.length; i++) {
+    if (/^\s*(from|import)\b/.test(out[i])) lastImport = i;
+  }
+  if (lastImport >= 0 && out[lastImport + 1] !== "") out.splice(lastImport + 1, 0, "");
+
+  // 7) Final cleanup: if still one-line-ish, do a very safe split on " ; " (rare in py) and on " ) " etc not safe
+  const result = out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+
+  // Guarantee multi-line if it looks minified
+  if (result.split("\n").filter(Boolean).length < 4 && result.length > 140) {
+    // last resort: split on " def ", " if ", " for ", " with ", " try:" to make copyable
+    return result
+      .replace(/\s+(def\s+)/g, "\n\n$1")
+      .replace(/\s+(if\s+__name__\s*==)/g, "\n\n$1")
+      .replace(/\s+(try:)/g, "\n$1")
+      .replace(/\s+(with\s+)/g, "\n$1")
+      .replace(/\s+(for\s+)/g, "\n$1")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+  return result;
+}
+
+/* ---------------------- detect minified-ish ---------------------- */
+
+function isMinifiedOrOneLine(code) {
+  const c = s(code).replace(/\r/g, "").trim();
+  if (!c) return false;
+  const lines = c.split("\n").map((x) => x.trim()).filter(Boolean);
+
+  if (lines.length === 1 && c.length >= 120) return true;
+
+  const longLines = lines.filter((x) => x.length >= 160).length;
+  const hasIndent = lines.some((x) => /^\s{2,}\S/.test(x));
+
+  if (lines.length <= 3 && (longLines >= 1 || c.length >= 260) && !hasIndent) return true;
+
+  return false;
+}
+
+/* ---------------------- FORCE fence from plain/inline merge code ---------------------- */
+
+function forceMergeFenceFromInline(md, { lang = "fa", fenceLang = "txt" } = {}) {
   const fa = lang !== "en";
   const hMerge = fa ? "## کد Merge نهایی" : "## Final Merged Code";
 
@@ -456,78 +765,189 @@ function wrapMergeSectionIfMissingFence(md, { lang = "fa", fenceLang = "txt" } =
   if (idx < 0) return t;
 
   const before = t.slice(0, idx + hMerge.length);
-  let after = t.slice(idx + hMerge.length);
+  const after0 = t.slice(idx + hMerge.length);
 
   // If there is already any fence after the heading, do nothing.
-  if (/```/.test(after)) return t;
+  if (/```/.test(after0)) return t;
+
+  const after = after0.replace(/^\s*\n+/, "");
+  if (!after.trim()) return t;
 
   // Collect merge body lines (until next "## " heading, if any)
-  const lines = after.replace(/^\s*\n+/, "").split("\n");
+  const lines = after.split("\n");
   const bodyLines = [];
   let restLines = [];
-  let hitNextHeading = false;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (/^\s*##\s+/.test(line)) {
-      hitNextHeading = true;
       restLines = lines.slice(i);
       break;
     }
     bodyLines.push(line);
   }
-  if (!hitNextHeading) restLines = [];
 
-  // Clean body from junk empty headers
-  const cleaned = bodyLines
-    .map((x) => s(x).replace(/\r/g, ""))
-    .filter((x) => !/^\s*(CODE|Copy|کپی|کپي)\s*$/i.test(s(x).trim()))
-    .filter((x) => !/^\s*(python|javascript|typescript|c\#|csharp|java|go|rust|cpp|c\+\+)\s*$/i.test(s(x).trim()));
+  let body = bodyLines.join("\n").trim();
+  if (!body) return t;
 
-  const hasAny = cleaned.some((x) => s(x).trim());
-  if (!hasAny) {
-    const msg = fa ? "کد نهایی ارائه نشد." : "Final code not provided.";
-    const rebuilt = "\n\n```txt\n" + msg + "\n```\n" + restLines.join("\n");
-    return before + rebuilt;
+  // unwrap whole-body inline backticks
+  if (/^`[\s\S]*`$/.test(body) && body.length >= 2) {
+    body = body.slice(1, -1).trim();
   }
 
-  // Wrap only if it looks like code OR if it's multi-line content (better UX)
-  const codey = cleaned.some((x) => looksLikeCode(x));
-  const multiline = cleaned.filter((x) => s(x).trim()).length >= 2;
-
-  if (!codey && !multiline) {
-    // keep as text, but STILL wrap to guarantee Copy UX (your requirement)
-    // (this avoids the UI not providing copy)
-  }
+  body = sanitizeLeadingLangLabel(body, fenceLang);
+  if (!body.trim()) return t;
 
   const fenced =
     "\n\n```" +
-    fenceLang +
+    (fenceLang || "txt") +
     "\n" +
-    cleaned.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() +
+    body.trimEnd() +
     "\n```\n" +
     (restLines.length ? restLines.join("\n") : "");
 
   return before + fenced;
 }
 
-function enforceMergeRules(md, opts = {}) {
+function forceInlineBacktickMergeToFence(md, opts = {}) {
+  const lang = s(opts.lang || "fa").toLowerCase() === "en" ? "en" : "fa";
+  const fa = lang !== "en";
+  const hMerge = fa ? "## کد Merge نهایی" : "## Final Merged Code";
+  const fenceLang = chooseFenceLang(opts) || "txt";
+
+  let t = s(md || "");
+  const idx = t.indexOf(hMerge);
+  if (idx < 0) return t;
+
+  const before = t.slice(0, idx + hMerge.length);
+  const after0 = t.slice(idx + hMerge.length);
+
+  if (/```/.test(after0)) return t;
+
+  const after = after0.replace(/^\s*\n+/, "");
+  if (!after.trim()) return t;
+
+  const lines = after.split("\n");
+
+  const bodyLines = [];
+  let restLines = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\s*##\s+/.test(lines[i])) {
+      restLines = lines.slice(i);
+      break;
+    }
+    bodyLines.push(lines[i]);
+  }
+
+  let body = bodyLines.join("\n").trim();
+  if (!body) return t;
+
+  if (!(body.startsWith("`") && body.endsWith("`") && body.length >= 2)) return t;
+
+  body = body.slice(1, -1).trim();
+  body = sanitizeLeadingLangLabel(body, fenceLang);
+
+  const normLang = normalizeLangToken(fenceLang);
+  if (normLang === "python") {
+    body = pythonForceMultiline(body);
+  } else if (isMinifiedOrOneLine(body)) {
+    body = bracePretty(body);
+  }
+
+  const fenced = `\n\n\`\`\`${fenceLang}\n${s(body).trimEnd()}\n\`\`\`\n`;
+  return before + fenced + (restLines.length ? restLines.join("\n") : "");
+}
+
+/* ---------------------- merge fence prettifier (all langs) ---------------------- */
+
+/**
+ * IMPORTANT:
+ * We only prettify the FIRST fenced block that exists AFTER merge rules have been applied,
+ * which (by design) is the merge final code fence.
+ */
+async function prettifyMergedFence(md, { fenceLang = "txt" } = {}) {
+  const lang = normalizeLangToken(fenceLang);
+
+  // only first fenced block (after enforceMergeRulesSyncPart, this is merge fence)
+  const match = s(md).match(/```([^\n]*)\n([\s\S]*?)```/m);
+  if (!match) return md;
+
+  const full = match[0];
+  const fenceHeader = s(match[1]).trim() || lang || "txt";
+  let inner = s(match[2]).trimEnd();
+
+  inner = sanitizeLeadingLangLabel(inner, lang);
+
+  // ✅ PYTHON: ALWAYS enforce multiline if code looks minified OR if it contains block-ish keywords
+  if (lang === "python") {
+    const triggers =
+      isMinifiedOrOneLine(inner) ||
+      /\b(def|class|try:|except\b|with\b|for\b|while\b|if\s+__name__\b)\b/.test(inner) ||
+      inner.startsWith("from ") ||
+      inner.startsWith("import ");
+
+    if (triggers) {
+      const py = pythonForceMultiline(inner);
+      const replaced = "```" + (fenceHeader || "python") + "\n" + s(py).trimEnd() + "\n```";
+      return s(md).replace(full, replaced);
+    }
+  }
+
+  let formatted = inner;
+
+  // Non-python: prettify if minified
+  if (isMinifiedOrOneLine(inner)) {
+    if (lang === "json") {
+      const jf = tryJsonFormat(inner);
+      if (jf) formatted = jf;
+    }
+
+    if (formatted === inner) {
+      const p = await tryPrettierFormat(inner, lang);
+      if (p) formatted = p;
+    }
+
+    if (formatted === inner && lang === "sql") {
+      const sf = await trySqlFormat(inner);
+      if (sf) formatted = sf;
+    }
+
+    if (formatted === inner) {
+      formatted = bracePretty(inner);
+    }
+  }
+
+  if (isMinifiedOrOneLine(formatted)) {
+    formatted = bracePretty(formatted);
+  }
+
+  const replaced = "```" + fenceHeader + "\n" + s(formatted).trimEnd() + "\n```";
+  return s(md).replace(full, replaced);
+}
+
+/* ---------------------- merge rules (keep exactly one fence) ---------------------- */
+
+function enforceMergeRulesSyncPart(md, opts = {}) {
   const lang = s(opts.lang || "fa").toLowerCase() === "en" ? "en" : "fa";
   const fa = lang !== "en";
   const hMerge = fa ? "## کد Merge نهایی" : "## Final Merged Code";
 
   let t = s(md);
-
-  // First: ensure merge section ALWAYS ends up with exactly one fenced block
   const fenceLang = chooseFenceLang(opts);
-  t = wrapMergeSectionIfMissingFence(t, { lang, fenceLang });
+
+  t = normalizeInlineFences(t);
+
+  // 1) If merge has plain/inline, force it into a fence
+  t = forceMergeFenceFromInline(t, { lang, fenceLang });
+
+  // 2) Guarantee: if still inline-backtick, force to fence
+  t = forceInlineBacktickMergeToFence(t, { ...opts, lang });
 
   const idx = t.indexOf(hMerge);
   if (idx < 0) {
-    // if for some reason merge heading missing, just sanitize
     t = stripFencesToInline(t);
     t = stripIndentedBlocks(t);
-    return t;
+    return { text: t, fenceLang };
   }
 
   let before = t.slice(0, idx);
@@ -554,28 +974,44 @@ function enforceMergeRules(md, opts = {}) {
     return toInlineCode(firstLine);
   });
 
-  after = after.replace(/```([^`]+)```/g, (_, inner) => toInlineCode(inner));
+  after = after.replace(/```([^`]+)```/g, (_m, inner2) => toInlineCode(inner2));
   after = stripIndentedBlocks(after);
+  after = normalizeInlineFences(after);
 
-  return (before + after).trim();
+  return { text: (before + after).trim(), fenceLang };
 }
 
-export function normalizeCompareMarkdown(md, opts = {}) {
+async function enforceMergeRules(md, opts = {}) {
+  const { text, fenceLang } = enforceMergeRulesSyncPart(md, opts);
+  return await prettifyMergedFence(text, { fenceLang });
+}
+
+/* ---------------------- FINAL normalizer ---------------------- */
+
+export async function normalizeCompareMarkdown(md, opts = {}) {
   const lang = s(opts.lang || "fa").toLowerCase() === "en" ? "en" : "fa";
   const mode = s(opts.mode || opts.compareOutputMode || "merge").toLowerCase() === "advice" ? "advice" : "merge";
 
   let t = s(md || "");
   t = stripNoiseLines(t, { lang });
-
   t = ensureHeadings(t, { lang, mode });
 
   if (mode === "advice") {
-    // absolutely no code blocks anywhere
     t = enforceNoBlocks(t);
-  } else {
-    // merge: allow exactly one fenced block under final heading only
-    t = enforceMergeRules(t, { ...opts, lang });
+    t = collapseExtraBlankLines(t).trim() + "\n";
+    return t;
   }
+
+  // merge: allow exactly one fenced block under final heading only
+  t = await enforceMergeRules(t, { ...opts, lang });
+
+  // ✅ FINAL GUARANTEE: if still inline-backtick, force to fence
+  t = forceInlineBacktickMergeToFence(t, { ...opts, lang });
+
+  // ✅ HARD STRIP for "auto " leakage
+  t = t.replace(/```([^\n]*)\n[ \t]*auto[ \t]+/gi, "```$1\n");
+  t = t.replace(/`[ \t]*auto[ \t]+/gi, "`");
+  t = t.replace(/(##\s+(?:کد\s+Merge\s+نهایی|Final\s+Merged\s+Code)\s*\n\s*\n)[ \t]*auto[ \t]+/gi, "$1");
 
   t = collapseExtraBlankLines(t).trim() + "\n";
   return t;
