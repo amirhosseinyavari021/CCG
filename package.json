@@ -15,7 +15,8 @@
         "pkg:linux": "cd cli && npm install && pkg . --targets latest-linux-x64 --output ../dist/ccg-linux",
         "pkg:win": "cd cli && npm install && pkg . --targets latest-win-x64 --output ../dist/ccg-win.exe",
         "pkg:macos": "cd cli && npm install && pkg . --targets latest-macos-x64 --output ../dist/ccg-macos",
-        "release": "npm run build && npm run pkg:linux && npm run pkg:win && npm run pkg:macos"
+        "release": "npm run build && npm run pkg:linux && npm run pkg:win && npm run pkg:macos",
+        "check:conflicts": "bash scripts/check-conflicts.sh"
     },
     "engines": {
         "node": ">=20.x"
