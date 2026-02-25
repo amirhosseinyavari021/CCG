@@ -216,6 +216,16 @@ function extractWarningLikeLines(md) {
   return [...new Set(out)];
 }
 
+function isWarningTextLine(line) {
+  const t = String(line || "").toLowerCase().trim();
+  if (!t) return false;
+  return (
+    /⚠|warning|warnings|هشدار|هشدارها|احتیاط|خطر/.test(t) ||
+    /before (run|running|execute|execution)/.test(t) ||
+    /قبل\s+از\s+(اجرا|استفاده|ریستارت|خاموش)/.test(t)
+  );
+}
+
 function coerceCommandItem(x) {
   if (typeof x === "string") return x.trim();
   if (x && typeof x === "object") {
@@ -338,11 +348,24 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode) {
     explanation = filterChitChat(extractLabelLines(md, ["explanation", "details", "توضیح", "توضیحات", "شرح"]));
   }
 
+  // اگر مدل هشدار را داخل توضیحات ریخته بود، جدا کن تا کارت هشدار حتماً نمایش داده شود
+  if (explanation.length) {
+    const movedToWarnings = explanation.filter((x) => isWarningTextLine(x));
+    const keptExplanation = explanation.filter((x) => !isWarningTextLine(x));
+    if (movedToWarnings.length) {
+      warnings = [...warnings, ...movedToWarnings];
+      explanation = keptExplanation;
+    }
+  }
+
   // اگر exp/warn متن داشت ولی bullet نشد
   if (!explanation.length && expRaw.trim()) explanation.push(expRaw.trim());
   if (!warnings.length && warnRaw.trim()) warnings.push(warnRaw.trim());
 
   alts = [...new Set(alts.map((x) => String(x || "").trim()).filter(Boolean))].filter((x) => x !== primary);
+  warnings = [...new Set(warnings.map((x) => String(x || "").trim()).filter(Boolean))];
+  explanation = [...new Set(explanation.map((x) => String(x || "").trim()).filter(Boolean))];
+  notes = [...new Set(notes.map((x) => String(x || "").trim()).filter(Boolean))];
 
   // اگر outputMode == script و primary چند خطه/کد است، ok.
   // UI ToolResult خودش تفکیک می‌کند.
