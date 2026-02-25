@@ -13,6 +13,22 @@ function asText(x) {
   }
 }
 
+function toLines(value) {
+  if (value === null || value === undefined) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((v) => asText(v).trim())
+      .filter(Boolean)
+      .flatMap((v) => v.split("\n").map((l) => l.trim()).filter(Boolean));
+  }
+  const t = asText(value).trim();
+  if (!t || t === "[]") return [];
+  return t
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+}
+
 function pickAltCommand(alt) {
   if (!alt) return "";
   if (typeof alt === "string") return alt;
@@ -88,7 +104,7 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
 
   const normalized = useMemo(() => {
     const t = tool || {};
-    const primary = t.primary || t.primaryCommand || t.command || null;
+    const primary = t.primary || t.primaryCommand || t.primary_command || t.command || null;
 
     const primaryCommand =
       typeof primary === "string"
@@ -98,19 +114,36 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
     const primaryLang =
       (typeof primary === "object" ? primary?.lang : null) || t.primaryLang || t.lang || "";
 
-    const explanations = t.explanations || t.explanation || t.description || "";
-    const warnings = Array.isArray(t.warnings) ? t.warnings : t.warnings ? [t.warnings] : [];
-    const alternatives = Array.isArray(t.alternatives) ? t.alternatives : [];
-    const script = t.script || t.pythonScript || "";
+    const explanations = toLines(t.explanations || t.explanation || t.description || "");
+    const warnings = toLines(t.warnings);
+    const notes = toLines(t.notes || t.moreDetails || "");
+
+    const alternatives = Array.isArray(t.alternatives)
+      ? t.alternatives
+      : Array.isArray(t.moreCommands)
+        ? t.moreCommands
+        : [];
+
+    const script =
+      asText(t.script || t.python_script || "").trim() ||
+      (typeof t.pythonScript === "string" ? t.pythonScript.trim() : "");
+
+    const isScriptLike =
+      Boolean(script) ||
+      Boolean(t.python_script) ||
+      Boolean(t.isScript) ||
+      (typeof primaryCommand === "string" && primaryCommand.includes("\n") && !alternatives.length);
 
     return {
       title: t.title || (uiLang === "fa" ? "نتیجه" : "Result"),
       primaryCommand,
       primaryLang,
-      explanations: asText(explanations).trim(),
-      warnings: warnings.map((w) => asText(w).trim()).filter(Boolean),
+      explanations,
+      warnings,
+      notes,
       alternatives,
-      script: asText(script).trim(),
+      script,
+      isScriptLike,
     };
   }, [tool, uiLang]);
 
@@ -125,7 +158,7 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
   return (
     <div className="space-y-4" dir={dir}>
       {/* Primary command */}
-      {normalized.primaryCommand ? (
+      {normalized.primaryCommand && !normalized.isScriptLike ? (
         <CodeCard
           title={uiLang === "fa" ? "کامند اصلی" : "Primary Command"}
           lang={normalized.primaryLang || "bash"}
@@ -135,10 +168,20 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
         />
       ) : null}
 
+      {/* Script (if any) */}
+      {(normalized.script || normalized.isScriptLike) ? (
+        <CodeCard
+          title={uiLang === "fa" ? "اسکریپت" : "Script"}
+          lang={normalized.primaryLang || "bash"}
+          code={normalized.script || normalized.primaryCommand}
+          dir="ltr"
+        />
+      ) : null}
+
       {/* Explanations */}
-      {normalized.explanations ? (
+      {normalized.explanations.length ? (
         <MdCard title={uiLang === "fa" ? "توضیحات" : "Explanation"} icon="🧾">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{normalized.explanations}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{normalized.explanations.join("\n")}</ReactMarkdown>
         </MdCard>
       ) : null}
 
@@ -149,6 +192,19 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
             {normalized.warnings.map((w, i) => (
               <li key={i}>
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{w}</ReactMarkdown>
+              </li>
+            ))}
+          </ul>
+        </MdCard>
+      ) : null}
+
+      {/* Notes */}
+      {normalized.notes.length ? (
+        <MdCard title={uiLang === "fa" ? "نکات" : "Notes"} icon="📌">
+          <ul>
+            {normalized.notes.map((n, i) => (
+              <li key={i}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{n}</ReactMarkdown>
               </li>
             ))}
           </ul>
@@ -177,15 +233,6 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
         </div>
       ) : null}
 
-      {/* Script (if any) */}
-      {normalized.script ? (
-        <CodeCard
-          title={uiLang === "fa" ? "اسکریپت" : "Script"}
-          lang="python"
-          code={normalized.script}
-          dir="ltr"
-        />
-      ) : null}
     </div>
   );
 }
