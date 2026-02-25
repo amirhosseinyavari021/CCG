@@ -70,16 +70,29 @@ function extractSection(md, titles) {
   if (!text.trim()) return "";
 
   const lines = text.split("\n");
+  const normalizeHeading = (s) =>
+    String(s || "")
+      .toLowerCase()
+      .replace(/^#{1,6}\s+/, "")
+      .replace(/[*_`~]/g, "")
+      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "")
+      .replace(/[:：]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const titleSet = new Set((titles || []).map((x) => normalizeHeading(x)).filter(Boolean));
   const headingIdx = lines.findIndex((l) => {
-    const t = l.trim().toLowerCase();
-    return titles.some((x) => t === `### ${String(x).trim().toLowerCase()}`);
+    const t = l.trim();
+    if (!/^#{1,6}\s+/.test(t)) return false;
+    const h = normalizeHeading(t);
+    return titleSet.has(h);
   });
   if (headingIdx === -1) return "";
 
   const out = [];
   for (let i = headingIdx + 1; i < lines.length; i++) {
     const l = lines[i];
-    if (l.trim().startsWith("### ")) break;
+    if (/^#{1,6}\s+/.test(l.trim())) break;
     out.push(l);
   }
   return out.join("\n").trim();
@@ -173,7 +186,11 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode) {
 
   // ---------- Command / Script ----------
   const commandsArr = Array.isArray(res?.commands) ? res.commands : [];
-  const moreArr = Array.isArray(res?.moreCommands) ? res.moreCommands : [];
+  const moreArr = Array.isArray(res?.moreCommands)
+    ? res.moreCommands
+    : Array.isArray(res?.alternatives)
+      ? res.alternatives
+      : [];
 
   let primary = commandsArr.length ? coerceCommandItem(commandsArr[0]) : "";
   let alts = moreArr.map(coerceCommandItem).filter(Boolean);
@@ -185,11 +202,12 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode) {
   }
 
   // توضیح/هشدار/توضیحات بیشتر از headingها
-  const expRaw = extractSection(md, ["Explanation", "توضیح"]) || "";
-  const warnRaw = extractSection(md, ["Warning", "Warnings", "هشدار", "هشدارها"]) || "";
+  const expRaw = extractSection(md, ["Explanation", "توضیح", "توضیحات", "شرح"]) || String(res?.explanation || "");
+  const warnRaw = extractSection(md, ["Warning", "Warnings", "هشدار", "هشدارها"]) || String(res?.warnings || "");
   const notesRaw =
-    extractSection(md, ["More Details", "توضیحات بیشتر", "📌 More Details", "📌 توضیحات بیشتر"]) ||
-    extractSection(md, ["Notes", "توضیحات"]) ||
+    extractSection(md, ["More Details", "توضیحات بیشتر", "📌 More Details", "📌 توضیحات بیشتر", "Details", "جزئیات بیشتر"]) ||
+    extractSection(md, ["Notes", "توضیحات", "نکات"]) ||
+    String(res?.notes || "") ||
     "";
 
   const explanation = filterChitChat(toBullets(expRaw));
