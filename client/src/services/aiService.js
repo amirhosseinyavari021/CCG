@@ -51,7 +51,30 @@ async function fetchJSON(url, { method = "GET", body, timeoutMs = 60_000, signal
 ========================= */
 
 export async function callCCG(payload, opts = {}) {
-  return fetchJSON(withBase("/api/ccg"), { method: "POST", body: payload, timeoutMs: opts.timeoutMs || 60_000, signal: opts.signal });
+  const data = await fetchJSON(withBase("/api/ccg"), {
+    method: "POST",
+    body: payload,
+    timeoutMs: opts.timeoutMs || 60_000,
+    signal: opts.signal,
+  });
+
+  // ✅ FIX: بعضی وقت‌ها بک‌اند با 200 جواب می‌دهد ولی ok:false می‌فرستد.
+  // این حالت قبلاً “بی‌صدا” باعث خروجی خالی می‌شد. الان تبدیلش می‌کنیم به Error.
+  if (data && typeof data === "object" && data.ok === false) {
+    const msg =
+      data?.error?.userMessage ||
+      data?.error?.message ||
+      (typeof data?.error === "string" ? data.error : "") ||
+      data?.message ||
+      "CCG_FAILED";
+
+    const e = new Error(msg);
+    e.status = Number(data?.status || 500) || 500;
+    e.data = data;
+    throw e;
+  }
+
+  return data;
 }
 
 /* =========================

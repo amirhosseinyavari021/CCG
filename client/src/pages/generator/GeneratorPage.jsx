@@ -64,13 +64,6 @@ function cliOptionsForPlatform(platform) {
   return ["bash", "zsh", "sh", "fish"];
 }
 
-function scriptCliForPlatform(platform) {
-  if (platform === "windows") return "powershell";
-  if (platform === "mac") return "zsh";
-  if (platform === "network") return "network";
-  return "bash";
-}
-
 /** --------- markdown helpers --------- */
 function extractSection(md, titles) {
   const text = String(md || "");
@@ -167,10 +160,7 @@ function clamp(n, a, b) {
 }
 
 /** --------- Client-side Precheck (anti token-waste) --------- */
-const PRECHECK = {
-  minChars: 8,
-  minWords: 2,
-};
+const PRECHECK = { minChars: 8, minWords: 2 };
 
 function normalizeSpaces(s) {
   return String(s || "").replace(/\s+/g, " ").trim();
@@ -185,7 +175,6 @@ function countWords(s) {
 function isMostlyPunctOrEmoji(s) {
   const t = String(s || "").trim();
   if (!t) return true;
-  // keep letters/digits from many languages
   const keep = t.replace(/[^\p{L}\p{N}]+/gu, "");
   return keep.length === 0;
 }
@@ -193,21 +182,13 @@ function isMostlyPunctOrEmoji(s) {
 function isRepeatedCharGibberish(s) {
   const t = normalizeSpaces(s);
   if (!t) return true;
-  // detect long runs like "aaaaaa" or "؟؟؟؟؟؟" or "111111"
   const compact = t.replace(/\s+/g, "");
   if (compact.length < 8) return false;
   return /(.)\1{5,}/u.test(compact);
 }
 
 function buildClientInputError({ lang, code, message, hint, fields }) {
-  return {
-    code,
-    message,
-    hint,
-    fields: fields || null,
-    source: "client",
-    lang,
-  };
+  return { code, message, hint, fields: fields || null, source: "client", lang };
 }
 
 function precheckUserRequest(raw, lang) {
@@ -280,7 +261,6 @@ function precheckUserRequest(raw, lang) {
 }
 
 function formatApiErrorForUI(err, lang) {
-  // err from aiService includes: name, message, status, data
   const isAbort = err?.name === "AbortError" || /aborted|abort/i.test(String(err?.message || ""));
   if (isAbort) {
     return {
@@ -295,7 +275,6 @@ function formatApiErrorForUI(err, lang) {
   const status = Number(err?.status || err?.response?.status || 0) || 0;
   const data = err?.data;
 
-  // If backend returns structured error
   const apiErr = data && typeof data === "object" ? data.error || data.err || null : null;
   if (apiErr && typeof apiErr === "object") {
     return {
@@ -308,7 +287,6 @@ function formatApiErrorForUI(err, lang) {
     };
   }
 
-  // Common status mapping
   if (status === 400) {
     return {
       code: "BAD_REQUEST",
@@ -328,8 +306,8 @@ function formatApiErrorForUI(err, lang) {
       message: lang === "fa" ? "⏳ تعداد درخواست‌ها زیاد است" : "⏳ Too many requests",
       hint:
         lang === "fa"
-          ? "کمی صبر کن و دوباره تلاش کن. (بعداً اینجا پیشنهاد ارتقا پلن هم می‌آید.)"
-          : "Please wait and try again. (Upgrade CTA can be added here later.)",
+          ? "کمی صبر کن و دوباره تلاش کن."
+          : "Please wait and try again.",
       source: "api",
       status,
     };
@@ -359,6 +337,8 @@ function formatApiErrorForUI(err, lang) {
 
 export default function GeneratorPage() {
   const { lang } = useLanguage();
+  const isRTL = lang === "fa";
+  const dirClass = isRTL ? "rtl" : "ltr";
 
   const [platform, setPlatform] = usePersistState("platform", "linux");
   const [otherOS, setOtherOS] = usePersistState("other_os", "freebsd");
@@ -376,8 +356,6 @@ export default function GeneratorPage() {
   const [output, setOutput] = useState("");
   const [tool, setTool] = useState(null);
   const [loading, setLoading] = useState(false);
-
-  // ✅ error is now an object (but backward compatible)
   const [error, setError] = useState(null);
 
   const [showAdvanced, setShowAdvanced] = usePersistState("show_advanced", false);
@@ -436,10 +414,16 @@ export default function GeneratorPage() {
     setError(null);
   };
 
-  function computeCliForPayload({ platform, outputMode, cli }) {
+  function computeCliForPayload({ outputMode, cli }) {
     if (outputMode === "python") return "python";
-    if (outputMode === "script") return scriptCliForPlatform(platform);
-    return String(cli || defaultCliForPlatform(platform)).toLowerCase();
+    return String(cli || "bash").toLowerCase();
+  }
+
+  function mapOutputType(mode) {
+    // server expects outputType in {tool, command, python}
+    if (mode === "python") return "python";
+    if (mode === "command") return "command";
+    return "tool"; // script mode -> tool (structured output) but cli reflects chosen shell
   }
 
   function pickNetworkOsType(s) {
@@ -452,20 +436,16 @@ export default function GeneratorPage() {
   }
 
   async function generate() {
-    // ✅ Precheck (no token waste)
     const preErr = precheckUserRequest(input, lang);
     if (preErr) {
       setError(preErr);
       return;
     }
 
-    // cancel in-flight
     if (abortRef.current) {
       try {
         abortRef.current.abort();
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
 
     const controller = new AbortController();
@@ -474,7 +454,7 @@ export default function GeneratorPage() {
     setLoading(true);
     setError(null);
 
-    const baseCli = computeCliForPayload({ platform, outputMode, cli });
+    const baseCli = computeCliForPayload({ outputMode, cli });
 
     const netOsType = platform === "network" ? pickNetworkOsType(advancedSettings) : "";
     const netOsVersion = platform === "network" ? pickNetworkOsVersion(advancedSettings) : "";
@@ -483,12 +463,17 @@ export default function GeneratorPage() {
       mode: "generate",
       modeStyle: "generator",
       lang,
+
       platform: finalPlatform,
       cli: baseCli,
+
+      // IMPORTANT: also send outputType in canonical form
+      outputType: mapOutputType(outputMode),
 
       moreDetails: Boolean(moreDetails),
       moreCommands: outputMode === "command" ? Boolean(moreCommands) : false,
 
+      // keep compatibility with previous backend logic too
       pythonScript: outputMode === "python",
 
       vendor: platform === "network" ? netVendor : undefined,
@@ -509,6 +494,7 @@ export default function GeneratorPage() {
     try {
       const result = await callCCG(payload, { signal: controller.signal });
 
+      // If backend returned ok:false but still 200, aiService patch will throw.
       const markdown = String(result?.markdown || result?.output || result?.result || "").trim();
       setOutput(markdown);
 
@@ -516,6 +502,8 @@ export default function GeneratorPage() {
       setTool(built);
     } catch (err) {
       setError(formatApiErrorForUI(err, lang));
+      setOutput("");
+      setTool(null);
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
       setLoading(false);
@@ -526,9 +514,7 @@ export default function GeneratorPage() {
     if (!abortRef.current) return;
     try {
       abortRef.current.abort();
-    } catch {
-      // ignore
-    }
+    } catch {}
   }
 
   const outputModes = useMemo(() => {
@@ -542,7 +528,7 @@ export default function GeneratorPage() {
       {
         value: "script",
         label: lang === "fa" ? "اسکریپت سیستم‌عامل" : "OS Script",
-        sub: lang === "fa" ? "بر اساس پلتفرم انتخابی" : "Matches selected platform",
+        sub: lang === "fa" ? "اسکریپت با شل انتخابی" : "Script with chosen shell",
         icon: "📄",
       },
       {
@@ -632,8 +618,6 @@ export default function GeneratorPage() {
     </div>
   );
 
-  const dirClass = lang === "fa" ? "rtl" : "ltr";
-
   const panelClass =
     "ccg-card ccg-glass p-4 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm ring-1 ring-black/5 dark:ring-white/10";
   const subCardClass =
@@ -642,13 +626,117 @@ export default function GeneratorPage() {
     "ccg-card ccg-glass-soft p-3 rounded-2xl border border-gray-200/60 dark:border-white/10 shadow-sm text-left transition";
   const knobActive = "ccg-knob-active ring-2 ring-blue-500/20 dark:ring-blue-400/20";
 
-  // ✅ normalize error for display (string or object)
   const errObj =
     error && typeof error === "object"
       ? error
       : error
       ? { code: "ERROR", message: String(error), hint: "", source: "client" }
       : null;
+
+  // ---- panes (DOM order will swap for RTL) ----
+  const inputPane = (
+    <div className="ccg-card ccg-glass p-4 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm ring-1 ring-black/5 dark:ring-white/10">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+        <h2 className="font-bold text-base">{lang === "fa" ? "📝 درخواست شما" : "📝 Your Request"}</h2>
+        <button
+          onClick={clearAll}
+          className="px-2 py-1 text-xs bg-gray-100/70 dark:bg-black/30 rounded-xl hover:opacity-90 transition border border-gray-200/60 dark:border-white/10"
+          type="button"
+        >
+          🗑️ {lang === "fa" ? "پاک کردن" : "Clear"}
+        </button>
+      </div>
+
+      <textarea
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        placeholder={lang === "fa" ? "مثال: میخوام سیستمم ۱ ساعت دیگه خاموش بشه" : "Example: Shutdown the system in 1 hour"}
+        className="w-full h-44 p-3 text-sm border border-gray-300/70 dark:border-white/10 rounded-xl resize-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white/70 dark:bg-black/30"
+        rows={4}
+      />
+
+      {errObj && (
+        <div className="mt-3 rounded-xl border border-rose-200/70 bg-rose-50/80 p-3 text-rose-800 dark:border-rose-700/40 dark:bg-rose-900/20 dark:text-rose-200 animate-fadeIn">
+          <div className="text-xs font-semibold">
+            {errObj.message}
+            {errObj.code ? <span className="ml-2 opacity-70">({errObj.code})</span> : null}
+          </div>
+          {errObj.hint ? <div className="mt-1 text-xs opacity-95">💡 {errObj.hint}</div> : null}
+        </div>
+      )}
+
+      <button
+        onClick={loading ? cancelGenerate : generate}
+        disabled={!loading && !String(input || "").trim()}
+        className={`
+          mt-4 w-full py-3 rounded-2xl font-semibold text-sm transition
+          ${
+            loading
+              ? "bg-rose-600 text-white hover:opacity-90"
+              : !String(input || "").trim()
+              ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed"
+              : `bg-gradient-to-r ${getPlatformColor(platform)} text-white hover:opacity-90`
+          }
+        `}
+        type="button"
+      >
+        {loading ? (
+          <div className="flex items-center justify-center gap-2">
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            <span>{lang === "fa" ? "لغو تولید" : "Cancel"}</span>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-base">🚀</span>
+            <span>{lang === "fa" ? "تولید خروجی" : "Generate"}</span>
+          </div>
+        )}
+      </button>
+
+      {loading ? (
+        <div className="mt-2 text-[11px] text-gray-600 dark:text-gray-300">
+          {lang === "fa" ? "برای لغو، دوباره روی دکمه کلیک کنید." : "Click again to cancel the request."}
+        </div>
+      ) : null}
+    </div>
+  );
+
+  const resizer = (
+    <div
+      className="ccg-resizer"
+      role="separator"
+      aria-orientation="vertical"
+      tabIndex={0}
+      onMouseDown={onMouseDownResizer}
+      onTouchStart={() => {
+        draggingRef.current = true;
+        document.body.classList.add("ccg-noselect");
+      }}
+      title={lang === "fa" ? "کشیدن برای تغییر اندازه" : "Drag to resize"}
+    >
+      <div className="ccg-resizer-handle" />
+    </div>
+  );
+
+  const outputPane = (
+    <div className="ccg-card ccg-glass p-4 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm ring-1 ring-black/5 dark:ring-white/10">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <h2 className="font-bold text-base">{lang === "fa" ? "✨ نتیجه" : "✨ Result"}</h2>
+      </div>
+
+      {tool ? (
+        <ToolResult tool={tool} lang={lang} />
+      ) : output ? (
+        <CodeBlock code={output} language="markdown" showCopy={true} maxHeight="520px" />
+      ) : (
+        <div className="text-center py-10 text-gray-600 dark:text-gray-300">
+          <div className="text-3xl mb-2">✨</div>
+          <div className="text-sm mb-1">{lang === "fa" ? "آماده برای تولید!" : "Ready!"}</div>
+          <div className="text-xs">{lang === "fa" ? "درخواست خود را بنویسید و تولید را بزنید" : "Write a request and click Generate"}</div>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className={`space-y-4 md:space-y-6 ${dirClass}`}>
@@ -740,7 +828,7 @@ export default function GeneratorPage() {
                 value={cli}
                 onChange={(e) => setCli(e.target.value)}
                 className="w-full p-2.5 text-sm border border-gray-300/70 dark:border-white/10 rounded-xl bg-white/70 dark:bg-black/30 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                disabled={outputMode !== "command"}
+                disabled={outputMode === "python"} // ✅ فقط در Python غیرفعال
               >
                 {cliOptions.map((c) => (
                   <option key={c} value={c}>
@@ -750,17 +838,13 @@ export default function GeneratorPage() {
               </select>
 
               <div className="mt-2 text-xs text-gray-600 dark:text-gray-300">
-                {outputMode === "command"
+                {outputMode === "python"
                   ? lang === "fa"
-                    ? "این انتخاب روی نوع دستور اثر می‌گذارد."
-                    : "This affects command style."
-                  : outputMode === "script"
-                  ? lang === "fa"
-                    ? "در حالت OS Script، سیستم خودش زبان مناسب را انتخاب می‌کند."
-                    : "In OS Script mode, we pick the best script language."
+                    ? "در حالت پایتون، این گزینه بی‌اثر است."
+                    : "CLI is disabled in Python mode."
                   : lang === "fa"
-                  ? "در حالت پایتون، CLI بی‌اثر است."
-                  : "CLI is disabled in Python mode."}
+                  ? "این انتخاب روی سبک خروجی اثر می‌گذارد."
+                  : "This affects output style."}
               </div>
             </div>
 
@@ -839,14 +923,6 @@ export default function GeneratorPage() {
               <div className="text-xs opacity-80">{lang === "fa" ? "توضیحات و هشدارها مفصل‌تر می‌شوند." : "Explanation and warnings become more detailed."}</div>
             </button>
           </div>
-
-          <div className="mt-3 rounded-xl border border-gray-200/70 dark:border-white/10 bg-gray-50/70 dark:bg-white/[0.03] px-3 py-2">
-            <div className="text-[11px] text-gray-700 dark:text-gray-300">
-              {lang === "fa"
-                ? "تولید فقط با دکمه «تولید خروجی» انجام می‌شود (تغییر گزینه‌ها تولید خودکار ندارد)."
-                : "Generation happens only via the Generate button (changing options won’t auto-generate)."}
-            </div>
-          </div>
         </div>
       </div>
 
@@ -913,108 +989,25 @@ export default function GeneratorPage() {
 
       {/* Split pane */}
       <div className="ccg-container">
-        <div ref={splitWrapRef} className={`ccg-split ${lang === "fa" ? "is-rtl" : "is-ltr"}`} style={{ "--split": `${splitPct}%` }}>
-          {/* Input */}
-          <div className="ccg-card ccg-glass p-4 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm ring-1 ring-black/5 dark:ring-white/10">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-              <h2 className="font-bold text-base">{lang === "fa" ? "📝 درخواست شما" : "📝 Your Request"}</h2>
-              <button
-                onClick={clearAll}
-                className="px-2 py-1 text-xs bg-gray-100/70 dark:bg-black/30 rounded-xl hover:opacity-90 transition border border-gray-200/60 dark:border-white/10"
-                type="button"
-              >
-                🗑️ {lang === "fa" ? "پاک کردن" : "Clear"}
-              </button>
-            </div>
-
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder={lang === "fa" ? "مثال: میخوام سیستمم ۱ ساعت دیگه خاموش بشه" : "Example: Shutdown the system in 1 hour"}
-              className="w-full h-44 p-3 text-sm border border-gray-300/70 dark:border-white/10 rounded-xl resize-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white/70 dark:bg-black/30"
-              rows={4}
-            />
-
-            {/* ✅ Better error UI */}
-            {errObj && (
-              <div className="mt-3 rounded-xl border border-rose-200/70 bg-rose-50/80 p-3 text-rose-800 dark:border-rose-700/40 dark:bg-rose-900/20 dark:text-rose-200 animate-fadeIn">
-                <div className="text-xs font-semibold">
-                  {errObj.message}
-                  {errObj.code ? <span className="ml-2 opacity-70">({errObj.code})</span> : null}
-                </div>
-                {errObj.hint ? <div className="mt-1 text-xs opacity-95">💡 {errObj.hint}</div> : null}
-              </div>
-            )}
-
-            <button
-              onClick={loading ? cancelGenerate : generate}
-              disabled={!loading && !String(input || "").trim()}
-              className={`
-                mt-4 w-full py-3 rounded-2xl font-semibold text-sm transition
-                ${
-                  loading
-                    ? "bg-rose-600 text-white hover:opacity-90"
-                    : !String(input || "").trim()
-                    ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed"
-                    : `bg-gradient-to-r ${getPlatformColor(platform)} text-white hover:opacity-90`
-                }
-              `}
-              type="button"
-            >
-              {loading ? (
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                  <span>{lang === "fa" ? "لغو تولید" : "Cancel"}</span>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center gap-2">
-                  <span className="text-base">🚀</span>
-                  <span>{lang === "fa" ? "تولید خروجی" : "Generate"}</span>
-                </div>
-              )}
-            </button>
-
-            {loading ? (
-              <div className="mt-2 text-[11px] text-gray-600 dark:text-gray-300">
-                {lang === "fa" ? "برای لغو، دوباره روی دکمه کلیک کنید." : "Click again to cancel the request."}
-              </div>
-            ) : null}
-          </div>
-
-          {/* Resizer */}
-          <div
-            className="ccg-resizer"
-            role="separator"
-            aria-orientation="vertical"
-            tabIndex={0}
-            onMouseDown={onMouseDownResizer}
-            onTouchStart={() => {
-              draggingRef.current = true;
-              document.body.classList.add("ccg-noselect");
-            }}
-            title={lang === "fa" ? "کشیدن برای تغییر اندازه" : "Drag to resize"}
-          >
-            <div className="ccg-resizer-handle" />
-          </div>
-
-          {/* Output */}
-          <div className="ccg-card ccg-glass p-4 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm ring-1 ring-black/5 dark:ring-white/10">
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <h2 className="font-bold text-base">{lang === "fa" ? "✨ نتیجه" : "✨ Result"}</h2>
-            </div>
-
-            {tool ? (
-              <ToolResult tool={tool} lang={lang} />
-            ) : output ? (
-              <CodeBlock code={output} language="markdown" showCopy={true} maxHeight="520px" />
-            ) : (
-              <div className="text-center py-10 text-gray-600 dark:text-gray-300">
-                <div className="text-3xl mb-2">✨</div>
-                <div className="text-sm mb-1">{lang === "fa" ? "آماده برای تولید!" : "Ready!"}</div>
-                <div className="text-xs">{lang === "fa" ? "درخواست خود را بنویسید و تولید را بزنید" : "Write a request and click Generate"}</div>
-              </div>
-            )}
-          </div>
+        <div
+          ref={splitWrapRef}
+          className={`ccg-split ${isRTL ? "is-rtl" : "is-ltr"}`}
+          style={{ "--split": `${splitPct}%` }}
+        >
+          {/* ✅ DOM order swap: RTL => Output | Resizer | Input  (so Input appears on the RIGHT) */}
+          {isRTL ? (
+            <>
+              {outputPane}
+              {resizer}
+              {inputPane}
+            </>
+          ) : (
+            <>
+              {inputPane}
+              {resizer}
+              {outputPane}
+            </>
+          )}
         </div>
       </div>
 

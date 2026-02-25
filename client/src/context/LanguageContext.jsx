@@ -60,7 +60,7 @@ const DICT = {
     copy: "کپی",
     copied: "کپی شد",
   },
-}
+};
 
 function pickInitialLang() {
   try {
@@ -72,6 +72,21 @@ function pickInitialLang() {
   const ls = (localStorage.getItem(LS_LANG) || "").toLowerCase();
   if (ls === "fa" || ls === "en") return ls;
   return "en";
+}
+
+function applyDirAndLang(lang) {
+  const isFa = String(lang || "").toLowerCase() === "fa";
+  const dir = isFa ? "rtl" : "ltr";
+
+  try {
+    // ✅ this is the critical fix: many layout rules depend on html[dir]
+    document.documentElement.setAttribute("dir", dir);
+    document.documentElement.setAttribute("lang", isFa ? "fa" : "en");
+  } catch {}
+
+  try {
+    document.body.setAttribute("dir", dir);
+  } catch {}
 }
 
 export function LanguageProvider({ children }) {
@@ -88,22 +103,24 @@ export function LanguageProvider({ children }) {
       u.searchParams.set("lang", lang);
       window.history.replaceState({}, "", u.toString());
     } catch {}
+
+    // ✅ Keep document direction in sync with language
+    applyDirAndLang(lang);
   }, [lang]);
 
   // IMPORTANT: `t` is defined BEFORE it is ever referenced anywhere in this module.
-  const t = useCallback((key) => {
-    const k = String(key || "");
-    const table = DICT[lang] || DICT.en;
-    return table[k] ?? DICT.en[k] ?? k;
-  }, [lang]);
+  const t = useCallback(
+    (key) => {
+      const k = String(key || "");
+      const table = DICT[lang] || DICT.en;
+      return table[k] ?? DICT.en[k] ?? k;
+    },
+    [lang]
+  );
 
   const value = useMemo(() => ({ lang, setLang, t }), [lang, t]);
 
-  return (
-    <LanguageContext.Provider value={value}>
-      {children}
-    </LanguageContext.Provider>
-  );
+  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }
 
 export function useLanguage() {

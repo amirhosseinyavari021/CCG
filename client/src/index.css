@@ -1,243 +1,280 @@
+/* client/src/index.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* =========================================================
-   CCG THEME SYSTEM
-   Light = Dim (comfortable)
-   Dark  = Deep (night)
-   ========================================================= */
-
-/* =======================
-   DIM LIGHT (default)
-   ======================= */
-:root {
-  --bg: 20 24 32;
-  --bg2: 26 31 41;
-
-  --card: 34 40 52;
-  --card2: 42 49 64;
-
-  --text: 245 248 255;
-  --muted: 200 210 230;
-  --hint: 170 185 210;
-
-  --border: 255 255 255 / 0.14;
-
-  --input-bg: 255 255 255 / 0.07;
-  --input-border: 255 255 255 / 0.18;
-
-  --brand1: 59 130 246;
-  --brand2: 168 85 247;
-
-  --shadow: 0 14px 46px rgba(0, 0, 0, 0.35);
-
-  --r-lg: 18px;
-  --r-xl: 24px;
-}
-
-/* =======================
-   DEEP DARK
-   ======================= */
-html.dark {
-  --bg: 8 10 14;
-  --bg2: 12 15 21;
-
-  --card: 16 19 27;
-  --card2: 20 24 33;
-
-  --text: 243 246 255;
-  --muted: 186 196 215;
-  --hint: 155 165 190;
-
-  --border: 255 255 255 / 0.10;
-
-  --input-bg: 255 255 255 / 0.05;
-  --input-border: 255 255 255 / 0.12;
-
-  --shadow: 0 22px 70px rgba(0, 0, 0, 0.55);
-}
-
-/* =========================================================
-   BASE LAYER
-   ========================================================= */
 @layer base {
-  html,
-  body {
-    height: 100%;
-    background: rgb(var(--bg));
-    color: rgb(var(--text));
+  :root{
+    --font-en: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial;
+    --font-fa: "Vazirmatn", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial;
+
+    /* =========================
+       LIGHT THEME (SOFTER)
+       ========================= */
+    --bg: #eef2f7;
+    --text: #0b1220;
+    --muted: #526277;
+
+    --card: rgba(255,255,255,.58);
+    --card-solid: rgba(255,255,255,.88);
+    --border: rgba(2,6,23,.10);
+
+    --primary: #2563eb;
+    --primary-light: rgba(37,99,235,.10);
+
+    /* Overlays / popovers (for context menus & dialogs) */
+    --overlay: rgba(2,6,23,.32);
+    --popover-bg: rgba(255,255,255,.92);
+    --popover-border: rgba(2,6,23,.10);
+    --popover-text: #0b1220;
+    --popover-muted: rgba(2,6,23,.55);
+    --shadow-elev: 0 18px 45px rgba(2,6,23,.14);
+    --shadow-soft: 0 10px 24px rgba(2,6,23,.10);
+
+    --danger-bg: rgba(239,68,68,.10);
+    --danger-border: rgba(239,68,68,.28);
+    --danger-text: #b91c1c;
   }
 
-  body {
-    overflow-x: hidden;
+  html[data-theme="dark"]{
+    --bg: #070b14;
+    --text: #e5e7eb;
+    --muted: #94a3b8;
+
+    --card: rgba(15,23,42,.55);
+    --card-solid: #0b1020;
+    --border: rgba(148,163,184,.16);
+
+    --primary: #60a5fa;
+    --primary-light: rgba(96,165,250,.12);
+
+    --overlay: rgba(0,0,0,.60);
+    --popover-bg: rgba(15,23,42,.88);
+    --popover-border: rgba(148,163,184,.16);
+    --popover-text: #e5e7eb;
+    --popover-muted: rgba(229,231,235,.65);
+    --shadow-elev: 0 22px 60px rgba(0,0,0,.55);
+    --shadow-soft: 0 12px 28px rgba(0,0,0,.45);
+
+    --danger-bg: rgba(239,68,68,.14);
+    --danger-border: rgba(239,68,68,.28);
+    --danger-text: #fecaca;
   }
 
-  ::selection {
-    background: rgba(59, 130, 246, 0.35);
+  html, body { height: 100%; }
+
+  html{
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-en);
+    color-scheme: light;
+  }
+
+  html[data-theme="dark"]{
+    color-scheme: dark;
+  }
+
+  html[dir="rtl"] { font-family: var(--font-fa); }
+
+  body{
+    margin: 0;
+    min-height: 100%;
+    /* light gradients are softer to avoid glare */
+    background:
+      radial-gradient(1200px 700px at 30% 20%, rgba(37,99,235,.06), transparent 55%),
+      radial-gradient(900px 600px at 80% 60%, rgba(96,165,250,.05), transparent 60%),
+      var(--bg);
+    color: var(--text);
+  }
+
+  html[data-theme="dark"] body{
+    background:
+      radial-gradient(1200px 700px at 30% 20%, rgba(37,99,235,.14), transparent 55%),
+      radial-gradient(900px 600px at 80% 60%, rgba(96,165,250,.10), transparent 60%),
+      var(--bg);
+  }
+
+  #root{
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  a{ color: var(--primary); text-decoration: none; }
+  a:hover{ text-decoration: underline; }
+
+  ::placeholder{ color: rgba(82,98,119,.78); }
+  html[data-theme="dark"] ::placeholder{ color: rgba(148,163,184,.70); }
+
+  *{ box-sizing: border-box; }
+}
+
+@layer components {
+  /* IMPORTANT:
+     Keep container definition ONLY here (no extra overrides later),
+     so Generator layout stays intact. */
+  .ccg-container{
+    @apply mx-auto w-full px-4 sm:px-6 lg:px-8;
+    max-width: 1200px;
+  }
+
+  .ccg-card, .ccg-panel{
+    background: var(--card);
+    border: 1px solid var(--border);
+    @apply rounded-2xl shadow-sm backdrop-blur;
+  }
+
+  .ccg-input, .ccg-select, .ccg-textarea{
+    background: rgba(255,255,255,.52);
+    border: 1px solid var(--border);
+    color: var(--text);
+    @apply rounded-xl px-3 py-2 outline-none;
+  }
+
+  html[data-theme="dark"] .ccg-input,
+  html[data-theme="dark"] .ccg-select,
+  html[data-theme="dark"] .ccg-textarea{
+    background: rgba(2,6,23,.40);
+  }
+
+  .ccg-input:focus, .ccg-select:focus, .ccg-textarea:focus{
+    @apply ring-2 ring-blue-500/40;
+  }
+
+  .ccg-btn{
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,.55);
+    color: var(--text);
+    @apply rounded-xl px-4 py-2 text-sm transition active:translate-y-[1px];
+  }
+
+  html[data-theme="dark"] .ccg-btn{
+    background: rgba(2,6,23,.30);
+  }
+
+  .ccg-btn-primary{
+    @apply ccg-btn;
+    background: linear-gradient(180deg, rgba(37,99,235,.95), rgba(37,99,235,.82));
+    border-color: rgba(37,99,235,.40);
+    color: #fff;
+    box-shadow: 0 10px 26px rgba(96,165,250,.18);
+  }
+
+  .ccg-btn-ghost{
+    @apply ccg-btn;
+    background: transparent;
+  }
+
+  .ccg-btn-xs{
+    @apply px-2 py-1 text-xs rounded-lg;
+  }
+
+  .ccg-error{
+    border: 1px solid rgba(239,68,68,.35);
+    background: rgba(239,68,68,.08);
+    @apply rounded-2xl p-4 text-slate-900;
+  }
+  .dark .ccg-error{
+    color: #fff;
+  }
+
+  /* Popover / Menu / ContextMenu */
+  .ccg-popover{
+    background: var(--popover-bg);
+    color: var(--popover-text);
+    border: 1px solid var(--popover-border);
+    box-shadow: var(--shadow-elev);
+    @apply rounded-2xl backdrop-blur;
+  }
+
+  .ccg-menu-item{
+    @apply flex items-center gap-2 px-3 py-2 text-sm rounded-xl select-none cursor-pointer;
+    color: var(--popover-text);
+  }
+
+  .ccg-menu-item:hover{
+    background: var(--primary-light);
+  }
+
+  .ccg-menu-sep{
+    height: 1px;
+    background: var(--popover-border);
+    @apply my-1;
+  }
+
+  .ccg-menu-item-danger{
+    color: var(--danger-text);
+  }
+  .ccg-menu-item-danger:hover{
+    background: var(--danger-bg);
+    outline: 1px solid var(--danger-border);
+  }
+
+  /* Modal / Dialog */
+  .ccg-overlay{
+    background: var(--overlay);
+    @apply fixed inset-0;
+  }
+
+  .ccg-dialog{
+    background: var(--popover-bg);
+    color: var(--popover-text);
+    border: 1px solid var(--popover-border);
+    box-shadow: var(--shadow-elev);
+    @apply rounded-3xl;
+  }
+
+  .ccg-dialog-header{
+    @apply flex items-center justify-between gap-3 px-5 py-4;
+    border-bottom: 1px solid var(--popover-border);
+  }
+
+  .ccg-dialog-title{
+    @apply text-base font-semibold;
+  }
+
+  .ccg-dialog-body{
+    @apply px-5 py-4 text-sm leading-6;
+    color: var(--popover-muted);
+  }
+
+  .ccg-dialog-footer{
+    @apply flex items-center justify-end gap-2 px-5 py-4;
+    border-top: 1px solid var(--popover-border);
+  }
+
+  /* Markdown */
+  .ccg-markdown{
+    @apply text-sm leading-7;
+    color: var(--text);
+  }
+  .ccg-markdown.rtl{ direction: rtl; }
+  .ccg-markdown.ltr{ direction: ltr; }
+
+  .ccg-inline-code{
+    @apply px-1 py-0.5 rounded bg-black/5 dark:bg-white/10;
+  }
+
+  .ccg-codeblock{
+    @apply my-3 rounded-2xl overflow-hidden border;
+    border-color: var(--border);
+    background: rgba(2,6,23,.92);
+  }
+  .ccg-codeblock-head{
+    @apply flex items-center justify-between gap-3 px-4 py-2 border-b;
+    border-color: rgba(148,163,184,.18);
+  }
+  .ccg-codeblock-title{
+    @apply text-xs font-semibold text-slate-200;
+  }
+  .ccg-pre{
+    @apply overflow-auto p-4 text-xs text-slate-100;
   }
 }
 
-/* =========================================================
-   DIRECTION HELPERS
-   ========================================================= */
-.rtl-text {
-  direction: rtl;
-  text-align: right;
-  unicode-bidi: plaintext;
-}
-
-.ltr-text {
-  direction: ltr;
-  text-align: left;
-  unicode-bidi: plaintext;
-}
-
-/* =========================================================
-   LAYOUT HELPERS
-   ========================================================= */
-.ccg-container {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding-left: 16px;
-  padding-right: 16px;
-}
-
-.ccg-card {
-  background: rgba(var(--card), 0.78);
-  border: 1px solid rgba(var(--border));
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(16px);
-  border-radius: var(--r-xl);
-}
-
-.ccg-glass {
-  background: rgba(var(--card), 0.62);
-  border: 1px solid rgba(var(--border));
-  backdrop-filter: blur(18px);
-  border-radius: var(--r-xl);
-}
-
-/* =========================================================
-   INPUTS
-   ========================================================= */
-input,
-textarea,
-select {
-  color: rgb(var(--text));
-  background: rgba(var(--input-bg));
-  border: 1px solid rgba(var(--input-border));
-}
-
-input::placeholder,
-textarea::placeholder {
-  color: rgb(var(--hint));
-}
-
-input:focus,
-textarea:focus,
-select:focus {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
-  border-color: rgba(59, 130, 246, 0.35);
-}
-
-/* =========================================================
-   CODE SURFACES
-   ========================================================= */
-pre,
-code {
-  direction: ltr !important;
-  text-align: left !important;
-  unicode-bidi: isolate !important;
-}
-
-/* =========================================================
-   TAILWIND LIGHT OVERRIDES
-   Prevent white backgrounds in light mode
-   ========================================================= */
-html:not(.dark) .bg-white,
-html:not(.dark) .bg-white\/80,
-html:not(.dark) .bg-gray-50,
-html:not(.dark) .bg-gray-100,
-html:not(.dark) .bg-gray-200 {
-  background-color: rgba(var(--card), 0.78) !important;
-  border-color: rgba(var(--border)) !important;
-}
-
-html:not(.dark) .text-gray-900,
-html:not(.dark) .text-gray-800,
-html:not(.dark) .text-gray-700,
-html:not(.dark) .text-gray-600 {
-  color: rgb(var(--text)) !important;
-}
-
-html:not(.dark) .border-gray-200,
-html:not(.dark) .border-gray-300 {
-  border-color: rgba(var(--border)) !important;
-}
-
-/* =========================================================
-   RESIZER (your existing)
-   ========================================================= */
-.ccg-resizer {
-  position: relative;
-  width: 10px;
-  min-width: 10px;
-  cursor: col-resize;
-  transition: background 150ms ease, transform 150ms ease;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.dark .ccg-resizer {
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.ccg-resizer:hover {
-  background: rgba(34, 197, 94, 0.18);
-}
-
-.ccg-resizer:active {
-  transform: scaleX(1.15);
-}
-
-.ccg-resizer:focus {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25);
-}
-
-/* =========================================================
-   DANGER BOX
-   ========================================================= */
-.ccg-danger-box {
-  margin-top: 0.75rem;
-  padding: 0.75rem;
-  border-radius: 0.75rem;
-  border: 1px solid rgba(248, 113, 113, 0.35);
-  background: rgba(248, 113, 113, 0.12);
-  color: rgba(254, 202, 202, 0.95);
-}
-
-/* =========================================================
-   MOBILE FIX
-   ========================================================= */
-@media (max-width: 640px) {
-  body {
-    background: rgb(var(--bg)) !important;
-  }
-
-  .ccg-card {
-    background: rgba(var(--card), 0.75);
-  }
-
-  textarea,
-  select,
-  input {
-    background: rgba(var(--input-bg)) !important;
-    border: 1px solid rgba(var(--input-border)) !important;
-    color: rgb(var(--text)) !important;
-  }
+/* Tooltip safety */
+[data-tooltip],
+.tooltip,
+.popover {
+  z-index: 9999;
 }
