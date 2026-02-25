@@ -90,7 +90,7 @@
   html[data-theme="dark"] body{
     background:
       radial-gradient(1200px 700px at 30% 20%, rgba(37,99,235,.14), transparent 55%),
-      radial-gradient(900px 600px at 80% 60%, rgba(96,165,250,.10), transparent 60%),
+      radial-gradient(900px 600px at 80% 60%, rgba(96,165s0,.10), transparent 60%),
       var(--bg);
   }
 
@@ -269,6 +269,148 @@
   }
   .ccg-pre{
     @apply overflow-auto p-4 text-xs text-slate-100;
+  }
+
+  /* =========================================================
+     Generator-only layout helpers
+     - fixes Output Mode (ccg-seg) overlap/tight spacing
+     - fixes Split panes (ccg-split) side-by-side on desktop
+     - fixes RTL split: Input on RIGHT, Output on LEFT
+     ========================================================= */
+
+  /* Direction helper (your pages use "rtl"/"ltr" as className) */
+  .rtl{ direction: rtl; }
+  .ltr{ direction: ltr; }
+
+  /* Output mode segmented control */
+  .ccg-seg{
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    padding: 4px;
+    border-radius: 18px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,.35);
+    overflow: hidden;
+  }
+  html[data-theme="dark"] .ccg-seg{
+    background: rgba(2,6,23,.22);
+  }
+
+  .ccg-seg-item{
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    text-align: start;
+    border-radius: 14px;
+    padding: 10px 12px;
+    transition: opacity .15s ease, transform .15s ease;
+    color: var(--text);
+  }
+
+  .ccg-seg-item:not(.is-active){
+    opacity: .92;
+  }
+  .ccg-seg-item:hover{
+    opacity: 1;
+  }
+  .ccg-seg-item:active{
+    transform: translateY(1px);
+  }
+
+  .ccg-seg-indicator{
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    left: 4px;
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(37,99,235,.18), rgba(37,99,235,.10));
+    border: 1px solid rgba(37,99,235,.20);
+    box-shadow: 0 10px 24px rgba(37,99,235,.12);
+    transition: transform .18s ease;
+    z-index: 1;
+  }
+  html[data-theme="dark"] .ccg-seg-indicator{
+    background: linear-gradient(180deg, rgba(96,165,250,.20), rgba(96,165,250,.12));
+    border-color: rgba(96,165,250,.22);
+    box-shadow: 0 12px 28px rgba(0,0,0,.35);
+  }
+
+  /* Split panes (Input/Output side-by-side) */
+  .ccg-split{
+    --split: 50%;
+    display: grid;
+    grid-template-columns: minmax(320px, var(--split)) 10px minmax(320px, calc(100% - var(--split)));
+    gap: 12px;
+    align-items: stretch;
+
+    /* ✅ Important: Keep layout LTR so CSS grid doesn't "mirror" columns in RTL */
+    direction: ltr;
+  }
+
+  /* ✅ For RTL language, keep content RTL inside panes (writing + headings) */
+  .ccg-split.is-rtl > *{
+    direction: rtl;
+  }
+
+  /* ✅ Code/terminal must stay LTR */
+  .ccg-split.is-rtl pre,
+  .ccg-split.is-rtl code,
+  .ccg-split.is-rtl .ccg-pre{
+    direction: ltr;
+  }
+
+  /* ✅ Textarea in RTL */
+  .ccg-split.is-rtl textarea{
+    direction: rtl;
+    text-align: right;
+  }
+
+  /* On smaller screens stack (intentional) */
+  @media (max-width: 1024px){
+    .ccg-split{
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    .ccg-resizer{
+      display: none;
+    }
+  }
+
+  /* Resizer */
+  .ccg-resizer{
+    position: relative;
+    width: 10px;
+    border-radius: 14px;
+    cursor: col-resize;
+    transition: background 150ms ease, transform 150ms ease;
+    background: rgba(2,6,23,.06);
+    border: 1px solid rgba(2,6,23,.08);
+  }
+  html[data-theme="dark"] .ccg-resizer{
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.08);
+  }
+  .ccg-resizer:hover{
+    background: rgba(34,197,94,.15);
+  }
+  .ccg-resizer:active{
+    transform: scaleX(1.12);
+  }
+  .ccg-resizer-handle{
+    position: absolute;
+    inset: 18% 2px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.08);
+  }
+  html[data-theme="dark"] .ccg-resizer-handle{
+    background: rgba(255,255,255,.10);
+  }
+
+  /* Prevent selection while dragging (GeneratorPage toggles this on body) */
+  .ccg-noselect{
+    user-select: none !important;
   }
 }
 
