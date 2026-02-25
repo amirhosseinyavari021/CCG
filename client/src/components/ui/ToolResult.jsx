@@ -132,8 +132,8 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
       (typeof primary === "object" ? primary?.lang : null) || t.primaryLang || t.lang || "";
 
     const explanations = toLines(t.explanations || t.explanation || t.description || "");
-    const warnings = toLines(t.warnings);
-    const notes = toLines(t.notes || t.moreDetails || "");
+    const warnings = toLines(t.warnings || t.warning || t.alert || "");
+    const notes = toLines(t.notes || t.note || t.moreDetails || "");
 
     const alternatives = Array.isArray(t.alternatives)
       ? t.alternatives

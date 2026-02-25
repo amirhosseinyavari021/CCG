@@ -229,6 +229,17 @@ function coerceCommandItem(x) {
   return "";
 }
 
+function asTextValue(v) {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "string") return v;
+  if (Array.isArray(v)) return v.map((x) => String(x || "").trim()).filter(Boolean).join("\n");
+  try {
+    return String(v);
+  } catch {
+    return "";
+  }
+}
+
 function buildToolFromResponse(res, lang, cliGuess, outputMode) {
   const md = String(res?.markdown || res?.output || res?.result || "").trim();
 
@@ -292,12 +303,17 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode) {
   }
 
   // توضیح/هشدار/توضیحات بیشتر از headingها
-  const expRaw = extractSection(md, ["Explanation", "توضیح", "توضیحات", "شرح"]) || String(res?.explanation || "");
-  const warnRaw = extractSection(md, ["Warning", "Warnings", "هشدار", "هشدارها"]) || String(res?.warnings || "");
+  const expRaw =
+    extractSection(md, ["Explanation", "توضیح", "توضیحات", "شرح"]) ||
+    asTextValue(res?.explanation || res?.explanations || res?.description);
+
+  const warnRaw =
+    extractSection(md, ["Warning", "Warnings", "هشدار", "هشدارها"]) ||
+    asTextValue(res?.warnings || res?.warning || res?.alert || res?.alerts);
   const notesRaw =
     extractSection(md, ["More Details", "توضیحات بیشتر", "📌 More Details", "📌 توضیحات بیشتر", "Details", "جزئیات بیشتر"]) ||
     extractSection(md, ["Notes", "توضیحات", "نکات"]) ||
-    String(res?.notes || "") ||
+    asTextValue(res?.notes || res?.note || res?.details || res?.moreDetails) ||
     "";
 
   let explanation = filterChitChat(toBullets(expRaw));
