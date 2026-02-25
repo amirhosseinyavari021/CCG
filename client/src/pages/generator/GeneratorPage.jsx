@@ -778,7 +778,7 @@ export default function GeneratorPage() {
       </div>
 
       {tool ? (
-        <ToolResult tool={tool} lang={lang} />
+        <ToolResult tool={tool} uiLang={lang} />
       ) : output ? (
         <CodeBlock code={output} language="markdown" showCopy={true} maxHeight="520px" />
       ) : (
