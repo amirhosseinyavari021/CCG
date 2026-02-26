@@ -48,6 +48,36 @@ function uniq(arr) {
   return out;
 }
 
+function pickCommandValue(x) {
+  if (typeof x === "string") return x.trim();
+  if (x && typeof x === "object") {
+    const v = x.command || x.cmd || x.code || x.text || x.value;
+    if (typeof v === "string") return v.trim();
+  }
+  return "";
+}
+
+function normalizeAlternatives(arr) {
+  const list = Array.isArray(arr) ? arr : [];
+  const out = [];
+  const seen = new Set();
+  for (const item of list) {
+    const command = pickCommandValue(item);
+    if (!command || seen.has(command)) continue;
+    seen.add(command);
+    if (item && typeof item === "object") {
+      out.push({
+        label: typeof item.label === "string" ? item.label : "alternative",
+        command,
+        lang: typeof item.lang === "string" ? item.lang : undefined,
+      });
+    } else {
+      out.push(command);
+    }
+  }
+  return out;
+}
+
 function takeN(arr, n) {
   return arr.slice(0, Math.max(0, n));
 }
@@ -95,7 +125,7 @@ function buildMarkdown({
 
   if (alternatives && alternatives.length) {
     out.push(altTitle, "");
-    for (const c of alternatives) out.push("```" + cli, s(c).trim(), "```", "");
+    for (const c of alternatives) out.push("```" + cli, s(pickCommandValue(c) || c).trim(), "```", "");
   }
 
   if (details && details.length) {
@@ -131,7 +161,7 @@ export function formatOutput(input, opts = {}) {
     const mode = s(parsed.mode || src.mode).toLowerCase();
     const command = s(src.command || src?.primary?.command || src?.primary_command).trim();
 
-    const alternatives = uniq(src.alternatives || src.moreCommands || []);
+    const alternatives = normalizeAlternatives(src.alternatives || src.moreCommands || []);
     const details = uniq(src.details || src.moreDetails || src.notes || []);
 
     const warning = s(src.warning || (Array.isArray(src.warnings) ? src.warnings.join("\n") : src.warnings)).trim();
@@ -142,7 +172,9 @@ export function formatOutput(input, opts = {}) {
     const rawLang = s(src.lang || src.language).toLowerCase();
     const isPythonMode = mode === "python" || rawLang === "python" || rawLang === "py";
     const pythonScript = s(
-      isPythonMode ? (src.pythonScript || src.python_script || src.script) : (src.pythonScript || src.python_script)
+      isPythonMode
+        ? (src.pythonScript || src.python_script || src.script || src?.primary?.command || src.command)
+        : (src.pythonScript || src.python_script)
     ).trim();
     const pythonNotes = s(src.pythonNotes || src.notes).trim();
 

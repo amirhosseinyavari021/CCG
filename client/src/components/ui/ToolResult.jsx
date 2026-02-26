@@ -92,7 +92,11 @@ function CodeCard({ title, lang, code, badge, dir, copyLabel, copiedLabel }) {
 
 function MdCard({ title, icon, children, danger = false }) {
   return (
-    <div className={`ccg-card p-4 sm:p-5 ${danger ? "border-red-500/50 bg-red-500/10 ring-1 ring-red-500/25" : ""}`}>
+    <div
+      className={`ccg-card p-4 sm:p-5 ${
+        danger ? "border-red-500/50 bg-red-500/10 ring-1 ring-red-500/25" : ""
+      }`}
+    >
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm sm:text-base font-semibold flex items-center gap-2">
           <span className="opacity-90">{icon}</span>
@@ -150,7 +154,9 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
         ? t.moreCommands
         : [];
 
-    const script = asText(t.script || t.python_script || "").trim() || (typeof t.pythonScript === "string" ? t.pythonScript.trim() : "");
+    const script =
+      asText(t.script || t.python_script || "").trim() ||
+      (typeof t.pythonScript === "string" ? t.pythonScript.trim() : "");
 
     const isScriptLike =
       Boolean(script) ||

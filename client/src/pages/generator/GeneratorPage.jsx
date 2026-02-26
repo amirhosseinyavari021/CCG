@@ -685,6 +685,7 @@ export default function GeneratorPage() {
     const netOsVersion = platform === "network" ? pickNetworkOsVersion(advancedSettings) : "";
 
     const normalizedInput = normalizeSpaces(input);
+
     const requestKey = JSON.stringify({
       normalizedInput,
       outputMode,
