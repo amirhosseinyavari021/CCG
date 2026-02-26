@@ -101,6 +101,9 @@ Rules:
 - warnings: always include at least 1 safety warning (permissions/data loss/impact).
 - Do NOT ask questions, do NOT add “if you have questions…” lines.
 - Commands must match platform=${platform} and cli=${isPython ? "python" : cli}.
+- In outputType=command: primary.command must be one practical command line.
+- In outputType=tool: primary.command must be a real multi-line ${cli} script (>=4 lines) with safe checks, not a single command line.
+- In outputType=python: return python script in primary.command or pythonScript and keep lang=python.
 `.trim();
 }
 
