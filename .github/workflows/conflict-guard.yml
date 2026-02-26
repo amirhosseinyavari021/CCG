@@ -1,0 +1,20 @@
+name: Conflict Marker Guard
+
+on:
+  pull_request:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  conflict-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check repo conflict markers
+        run: bash scripts/check-conflicts.sh
+
+      - name: Check client conflict markers
+        run: bash client/scripts/check-conflicts.sh

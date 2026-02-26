@@ -1,5 +1,5 @@
 // client/src/components/ui/ToolResult.jsx
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -13,6 +13,22 @@ function asText(x) {
   }
 }
 
+function toLines(value) {
+  if (value === null || value === undefined) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((v) => asText(v).trim())
+      .filter(Boolean)
+      .flatMap((v) => v.split("\n").map((l) => l.trim()).filter(Boolean));
+  }
+  const t = asText(value).trim();
+  if (!t || t === "[]") return [];
+  return t
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+}
+
 function pickAltCommand(alt) {
   if (!alt) return "";
   if (typeof alt === "string") return alt;
@@ -21,26 +37,33 @@ function pickAltCommand(alt) {
   return alt.command || alt.code || alt.text || alt.value || "";
 }
 
-function CopyButton({ text, label = "کپی" }) {
+function CopyButton({ text, label = "کپی", copiedLabel = "کپی شد" }) {
+  const [copied, setCopied] = useState(false);
+
   const onCopy = async () => {
     try {
       await navigator.clipboard.writeText(text || "");
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
     } catch {
-      // ignore
+      setCopied(false);
     }
   };
+
   return (
     <button
       type="button"
       onClick={onCopy}
-      className="px-3 py-1 rounded-lg text-xs font-semibold bg-white/10 hover:bg-white/15 border border-white/10"
+      className={`px-3 py-1 rounded-lg text-xs font-semibold border transition ${
+        copied ? "bg-emerald-500/25 border-emerald-400/40 text-emerald-100" : "bg-white/10 hover:bg-white/15 border-white/10"
+      }`}
     >
-      {label}
+      {copied ? copiedLabel : label}
     </button>
   );
 }
 
-function CodeCard({ title, lang, code, badge, dir }) {
+function CodeCard({ title, lang, code, badge, dir, copyLabel, copiedLabel }) {
   const safeCode = code || "";
   return (
     <div className="ccg-card p-0 overflow-hidden">
@@ -58,7 +81,7 @@ function CodeCard({ title, lang, code, badge, dir }) {
             </span>
           ) : null}
         </div>
-        <CopyButton text={safeCode} />
+        <CopyButton text={safeCode} label={copyLabel} copiedLabel={copiedLabel} />
       </div>
       <pre className="ccg-pre" dir={dir}>
         <code>{safeCode}</code>
@@ -69,7 +92,11 @@ function CodeCard({ title, lang, code, badge, dir }) {
 
 function MdCard({ title, icon, children, danger = false }) {
   return (
-    <div className={`ccg-card p-4 sm:p-5 ${danger ? "border-red-500/35 bg-red-500/5" : ""}`}>
+    <div
+      className={`ccg-card p-4 sm:p-5 ${
+        danger ? "border-red-500/50 bg-red-500/10 ring-1 ring-red-500/25" : ""
+      }`}
+    >
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm sm:text-base font-semibold flex items-center gap-2">
           <span className="opacity-90">{icon}</span>
@@ -83,12 +110,25 @@ function MdCard({ title, icon, children, danger = false }) {
   );
 }
 
+function LinesList({ lines = [], dense = false }) {
+  if (!Array.isArray(lines) || !lines.length) return null;
+  return (
+    <ul className={`list-disc ${dense ? "space-y-1" : "space-y-2"} pe-5`}>
+      {lines.map((line, idx) => (
+        <li key={idx} className="leading-7">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(line || "")}</ReactMarkdown>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function ToolResult({ tool, uiLang = "fa" }) {
   const dir = uiLang === "fa" ? "rtl" : "ltr";
 
   const normalized = useMemo(() => {
     const t = tool || {};
-    const primary = t.primary || t.primaryCommand || t.command || null;
+    const primary = t.primary || t.primaryCommand || t.primary_command || t.command || null;
 
     const primaryCommand =
       typeof primary === "string"
@@ -98,19 +138,43 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
     const primaryLang =
       (typeof primary === "object" ? primary?.lang : null) || t.primaryLang || t.lang || "";
 
-    const explanations = t.explanations || t.explanation || t.description || "";
-    const warnings = Array.isArray(t.warnings) ? t.warnings : t.warnings ? [t.warnings] : [];
-    const alternatives = Array.isArray(t.alternatives) ? t.alternatives : [];
-    const script = t.script || t.pythonScript || "";
+    const explanations = toLines(t.explanations || t.explanation || t.description || "");
+    const warnings = toLines(t.warnings || t.warning || t.alert || "");
+    const warningFromExplanation = explanations.filter((x) => /(^|\s)(⚠|warning|هشدار|خطر|احتیاط)/i.test(x));
+    const cleanExplanations = explanations.filter((x) => !/(^|\s)(⚠|warning|هشدار|خطر|احتیاط)/i.test(x));
+    const notes = toLines(t.notes || t.note || t.moreDetails || "");
+
+    const alternatives = Array.isArray(t.alternatives)
+      ? t.alternatives
+      : Array.isArray(t.moreCommands)
+        ? t.moreCommands
+        : [];
+
+    const script =
+      (typeof t.script === "string" ? t.script.trim() : "") ||
+      (typeof t.python_script === "string" ? t.python_script.trim() : "") ||
+      (typeof t.pythonScript === "string" ? t.pythonScript.trim() : "");
+
+    const hasPythonScriptText =
+      (typeof t.python_script === "string" && t.python_script.trim().length > 0) ||
+      (typeof t.pythonScript === "string" && t.pythonScript.trim().length > 0);
+
+    const isScriptLike =
+      Boolean(script) ||
+      hasPythonScriptText ||
+      Boolean(t.isScript) ||
+      (typeof primaryCommand === "string" && primaryCommand.includes("\n") && !alternatives.length);
 
     return {
       title: t.title || (uiLang === "fa" ? "نتیجه" : "Result"),
       primaryCommand,
       primaryLang,
-      explanations: asText(explanations).trim(),
-      warnings: warnings.map((w) => asText(w).trim()).filter(Boolean),
+      explanations: cleanExplanations,
+      warnings: [...new Set([...(warnings || []), ...warningFromExplanation])],
+      notes,
       alternatives,
-      script: asText(script).trim(),
+      script,
+      isScriptLike,
     };
   }, [tool, uiLang]);
 
@@ -125,33 +189,48 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
   return (
     <div className="space-y-4" dir={dir}>
       {/* Primary command */}
-      {normalized.primaryCommand ? (
+      {normalized.primaryCommand && !normalized.isScriptLike ? (
         <CodeCard
           title={uiLang === "fa" ? "کامند اصلی" : "Primary Command"}
           lang={normalized.primaryLang || "bash"}
           code={normalized.primaryCommand}
           badge="✓"
           dir="ltr"
+          copyLabel={uiLang === "fa" ? "کپی" : "Copy"}
+          copiedLabel={uiLang === "fa" ? "کپی شد" : "Copied"}
+        />
+      ) : null}
+
+      {/* Script (if any) */}
+      {(normalized.script || normalized.isScriptLike) ? (
+        <CodeCard
+          title={uiLang === "fa" ? "اسکریپت" : "Script"}
+          lang={normalized.primaryLang || "bash"}
+          code={normalized.script || normalized.primaryCommand}
+          dir="ltr"
+          copyLabel={uiLang === "fa" ? "کپی" : "Copy"}
+          copiedLabel={uiLang === "fa" ? "کپی شد" : "Copied"}
         />
       ) : null}
 
       {/* Explanations */}
-      {normalized.explanations ? (
+      {normalized.explanations.length ? (
         <MdCard title={uiLang === "fa" ? "توضیحات" : "Explanation"} icon="🧾">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{normalized.explanations}</ReactMarkdown>
+          <LinesList lines={normalized.explanations} />
         </MdCard>
       ) : null}
 
       {/* Warnings */}
       {normalized.warnings.length ? (
         <MdCard title={uiLang === "fa" ? "هشدارها" : "Warnings"} icon="⚠️" danger>
-          <ul>
-            {normalized.warnings.map((w, i) => (
-              <li key={i}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{w}</ReactMarkdown>
-              </li>
-            ))}
-          </ul>
+          <LinesList lines={normalized.warnings} />
+        </MdCard>
+      ) : null}
+
+      {/* Notes */}
+      {normalized.notes.length ? (
+        <MdCard title={uiLang === "fa" ? "نکات" : "Notes"} icon="📌">
+          <LinesList lines={normalized.notes} />
         </MdCard>
       ) : null}
 
@@ -171,21 +250,14 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
                 lang={lang}
                 code={cmd}
                 dir="ltr"
+                copyLabel={uiLang === "fa" ? "کپی" : "Copy"}
+                copiedLabel={uiLang === "fa" ? "کپی شد" : "Copied"}
               />
             );
           })}
         </div>
       ) : null}
 
-      {/* Script (if any) */}
-      {normalized.script ? (
-        <CodeCard
-          title={uiLang === "fa" ? "اسکریپت" : "Script"}
-          lang="python"
-          code={normalized.script}
-          dir="ltr"
-        />
-      ) : null}
     </div>
   );
 }
