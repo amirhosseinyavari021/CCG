@@ -70,16 +70,29 @@ function extractSection(md, titles) {
   if (!text.trim()) return "";
 
   const lines = text.split("\n");
+  const normalizeHeading = (s) =>
+    String(s || "")
+      .toLowerCase()
+      .replace(/^#{1,6}\s+/, "")
+      .replace(/[*_`~]/g, "")
+      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "")
+      .replace(/[:：]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const titleSet = new Set((titles || []).map((x) => normalizeHeading(x)).filter(Boolean));
   const headingIdx = lines.findIndex((l) => {
-    const t = l.trim().toLowerCase();
-    return titles.some((x) => t === `### ${String(x).trim().toLowerCase()}`);
+    const t = l.trim();
+    if (!/^#{1,6}\s+/.test(t)) return false;
+    const h = normalizeHeading(t);
+    return titleSet.has(h);
   });
   if (headingIdx === -1) return "";
 
   const out = [];
   for (let i = headingIdx + 1; i < lines.length; i++) {
     const l = lines[i];
-    if (l.trim().startsWith("### ")) break;
+    if (/^#{1,6}\s+/.test(l.trim())) break;
     out.push(l);
   }
   return out.join("\n").trim();
@@ -136,6 +149,83 @@ function firstFencedCodeBlock(md) {
   return { lang: String(m[1] || "").trim(), code: String(m[2] || "").trim() };
 }
 
+function allFencedCodeBlocks(md) {
+  const text = String(md || "");
+  const out = [];
+  const re = /```([a-zA-Z0-9_-]+)?\s*\n([\s\S]*?)\n```/g;
+  let m;
+  while ((m = re.exec(text))) {
+    const code = String(m[2] || "").trim();
+    if (!code) continue;
+    out.push({ lang: String(m[1] || "").trim(), code });
+  }
+  return out;
+}
+
+function extractLabelLines(md, labels = []) {
+  const set = new Set((labels || []).map((x) => String(x || "").toLowerCase().trim()).filter(Boolean));
+  if (!set.size) return [];
+
+  return String(md || "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .filter((line) => {
+      const norm = line
+        .toLowerCase()
+        .replace(/^[-*]\s+/, "")
+        .replace(/^>\s*/, "")
+        .replace(/[⚠️📌✅🔁]/g, "")
+        .trim();
+      return [...set].some((k) => norm.startsWith(`${k}:`) || norm.startsWith(`${k} :`) || norm === k);
+    })
+    .map((line) =>
+      line
+        .replace(/^[-*]\s+/, "")
+        .replace(/^>\s*/, "")
+        .replace(/[⚠️📌✅🔁]/g, "")
+        .replace(/^\s*[^:]+:\s*/, "")
+        .trim()
+    )
+    .filter(Boolean);
+}
+
+function extractWarningLikeLines(md) {
+  const lines = String(md || "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const out = [];
+  for (const line of lines) {
+    const t = line.toLowerCase();
+    if (
+      /⚠|warning|warnings|هشدار|هشدارها|احتیاط|خطر/.test(t) ||
+      /before (run|running|execute|execution)/.test(t) ||
+      /قبل\s+از\s+(اجرا|استفاده|ریستارت|خاموش)/.test(t)
+    ) {
+      const cleaned = line
+        .replace(/^[-*]\s+/, "")
+        .replace(/^>\s*/, "")
+        .replace(/[⚠️]/g, "")
+        .replace(/^\s*[^:]+:\s*/, "")
+        .trim();
+      if (cleaned) out.push(cleaned);
+    }
+  }
+  return [...new Set(out)];
+}
+
+function isWarningTextLine(line) {
+  const t = String(line || "").toLowerCase().trim();
+  if (!t) return false;
+  return (
+    /⚠|warning|warnings|هشدار|هشدارها|احتیاط|خطر/.test(t) ||
+    /before (run|running|execute|execution)/.test(t) ||
+    /قبل\s+از\s+(اجرا|استفاده|ریستارت|خاموش)/.test(t)
+  );
+}
+
 function coerceCommandItem(x) {
   if (typeof x === "string") return x.trim();
   if (x && typeof x === "object") {
@@ -149,7 +239,18 @@ function coerceCommandItem(x) {
   return "";
 }
 
-function buildToolFromResponse(res, lang, cliGuess, outputMode) {
+function asTextValue(v) {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "string") return v;
+  if (Array.isArray(v)) return v.map((x) => String(x || "").trim()).filter(Boolean).join("\n");
+  try {
+    return String(v);
+  } catch {
+    return "";
+  }
+}
+
+function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null, refineTarget = "") {
   const md = String(res?.markdown || res?.output || res?.result || "").trim();
 
   const py = String(res?.pythonScript || res?.python_script || "").trim();
@@ -161,6 +262,7 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode) {
     return {
       title: lang === "fa" ? "نتیجه" : "Result",
       cli: "python",
+      lang: "python",
       pythonScript: true,
       python_script: py || firstFencedCodeBlock(md).code,
       notes: filterChitChat(toBullets(notesRaw)),
@@ -173,32 +275,111 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode) {
 
   // ---------- Command / Script ----------
   const commandsArr = Array.isArray(res?.commands) ? res.commands : [];
-  const moreArr = Array.isArray(res?.moreCommands) ? res.moreCommands : [];
+  const moreArr = Array.isArray(res?.moreCommands)
+    ? res.moreCommands
+    : Array.isArray(res?.alternatives)
+      ? res.alternatives
+      : [];
 
   let primary = commandsArr.length ? coerceCommandItem(commandsArr[0]) : "";
   let alts = moreArr.map(coerceCommandItem).filter(Boolean);
+  const mdBlocks = allFencedCodeBlocks(md);
+  const isScriptMode = outputMode === "script";
 
   // اگر بک‌اند commands نداد، از اولین codeblock داخل markdown بردار
   if (!primary) {
-    const block = firstFencedCodeBlock(md);
+    const block = mdBlocks[0] || firstFencedCodeBlock(md);
     if (block.code) primary = block.code;
   }
 
+  if (!isScriptMode && !alts.length) {
+    const fromBlocks = mdBlocks
+      .map((b) => b.code)
+      .filter(Boolean)
+      .filter((c) => c.trim() !== String(primary || "").trim());
+    if (fromBlocks.length) alts = fromBlocks;
+  }
+
+  if (!isScriptMode && !alts.length) {
+    const altRaw = extractSection(md, [
+      "Alternative Commands",
+      "Alternatives",
+      "دستورات جایگزین",
+      "جایگزین‌ها",
+      "جایگزین ها",
+      "فرمان‌های جایگزین",
+      "فرمان های جایگزین",
+    ]);
+    const altBullets = toBullets(altRaw).filter((x) => x && x !== primary);
+    if (altBullets.length) alts = altBullets;
+  }
+
   // توضیح/هشدار/توضیحات بیشتر از headingها
-  const expRaw = extractSection(md, ["Explanation", "توضیح"]) || "";
-  const warnRaw = extractSection(md, ["Warning", "Warnings", "هشدار", "هشدارها"]) || "";
+  const expRaw =
+    extractSection(md, ["Explanation", "توضیح", "توضیحات", "شرح"]) ||
+    asTextValue(res?.explanation || res?.explanations || res?.description);
+
+  const warnRaw =
+    extractSection(md, ["Warning", "Warnings", "هشدار", "هشدارها"]) ||
+    asTextValue(res?.warnings || res?.warning || res?.alert || res?.alerts);
   const notesRaw =
-    extractSection(md, ["More Details", "توضیحات بیشتر", "📌 More Details", "📌 توضیحات بیشتر"]) ||
-    extractSection(md, ["Notes", "توضیحات"]) ||
+    extractSection(md, ["More Details", "توضیحات بیشتر", "📌 More Details", "📌 توضیحات بیشتر", "Details", "جزئیات بیشتر"]) ||
+    extractSection(md, ["Notes", "توضیحات", "نکات"]) ||
+    asTextValue(res?.notes || res?.note || res?.details || res?.moreDetails) ||
     "";
 
-  const explanation = filterChitChat(toBullets(expRaw));
-  const warnings = filterChitChat(toBullets(warnRaw));
-  const notes = filterChitChat(toBullets(notesRaw));
+  let explanation = filterChitChat(toBullets(expRaw));
+  let warnings = filterChitChat(toBullets(warnRaw));
+  let notes = filterChitChat(toBullets(notesRaw));
+
+  if (!warnings.length) {
+    warnings = filterChitChat(extractLabelLines(md, ["warning", "warnings", "هشدار", "هشدارها"]));
+  }
+
+  if (!warnings.length) {
+    warnings = filterChitChat(extractWarningLikeLines(md));
+  }
+
+  if (!notes.length) {
+    notes = filterChitChat(
+      extractLabelLines(md, ["note", "notes", "more details", "detail", "نکته", "نکات", "توضیحات بیشتر"])
+    );
+  }
+
+  if (!explanation.length) {
+    explanation = filterChitChat(extractLabelLines(md, ["explanation", "details", "توضیح", "توضیحات", "شرح"]));
+  }
+
+  // اگر مدل هشدار را داخل توضیحات ریخته بود، جدا کن تا کارت هشدار حتماً نمایش داده شود
+  if (explanation.length) {
+    const movedToWarnings = explanation.filter((x) => isWarningTextLine(x));
+    const keptExplanation = explanation.filter((x) => !isWarningTextLine(x));
+    if (movedToWarnings.length) {
+      warnings = [...warnings, ...movedToWarnings];
+      explanation = keptExplanation;
+    }
+  }
 
   // اگر exp/warn متن داشت ولی bullet نشد
   if (!explanation.length && expRaw.trim()) explanation.push(expRaw.trim());
   if (!warnings.length && warnRaw.trim()) warnings.push(warnRaw.trim());
+
+  alts = [...new Set(alts.map((x) => String(x || "").trim()).filter(Boolean))].filter((x) => x !== primary);
+  warnings = [...new Set(warnings.map((x) => String(x || "").trim()).filter(Boolean))];
+  explanation = [...new Set(explanation.map((x) => String(x || "").trim()).filter(Boolean))];
+  notes = [...new Set(notes.map((x) => String(x || "").trim()).filter(Boolean))];
+
+  if (prevTool && refineTarget === "details") {
+    primary = prevTool.primary_command || primary;
+    alts = Array.isArray(prevTool.alternatives) ? prevTool.alternatives : alts;
+  }
+
+  if (prevTool && refineTarget === "commands") {
+    primary = prevTool.primary_command || primary;
+    explanation = Array.isArray(prevTool.explanation) ? prevTool.explanation : explanation;
+    warnings = Array.isArray(prevTool.warnings) ? prevTool.warnings : warnings;
+    notes = Array.isArray(prevTool.notes) ? prevTool.notes : notes;
+  }
 
   // اگر outputMode == script و primary چند خطه/کد است، ok.
   // UI ToolResult خودش تفکیک می‌کند.
@@ -207,7 +388,7 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode) {
     cli: String(cliGuess || "bash").toLowerCase(),
     pythonScript: false,
     primary_command: primary,
-    alternatives: alts,
+    alternatives: isScriptMode ? [] : alts,
     explanation,
     warnings,
     notes,
@@ -423,6 +604,7 @@ export default function GeneratorPage() {
   const draggingRef = useRef(false);
 
   const abortRef = useRef(null);
+  const lastRequestRef = useRef(null);
 
   useEffect(() => {
     const allowed = new Set(cliOptions.map((x) => String(x).toLowerCase()));
@@ -512,6 +694,17 @@ export default function GeneratorPage() {
     const netOsType = platform === "network" ? pickNetworkOsType(advancedSettings) : "";
     const netOsVersion = platform === "network" ? pickNetworkOsVersion(advancedSettings) : "";
 
+    const normalizedInput = normalizeSpaces(input);
+    const requestKey = JSON.stringify({ normalizedInput, outputMode, platform: finalPlatform, cli: baseCli, advancedEnabled, advanced: advancedEnabled ? compactAdvanced(advancedSettings) : {} });
+    const last = lastRequestRef.current;
+    const sameBase = Boolean(last && last.requestKey === requestKey);
+    const refineTarget =
+      sameBase && outputMode === "command" && moreCommands && !last.moreCommands
+        ? "commands"
+        : sameBase && moreDetails && !last.moreDetails
+          ? "details"
+          : "";
+
     const payload = {
       mode: "generate",
       modeStyle: "generator",
@@ -538,7 +731,10 @@ export default function GeneratorPage() {
       advancedEnabled: Boolean(advancedEnabled),
       advanced: advancedEnabled ? compactAdvanced(advancedSettings) : undefined,
 
-      user_request: normalizeSpaces(input),
+      refineTarget: refineTarget || undefined,
+      previousTool: refineTarget && tool ? tool : undefined,
+
+      user_request: normalizedInput,
       timestamp: new Date().toISOString(),
     };
 
@@ -548,12 +744,14 @@ export default function GeneratorPage() {
       const markdown = String(result?.markdown || result?.output || result?.result || "").trim();
       setOutput(markdown);
 
-      const built = buildToolFromResponse(result, lang, payload.cli, outputMode);
+      const built = buildToolFromResponse(result, lang, payload.cli, outputMode, tool, refineTarget);
       setTool(built);
+      lastRequestRef.current = { requestKey, moreCommands, moreDetails };
     } catch (err) {
       setError(formatApiErrorForUI(err, lang));
       setOutput("");
       setTool(null);
+      lastRequestRef.current = null;
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
       setLoading(false);
@@ -778,7 +976,7 @@ export default function GeneratorPage() {
       </div>
 
       {tool ? (
-        <ToolResult tool={tool} lang={lang} />
+        <ToolResult tool={tool} uiLang={lang} />
       ) : output ? (
         <CodeBlock code={output} language="markdown" showCopy={true} maxHeight="520px" />
       ) : (
