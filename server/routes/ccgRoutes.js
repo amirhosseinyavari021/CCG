@@ -1,12 +1,12 @@
 // /home/cando/CCG/server/routes/ccgRoutes.js
 import express from "express";
 import { runAI } from "../utils/aiClient.js";
-import {
-  formatAIOutput,
-  normalizeCompareMarkdown,
-  extractFirstFencedCode,
-  postProcessMergeCode,
-} from "../utils/outputFormatter.js";
+import * as outputFormatter from "../utils/outputFormatter.js";
+
+const formatAIOutput = outputFormatter.formatAIOutput;
+const normalizeCompareMarkdown = outputFormatter.normalizeCompareMarkdown;
+const extractFirstFencedCode = outputFormatter.extractFirstFencedCode;
+const postProcessMergeCode = outputFormatter.postProcessMergeCode;
 
 const router = express.Router();
 
@@ -117,6 +117,9 @@ router.post(/.*/, async (req, res) => {
         markdown: formatted.markdown || "",
         commands: formatted.commands || [],
         moreCommands: formatted.moreCommands || [],
+        warnings: formatted.warnings || [],
+        explanation: formatted.explanation || [],
+        notes: formatted.notes || [],
         pythonScript: formatted.pythonScript || "",
         requestId,
         ms: Date.now() - t0,

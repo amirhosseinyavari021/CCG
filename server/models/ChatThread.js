@@ -10,7 +10,7 @@ const ChatThreadSchema = new mongoose.Schema(
 
     pinned: { type: Boolean, default: false, index: true },
 
-    expiresAt: { type: Date, required: true, index: true },
+    expiresAt: { type: Date, required: true },
 
     regenCount: { type: Number, default: 0 },
     lastAssistantMessageId: { type: mongoose.Schema.Types.ObjectId, default: null },
