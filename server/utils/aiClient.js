@@ -6,6 +6,7 @@
 
 import { buildGeneratorPrompt, buildComparatorPrompt } from "./promptBuilder.js";
 import { callOpenAICompat } from "./openaiCompat.js";
+import { buildFallbackPrompt, toPromptVariables } from "./promptTransformer.js";
 
 function s(v) {
   return v === null || v === undefined ? "" : String(v);
@@ -54,6 +55,10 @@ function getCompatConfig(provider, ctx = {}) {
 
 function buildPromptByMode(ctx = {}) {
   const mode = s(ctx.mode || "generate").toLowerCase().trim();
+  if (mode === "generate") {
+    const vars = toPromptVariables(ctx);
+    return buildFallbackPrompt(vars);
+  }
   if (mode === "compare") return buildComparatorPrompt(ctx);
   return buildGeneratorPrompt(ctx);
 }
@@ -140,5 +145,4 @@ export async function runAI(vars = {}) {
     ms: Date.now() - t0,
   };
 }
-
 

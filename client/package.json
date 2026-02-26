@@ -30,7 +30,9 @@
   "scripts": {
     "start": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check:conflicts": "bash scripts/check-conflicts.sh",
+    "prebuild": "npm run check:conflicts"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.0",
