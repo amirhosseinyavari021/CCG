@@ -139,10 +139,14 @@ export function formatOutput(input, opts = {}) {
       src.explanation || (Array.isArray(src.explanations) ? src.explanations.join("\n") : src.explanations)
     ).trim();
 
-    const pythonScript = s(src.pythonScript || src.script || src?.primary?.command).trim();
+    const rawLang = s(src.lang || src.language).toLowerCase();
+    const isPythonMode = mode === "python" || rawLang === "python" || rawLang === "py";
+    const pythonScript = s(
+      isPythonMode ? (src.pythonScript || src.python_script || src.script) : (src.pythonScript || src.python_script)
+    ).trim();
     const pythonNotes = s(src.pythonNotes || src.notes).trim();
 
-    if (mode === "python" || pythonScript) {
+    if (isPythonMode || pythonScript) {
       return {
         markdown: buildMarkdown({ lang, pythonScript, pythonNotes }),
         commands: [],

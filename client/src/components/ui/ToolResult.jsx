@@ -142,7 +142,6 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
     // اگر مدل هشدارها را داخل توضیحات ریخته باشد، جدا کنیم تا کارت هشدار حتماً نمایش داده شود
     const warningFromExplanation = explanationsRaw.filter((x) => isWarningishLine(x));
     const explanations = explanationsRaw.filter((x) => !isWarningishLine(x));
-
     const warnings = [...new Set([...(warningsRaw || []), ...warningFromExplanation])];
 
     const alternatives = Array.isArray(t.alternatives)
@@ -151,9 +150,7 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
         ? t.moreCommands
         : [];
 
-    const script =
-      asText(t.script || t.python_script || "").trim() ||
-      (typeof t.pythonScript === "string" ? t.pythonScript.trim() : "");
+    const script = asText(t.script || t.python_script || "").trim() || (typeof t.pythonScript === "string" ? t.pythonScript.trim() : "");
 
     const isScriptLike =
       Boolean(script) ||

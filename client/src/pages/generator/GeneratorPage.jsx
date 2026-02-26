@@ -261,6 +261,7 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
     return {
       title: lang === "fa" ? "نتیجه" : "Result",
       cli: "python",
+      lang: "python",
       pythonScript: true,
       python_script: py || firstFencedCodeBlock(md).code,
       notes: filterChitChat(toBullets(notesRaw)),
@@ -692,6 +693,7 @@ export default function GeneratorPage() {
       advancedEnabled,
       advanced: advancedEnabled ? compactAdvanced(advancedSettings) : {},
     });
+
     const last = lastRequestRef.current;
     const sameBase = Boolean(last && last.requestKey === requestKey);
     const refineTarget =
