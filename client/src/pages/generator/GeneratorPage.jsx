@@ -139,7 +139,10 @@ function looksLikeChitChatLine(line) {
 
 function filterChitChat(arr) {
   const a = Array.isArray(arr) ? arr : [];
-  return a.map((x) => String(x || "").trim()).filter(Boolean).filter((x) => !looksLikeChitChatLine(x));
+  return a
+    .map((x) => String(x || "").trim())
+    .filter(Boolean)
+    .filter((x) => !looksLikeChitChatLine(x));
 }
 
 function firstFencedCodeBlock(md) {
@@ -1262,7 +1265,11 @@ export default function GeneratorPage() {
 
       {/* Split pane */}
       <div className="ccg-container">
-        <div ref={splitWrapRef} className={`ccg-split ${isRTL ? "is-rtl" : "is-ltr"}`} style={{ "--split": `${splitPct}%` }}>
+        <div
+          ref={splitWrapRef}
+          className={`ccg-split ${isRTL ? "is-rtl" : "is-ltr"}`}
+          style={{ "--split": `${splitPct}%` }}
+        >
           {isRTL ? (
             <>
               {outputPane}
@@ -1285,7 +1292,9 @@ export default function GeneratorPage() {
           <div className="text-xs text-gray-700 dark:text-gray-200 flex items-center gap-2">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
             <span>
-              {lang === "fa" ? "وضعیت شما ذخیره شد. بعد از ریفرش تنظیمات حفظ می‌شوند." : "Your status is saved. Settings persist after refresh."}
+              {lang === "fa"
+                ? "وضعیت شما ذخیره شد. بعد از ریفرش تنظیمات حفظ می‌شوند."
+                : "Your status is saved. Settings persist after refresh."}
             </span>
           </div>
         </div>
