@@ -171,6 +171,11 @@ export function formatOutput(input, opts = {}) {
 
     const rawLang = s(src.lang || src.language).toLowerCase();
     const isPythonMode = mode === "python" || rawLang === "python" || rawLang === "py";
+<<<<<<< codex/-ccg-ie94ef
+
+    // Robust python script extraction (handles many response shapes safely)
+=======
+>>>>>>> main
     const pythonScript = s(
       isPythonMode
         ? (
@@ -191,6 +196,10 @@ export function formatOutput(input, opts = {}) {
       const pythonWarnings = warning ? splitLines(warning) : [];
       const pythonExplanation = explanation ? splitLines(explanation) : [];
       const pythonNotesLines = pythonNotes ? splitLines(pythonNotes) : details;
+<<<<<<< codex/-ccg-ie94ef
+
+=======
+>>>>>>> main
       return {
         markdown: buildMarkdown({ lang, pythonScript, pythonNotes }),
         commands: [],
