@@ -1,5 +1,5 @@
 // client/src/components/ui/ToolResult.jsx
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -37,26 +37,33 @@ function pickAltCommand(alt) {
   return alt.command || alt.code || alt.text || alt.value || "";
 }
 
-function CopyButton({ text, label = "کپی" }) {
+function CopyButton({ text, label = "کپی", copiedLabel = "کپی شد" }) {
+  const [copied, setCopied] = useState(false);
+
   const onCopy = async () => {
     try {
       await navigator.clipboard.writeText(text || "");
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
     } catch {
-      // ignore
+      setCopied(false);
     }
   };
+
   return (
     <button
       type="button"
       onClick={onCopy}
-      className="px-3 py-1 rounded-lg text-xs font-semibold bg-white/10 hover:bg-white/15 border border-white/10"
+      className={`px-3 py-1 rounded-lg text-xs font-semibold border transition ${
+        copied ? "bg-emerald-500/25 border-emerald-400/40 text-emerald-100" : "bg-white/10 hover:bg-white/15 border-white/10"
+      }`}
     >
-      {label}
+      {copied ? copiedLabel : label}
     </button>
   );
 }
 
-function CodeCard({ title, lang, code, badge, dir }) {
+function CodeCard({ title, lang, code, badge, dir, copyLabel, copiedLabel }) {
   const safeCode = code || "";
   return (
     <div className="ccg-card p-0 overflow-hidden">
@@ -74,7 +81,7 @@ function CodeCard({ title, lang, code, badge, dir }) {
             </span>
           ) : null}
         </div>
-        <CopyButton text={safeCode} />
+        <CopyButton text={safeCode} label={copyLabel} copiedLabel={copiedLabel} />
       </div>
       <pre className="ccg-pre" dir={dir}>
         <code>{safeCode}</code>
@@ -133,6 +140,8 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
 
     const explanations = toLines(t.explanations || t.explanation || t.description || "");
     const warnings = toLines(t.warnings || t.warning || t.alert || "");
+    const warningFromExplanation = explanations.filter((x) => /(^|\s)(⚠|warning|هشدار|خطر|احتیاط)/i.test(x));
+    const cleanExplanations = explanations.filter((x) => !/(^|\s)(⚠|warning|هشدار|خطر|احتیاط)/i.test(x));
     const notes = toLines(t.notes || t.note || t.moreDetails || "");
 
     const alternatives = Array.isArray(t.alternatives)
@@ -155,8 +164,8 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
       title: t.title || (uiLang === "fa" ? "نتیجه" : "Result"),
       primaryCommand,
       primaryLang,
-      explanations,
-      warnings,
+      explanations: cleanExplanations,
+      warnings: [...new Set([...(warnings || []), ...warningFromExplanation])],
       notes,
       alternatives,
       script,
@@ -182,6 +191,8 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
           code={normalized.primaryCommand}
           badge="✓"
           dir="ltr"
+          copyLabel={uiLang === "fa" ? "کپی" : "Copy"}
+          copiedLabel={uiLang === "fa" ? "کپی شد" : "Copied"}
         />
       ) : null}
 
@@ -192,6 +203,8 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
           lang={normalized.primaryLang || "bash"}
           code={normalized.script || normalized.primaryCommand}
           dir="ltr"
+          copyLabel={uiLang === "fa" ? "کپی" : "Copy"}
+          copiedLabel={uiLang === "fa" ? "کپی شد" : "Copied"}
         />
       ) : null}
 
@@ -232,6 +245,8 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
                 lang={lang}
                 code={cmd}
                 dir="ltr"
+                copyLabel={uiLang === "fa" ? "کپی" : "Copy"}
+                copiedLabel={uiLang === "fa" ? "کپی شد" : "Copied"}
               />
             );
           })}

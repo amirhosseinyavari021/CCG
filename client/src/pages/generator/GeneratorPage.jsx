@@ -250,7 +250,7 @@ function asTextValue(v) {
   }
 }
 
-function buildToolFromResponse(res, lang, cliGuess, outputMode) {
+function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null, refineTarget = "") {
   const md = String(res?.markdown || res?.output || res?.result || "").trim();
 
   const py = String(res?.pythonScript || res?.python_script || "").trim();
@@ -283,6 +283,7 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode) {
   let primary = commandsArr.length ? coerceCommandItem(commandsArr[0]) : "";
   let alts = moreArr.map(coerceCommandItem).filter(Boolean);
   const mdBlocks = allFencedCodeBlocks(md);
+  const isScriptMode = outputMode === "script";
 
   // اگر بک‌اند commands نداد، از اولین codeblock داخل markdown بردار
   if (!primary) {
@@ -290,7 +291,7 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode) {
     if (block.code) primary = block.code;
   }
 
-  if (!alts.length) {
+  if (!isScriptMode && !alts.length) {
     const fromBlocks = mdBlocks
       .map((b) => b.code)
       .filter(Boolean)
@@ -298,7 +299,7 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode) {
     if (fromBlocks.length) alts = fromBlocks;
   }
 
-  if (!alts.length) {
+  if (!isScriptMode && !alts.length) {
     const altRaw = extractSection(md, [
       "Alternative Commands",
       "Alternatives",
@@ -367,6 +368,18 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode) {
   explanation = [...new Set(explanation.map((x) => String(x || "").trim()).filter(Boolean))];
   notes = [...new Set(notes.map((x) => String(x || "").trim()).filter(Boolean))];
 
+  if (prevTool && refineTarget === "details") {
+    primary = prevTool.primary_command || primary;
+    alts = Array.isArray(prevTool.alternatives) ? prevTool.alternatives : alts;
+  }
+
+  if (prevTool && refineTarget === "commands") {
+    primary = prevTool.primary_command || primary;
+    explanation = Array.isArray(prevTool.explanation) ? prevTool.explanation : explanation;
+    warnings = Array.isArray(prevTool.warnings) ? prevTool.warnings : warnings;
+    notes = Array.isArray(prevTool.notes) ? prevTool.notes : notes;
+  }
+
   // اگر outputMode == script و primary چند خطه/کد است، ok.
   // UI ToolResult خودش تفکیک می‌کند.
   return {
@@ -374,7 +387,7 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode) {
     cli: String(cliGuess || "bash").toLowerCase(),
     pythonScript: false,
     primary_command: primary,
-    alternatives: alts,
+    alternatives: isScriptMode ? [] : alts,
     explanation,
     warnings,
     notes,
@@ -590,6 +603,7 @@ export default function GeneratorPage() {
   const draggingRef = useRef(false);
 
   const abortRef = useRef(null);
+  const lastRequestRef = useRef(null);
 
   useEffect(() => {
     const allowed = new Set(cliOptions.map((x) => String(x).toLowerCase()));
@@ -679,6 +693,17 @@ export default function GeneratorPage() {
     const netOsType = platform === "network" ? pickNetworkOsType(advancedSettings) : "";
     const netOsVersion = platform === "network" ? pickNetworkOsVersion(advancedSettings) : "";
 
+    const normalizedInput = normalizeSpaces(input);
+    const requestKey = JSON.stringify({ normalizedInput, outputMode, platform: finalPlatform, cli: baseCli, advancedEnabled, advanced: advancedEnabled ? compactAdvanced(advancedSettings) : {} });
+    const last = lastRequestRef.current;
+    const sameBase = Boolean(last && last.requestKey === requestKey);
+    const refineTarget =
+      sameBase && outputMode === "command" && moreCommands && !last.moreCommands
+        ? "commands"
+        : sameBase && moreDetails && !last.moreDetails
+          ? "details"
+          : "";
+
     const payload = {
       mode: "generate",
       modeStyle: "generator",
@@ -705,7 +730,10 @@ export default function GeneratorPage() {
       advancedEnabled: Boolean(advancedEnabled),
       advanced: advancedEnabled ? compactAdvanced(advancedSettings) : undefined,
 
-      user_request: normalizeSpaces(input),
+      refineTarget: refineTarget || undefined,
+      previousTool: refineTarget && tool ? tool : undefined,
+
+      user_request: normalizedInput,
       timestamp: new Date().toISOString(),
     };
 
@@ -715,12 +743,14 @@ export default function GeneratorPage() {
       const markdown = String(result?.markdown || result?.output || result?.result || "").trim();
       setOutput(markdown);
 
-      const built = buildToolFromResponse(result, lang, payload.cli, outputMode);
+      const built = buildToolFromResponse(result, lang, payload.cli, outputMode, tool, refineTarget);
       setTool(built);
+      lastRequestRef.current = { requestKey, moreCommands, moreDetails };
     } catch (err) {
       setError(formatApiErrorForUI(err, lang));
       setOutput("");
       setTool(null);
+      lastRequestRef.current = null;
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
       setLoading(false);
