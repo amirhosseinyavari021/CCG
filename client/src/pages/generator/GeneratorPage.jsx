@@ -1,3 +1,4 @@
+// /home/cando/CCG/client/src/pages/generator/GeneratorPage.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLanguage } from "../../context/LanguageContext";
 import { usePersistState, usePersistComplexState } from "../../hooks/usePersistState";
@@ -7,16 +8,45 @@ import AdvancedSettings from "../../components/generator/AdvancedSettings";
 import FeedbackButton from "../../components/ui/FeedbackButton";
 import ToolResult from "../../components/ui/ToolResult";
 
-/* ==============================
-   CONSTANTS
-============================== */
-
 const PLATFORMS = [
-  { value: "linux", label: "Linux", icon: "🐧" },
-  { value: "windows", label: "Windows", icon: "🪟" },
-  { value: "mac", label: "macOS", icon: "🍎" },
-  { value: "network", label: "Network", icon: "🌐" },
-  { value: "other", label: "Other OS", icon: "🔧" },
+  { value: "linux", label: "Linux", icon: "🐧", shortLabel: { fa: "لینوکس", en: "Linux" } },
+  { value: "windows", label: "Windows", icon: "🪟", shortLabel: { fa: "ویندوز", en: "Windows" } },
+  { value: "mac", label: "macOS", icon: "🍎", shortLabel: { fa: "مک", en: "macOS" } },
+  { value: "network", label: "Network", icon: "🌐", shortLabel: { fa: "شبکه", en: "Network" } },
+  { value: "other", label: "Other OS", icon: "🔧", shortLabel: { fa: "سایر", en: "Other" } },
+];
+
+const SUPPORTED_OTHER_OS = [
+  { value: "freebsd", label: "FreeBSD", icon: "🐡" },
+  { value: "openbsd", label: "OpenBSD", icon: "🐡" },
+  { value: "netbsd", label: "NetBSD", icon: "🐡" },
+  { value: "solaris", label: "Solaris", icon: "☀️" },
+  { value: "aix", label: "AIX", icon: "🖥️" },
+  { value: "hpux", label: "HP-UX", icon: "💻" },
+  { value: "zos", label: "z/OS", icon: "💾" },
+  { value: "android", label: "Android", icon: "🤖" },
+  { value: "ios", label: "iOS", icon: "📱" },
+  { value: "chromeos", label: "ChromeOS", icon: "🌐" },
+];
+
+const NETWORK_VENDORS = [
+  { value: "cisco", label: "Cisco" },
+  { value: "mikrotik", label: "MikroTik" },
+  { value: "juniper", label: "Juniper" },
+  { value: "huawei", label: "Huawei" },
+  { value: "fortinet", label: "Fortinet" },
+  { value: "paloalto", label: "Palo Alto" },
+  { value: "arista", label: "Arista" },
+  { value: "ubiquiti", label: "Ubiquiti" },
+  { value: "generic", label: "Generic" },
+];
+
+const NETWORK_DEVICE_TYPES = [
+  { value: "router", label: "Router" },
+  { value: "switch", label: "Switch" },
+  { value: "firewall", label: "Firewall" },
+  { value: "access_point", label: "Access Point" },
+  { value: "load_balancer", label: "Load Balancer" },
 ];
 
 function defaultCliForPlatform(platform) {
@@ -30,14 +60,53 @@ function cliOptionsForPlatform(platform) {
   if (platform === "windows") return ["powershell", "pwsh", "cmd"];
   if (platform === "mac") return ["zsh", "bash"];
   if (platform === "network") return ["network"];
+  if (platform === "other") return ["bash", "sh", "ksh", "tcsh", "zsh", "adb"];
   return ["bash", "zsh", "sh", "fish"];
+}
+
+/** --------- markdown helpers --------- */
+function extractSection(md, titles) {
+  const text = String(md || "");
+  if (!text.trim()) return "";
+
+  const lines = text.split("\n");
+  const normalizeHeading = (s) =>
+    String(s || "")
+      .toLowerCase()
+      .replace(/^#{1,6}\s+/, "")
+      .replace(/[*_`~]/g, "")
+      .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, "")
+      .replace(/[:：]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const titleSet = new Set((titles || []).map((x) => normalizeHeading(x)).filter(Boolean));
+  const headingIdx = lines.findIndex((l) => {
+    const t = l.trim();
+    if (!/^#{1,6}\s+/.test(t)) return false;
+    const h = normalizeHeading(t);
+    return titleSet.has(h);
+  });
+  if (headingIdx === -1) return "";
+
+  const out = [];
+  for (let i = headingIdx + 1; i < lines.length; i++) {
+    const l = lines[i];
+    if (/^#{1,6}\s+/.test(l.trim())) break;
+    out.push(l);
+  }
+  return out.join("\n").trim();
+}
+
+function stripCodeBlocks(md) {
+  const text = String(md || "");
+  return text.replace(/```[\s\S]*?```/g, "").trim();
 }
 
 function normalizeSpaces(s) {
   return String(s || "").replace(/\s+/g, " ").trim();
 }
 
-<<<<<<< codex/-ccg-ie94ef
 function toBullets(text) {
   const t = String(text || "").trim();
   if (!t) return [];
@@ -163,7 +232,6 @@ function isWarningTextLine(line) {
 function coerceCommandItem(x) {
   if (typeof x === "string") return x.trim();
   if (x && typeof x === "object") {
-    // رایج‌ترین حالت‌ها + robust keys
     const v =
       x.command ||
       x.cmd ||
@@ -173,7 +241,6 @@ function coerceCommandItem(x) {
       x.script ||
       x?.primary?.command ||
       x?.primary_command;
-
     if (typeof v === "string") return v.trim();
     const ks = Object.keys(x);
     if (ks.length === 1 && typeof x[ks[0]] === "string") return String(x[ks[0]]).trim();
@@ -235,6 +302,7 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
     let warnings = filterChitChat(toBullets(warnRaw));
     let notes = filterChitChat(toBullets(notesRaw));
 
+    // اگر توضیحات/هشدار از روی کامنت‌های اسکریپت قابل استخراج بود
     const commentLines = extractPythonCommentLines(pythonBody);
     if (!explanation.length && commentLines.length) {
       explanation = commentLines.filter((x) => !isWarningTextLine(x));
@@ -245,9 +313,10 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
 
     if (!warnings.length) warnings = filterChitChat(extractLabelLines(md, ["warning", "warnings", "هشدار", "هشدارها"]));
     if (!warnings.length) warnings = filterChitChat(extractWarningLikeLines(md));
-
     if (!explanation.length) explanation = filterChitChat(extractLabelLines(md, ["explanation", "details", "توضیح", "توضیحات", "شرح"]));
+    if (!notes.length) notes = filterChitChat(extractLabelLines(md, ["note", "notes", "more details", "detail", "نکته", "نکات", "توضیحات بیشتر"]));
 
+    // اگر هشدار داخل توضیحات بود جداش کن
     if (explanation.length) {
       const movedToWarnings = explanation.filter((x) => isWarningTextLine(x));
       const keptExplanation = explanation.filter((x) => !isWarningTextLine(x));
@@ -256,17 +325,6 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
         explanation = keptExplanation;
       }
     }
-
-    if (!notes.length) {
-      notes = filterChitChat(
-        extractLabelLines(md, ["note", "notes", "more details", "detail", "نکته", "نکات", "توضیحات بیشتر"])
-      );
-    }
-
-    // fallback: اگر متن هست ولی bullets خالی شد، همون متن رو نگه دار
-    if (!explanation.length && String(expRaw || "").trim()) explanation.push(String(expRaw).trim());
-    if (!warnings.length && String(warnRaw || "").trim()) warnings.push(String(warnRaw).trim());
-    if (!notes.length && String(notesRaw || "").trim()) notes.push(String(notesRaw).trim());
 
     warnings = [...new Set(warnings.map((x) => String(x || "").trim()).filter(Boolean))];
     explanation = [...new Set(explanation.map((x) => String(x || "").trim()).filter(Boolean))];
@@ -345,18 +403,10 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
 
   if (!warnings.length) warnings = filterChitChat(extractLabelLines(md, ["warning", "warnings", "هشدار", "هشدارها"]));
   if (!warnings.length) warnings = filterChitChat(extractWarningLikeLines(md));
+  if (!notes.length) notes = filterChitChat(extractLabelLines(md, ["note", "notes", "more details", "detail", "نکته", "نکات", "توضیحات بیشتر"]));
+  if (!explanation.length) explanation = filterChitChat(extractLabelLines(md, ["explanation", "details", "توضیح", "توضیحات", "شرح"]));
 
-  if (!notes.length) {
-    notes = filterChitChat(
-      extractLabelLines(md, ["note", "notes", "more details", "detail", "نکته", "نکات", "توضیحات بیشتر"])
-    );
-  }
-
-  if (!explanation.length) {
-    explanation = filterChitChat(extractLabelLines(md, ["explanation", "details", "توضیح", "توضیحات", "شرح"]));
-  }
-
-  // اگر مدل هشدار را داخل توضیحات ریخته بود، جدا کن تا کارت هشدار حتماً نمایش داده شود
+  // اگر هشدار داخل توضیحات بود جداش کن
   if (explanation.length) {
     const movedToWarnings = explanation.filter((x) => isWarningTextLine(x));
     const keptExplanation = explanation.filter((x) => !isWarningTextLine(x));
@@ -365,11 +415,6 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
       explanation = keptExplanation;
     }
   }
-
-  // fallback متن خام
-  if (!explanation.length && String(expRaw || "").trim()) explanation.push(String(expRaw).trim());
-  if (!warnings.length && String(warnRaw || "").trim()) warnings.push(String(warnRaw).trim());
-  if (!notes.length && String(notesRaw || "").trim()) notes.push(String(notesRaw).trim());
 
   alts = [...new Set(alts.map((x) => String(x || "").trim()).filter(Boolean))].filter((x) => x !== primary);
   warnings = [...new Set(warnings.map((x) => String(x || "").trim()).filter(Boolean))];
@@ -570,19 +615,21 @@ function formatApiErrorForUI(err, lang) {
     status,
   };
 }
-=======
-/* ==============================
-   COMPONENT
-============================== */
->>>>>>> main
 
 export default function GeneratorPage() {
   const { lang } = useLanguage();
   const isRTL = lang === "fa";
+  const dirClass = isRTL ? "rtl" : "ltr";
 
   const [platform, setPlatform] = usePersistState("platform", "linux");
-  const [cli, setCli] = usePersistState("generator_cli", defaultCliForPlatform(platform));
+  const [otherOS, setOtherOS] = usePersistState("other_os", "freebsd");
+
+  const [netVendor, setNetVendor] = usePersistState("network_vendor", "cisco");
+  const [deviceType, setDeviceType] = usePersistState("network_device_type", "router");
+
   const [outputMode, setOutputMode] = usePersistState("generator_output_mode", "command");
+  const [cli, setCli] = usePersistState("generator_cli", defaultCliForPlatform(platform));
+
   const [moreDetails, setMoreDetails] = usePersistState("generator_more_details", false);
   const [moreCommands, setMoreCommands] = usePersistState("generator_more_commands", false);
 
@@ -592,38 +639,95 @@ export default function GeneratorPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const [showAdvanced, setShowAdvanced] = usePersistState("show_advanced", false);
   const [advancedEnabled, setAdvancedEnabled] = usePersistState("advanced_enabled", false);
   const [advancedSettings, setAdvancedSettings] = usePersistComplexState("advanced_settings", {});
+
+  const finalPlatform = platform === "other" ? `other:${otherOS}` : platform;
+  const cliOptions = useMemo(() => cliOptionsForPlatform(platform), [platform]);
+
+  const [splitPct, setSplitPct] = usePersistState("generator_split_pct", 50);
+  const splitWrapRef = useRef(null);
+  const draggingRef = useRef(false);
 
   const abortRef = useRef(null);
   const lastRequestRef = useRef(null);
 
   useEffect(() => {
-    const allowed = new Set(cliOptionsForPlatform(platform));
-    if (!allowed.has(cli)) {
-      setCli(defaultCliForPlatform(platform));
-    }
+    const allowed = new Set(cliOptions.map((x) => String(x).toLowerCase()));
+    const cur = String(cli || "").toLowerCase();
+    if (!allowed.has(cur)) setCli(defaultCliForPlatform(platform));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [platform]);
 
-  function computeCli() {
+  useEffect(() => {
+    if (outputMode !== "command") {
+      if (moreCommands) setMoreCommands(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outputMode]);
+
+  const getPlatformColor = (plat) => {
+    const colors = {
+      linux: "from-orange-500 to-red-500",
+      windows: "from-blue-500 to-cyan-500",
+      mac: "from-gray-400 to-gray-600",
+      network: "from-green-500 to-emerald-600",
+      other: "from-purple-500 to-pink-500",
+    };
+    return colors[plat] || "from-blue-500 to-purple-600";
+  };
+
+  const compactAdvanced = (obj) => {
+    const o = obj && typeof obj === "object" ? obj : {};
+    const out = {};
+    for (const [k, v] of Object.entries(o)) {
+      if (v === undefined || v === null) continue;
+      if (typeof v === "string" && !v.trim()) continue;
+      out[k] = v;
+    }
+    return Object.keys(out).length ? out : null;
+  };
+
+  const clearAll = () => {
+    setInput("");
+    setOutput("");
+    setTool(null);
+    setError(null);
+  };
+
+  function computeCliForPayload({ outputMode, cli }) {
     if (outputMode === "python") return "python";
-    return cli || "bash";
+    return String(cli || "bash").toLowerCase();
   }
 
   function mapOutputType(mode) {
+    // server expects outputType in {tool, command, python}
     if (mode === "python") return "python";
     if (mode === "command") return "command";
-    return "tool";
+    return "tool"; // script mode -> tool (structured output)
+  }
+
+  function pickNetworkOsType(s) {
+    const o = s && typeof s === "object" ? s : {};
+    return String(o.os_type || o.osType || "").trim();
+  }
+  function pickNetworkOsVersion(s) {
+    const o = s && typeof s === "object" ? s : {};
+    return String(o.os_version || o.osVersion || "").trim();
   }
 
   async function generate() {
-    if (!normalizeSpaces(input)) {
-      setError(lang === "fa" ? "درخواست را وارد کن" : "Please enter a request");
+    const preErr = precheckUserRequest(input, lang);
+    if (preErr) {
+      setError(preErr);
       return;
     }
 
     if (abortRef.current) {
-      try { abortRef.current.abort(); } catch {}
+      try {
+        abortRef.current.abort();
+      } catch {}
     }
 
     const controller = new AbortController();
@@ -632,31 +736,60 @@ export default function GeneratorPage() {
     setLoading(true);
     setError(null);
 
+    const baseCli = computeCliForPayload({ outputMode, cli });
+
+    const netOsType = platform === "network" ? pickNetworkOsType(advancedSettings) : "";
+    const netOsVersion = platform === "network" ? pickNetworkOsVersion(advancedSettings) : "";
+
     const normalizedInput = normalizeSpaces(input);
 
     const requestKey = JSON.stringify({
       normalizedInput,
       outputMode,
-      platform,
-      cli: computeCli(),
+      platform: finalPlatform,
+      cli: baseCli,
       advancedEnabled,
-      advanced: advancedEnabled ? advancedSettings : {},
+      advanced: advancedEnabled ? compactAdvanced(advancedSettings) : {},
     });
 
-    const sameBase = lastRequestRef.current?.requestKey === requestKey;
+    const last = lastRequestRef.current;
+    const sameBase = Boolean(last && last.requestKey === requestKey);
+    const refineTarget =
+      sameBase && outputMode === "command" && moreCommands && !last.moreCommands
+        ? "commands"
+        : sameBase && moreDetails && !last.moreDetails
+          ? "details"
+          : "";
 
     const payload = {
       mode: "generate",
       modeStyle: "generator",
       lang,
-      platform,
-      cli: computeCli(),
+
+      platform: finalPlatform,
+      cli: baseCli,
+
       outputType: mapOutputType(outputMode),
+
       moreDetails: Boolean(moreDetails),
-      moreCommands: Boolean(moreCommands),
+      moreCommands: outputMode === "command" ? Boolean(moreCommands) : false,
+
       pythonScript: outputMode === "python",
-      advancedEnabled,
-      advanced: advancedEnabled ? advancedSettings : undefined,
+
+      vendor: platform === "network" ? netVendor : undefined,
+      deviceType: platform === "network" ? deviceType : undefined,
+
+      os_type: platform === "network" && netOsType ? netOsType : undefined,
+      os_version: platform === "network" && netOsVersion ? netOsVersion : undefined,
+      osType: platform === "network" && netOsType ? netOsType : undefined,
+      osVersion: platform === "network" && netOsVersion ? netOsVersion : undefined,
+
+      advancedEnabled: Boolean(advancedEnabled),
+      advanced: advancedEnabled ? compactAdvanced(advancedSettings) : undefined,
+
+      refineTarget: refineTarget || undefined,
+      previousTool: refineTarget && tool ? tool : undefined,
+
       user_request: normalizedInput,
       timestamp: new Date().toISOString(),
     };
@@ -664,14 +797,14 @@ export default function GeneratorPage() {
     try {
       const result = await callCCG(payload, { signal: controller.signal });
 
-      const markdown = String(result?.markdown || "").trim();
+      const markdown = String(result?.markdown || result?.output || result?.result || "").trim();
       setOutput(markdown);
-      setTool(result?.tool || null);
 
-      lastRequestRef.current = { requestKey };
+      const built = buildToolFromResponse(result, lang, payload.cli, outputMode, tool, refineTarget);
+      setTool(built);
+      lastRequestRef.current = { requestKey, moreCommands, moreDetails };
     } catch (err) {
-      if (err.name === "AbortError") return;
-      setError(err.message || "Server Error");
+      setError(formatApiErrorForUI(err, lang));
       setOutput("");
       setTool(null);
       lastRequestRef.current = null;
@@ -683,63 +816,524 @@ export default function GeneratorPage() {
 
   function cancelGenerate() {
     if (!abortRef.current) return;
-    try { abortRef.current.abort(); } catch {}
+    try {
+      abortRef.current.abort();
+    } catch {}
   }
 
-  return (
-    <div className={`space-y-6 ${isRTL ? "rtl text-right" : "ltr text-left"}`}>
-      <FeedbackButton />
+  const outputModes = useMemo(() => {
+    return [
+      {
+        value: "command",
+        label: lang === "fa" ? "کامند" : "Command",
+        sub: lang === "fa" ? "دستور کوتاه و مستقیم" : "Direct command output",
+        icon: "⌨️",
+      },
+      {
+        value: "script",
+        label: lang === "fa" ? "اسکریپت سیستم‌عامل" : "OS Script",
+        sub: lang === "fa" ? "اسکریپت با شل انتخابی" : "Script with chosen shell",
+        icon: "📄",
+      },
+      {
+        value: "python",
+        label: lang === "fa" ? "پایتون" : "Python",
+        sub: lang === "fa" ? "اتوماسیون با Python" : "Automation with Python",
+        icon: "🐍",
+      },
+    ];
+  }, [lang]);
 
-      <div className="ccg-card p-4 rounded-2xl space-y-4">
+  const onSetOutputMode = (mode) => {
+    const next = String(mode || "command");
+    setOutputMode(next);
+  };
 
-        {/* PLATFORM */}
-        <div className="flex gap-2 flex-wrap">
-          {PLATFORMS.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => setPlatform(p.value)}
-              className={`px-3 py-2 rounded-xl text-sm ${
-                platform === p.value
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-200 dark:bg-gray-800"
-              }`}
-            >
-              {p.icon} {p.label}
-            </button>
-          ))}
-        </div>
+  const startDrag = (clientX) => {
+    const wrap = splitWrapRef.current;
+    if (!wrap) return;
+    const rect = wrap.getBoundingClientRect();
+    const x = clamp(clientX - rect.left, 0, rect.width);
+    const pct = clamp((x / rect.width) * 100, 24, 76);
+    setSplitPct(Math.round(pct));
+  };
 
-        {/* INPUT */}
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          className="w-full h-40 p-3 rounded-xl border"
-          placeholder={
-            lang === "fa"
-              ? "مثال: سیستم را ۱ ساعت دیگر خاموش کن"
-              : "Example: Shutdown system in 1 hour"
-          }
-        />
+  const onMouseDownResizer = (e) => {
+    e.preventDefault();
+    draggingRef.current = true;
+    document.body.classList.add("ccg-noselect");
+  };
 
-        {/* BUTTON */}
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!draggingRef.current) return;
+      startDrag(e.clientX);
+    };
+    const onUp = () => {
+      if (!draggingRef.current) return;
+      draggingRef.current = false;
+      document.body.classList.remove("ccg-noselect");
+    };
+
+    const onTouchMove = (e) => {
+      if (!draggingRef.current) return;
+      const t = e.touches?.[0];
+      if (!t) return;
+      startDrag(t.clientX);
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
+    window.addEventListener("touchend", onUp);
+
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [splitPct]);
+
+  const renderPlatformButtons = () => (
+    <div className="grid grid-cols-5 gap-2 mb-3">
+      {PLATFORMS.map((p) => (
         <button
-          onClick={loading ? cancelGenerate : generate}
-          className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-500 to-purple-600 text-white"
+          key={p.value}
+          onClick={() => setPlatform(p.value)}
+          className={`
+            flex flex-col items-center p-2 rounded-xl transition-all
+            ${
+              platform === p.value
+                ? `bg-gradient-to-b ${getPlatformColor(p.value)} text-white shadow`
+                : "bg-gray-100 dark:bg-gray-900/50 hover:bg-gray-200 dark:hover:bg-gray-800 border border-gray-200/70 dark:border-white/10"
+            }
+          `}
+          title={p.label}
+          type="button"
         >
-          {loading ? (lang === "fa" ? "لغو" : "Cancel") : (lang === "fa" ? "تولید" : "Generate")}
+          <span className="text-lg">{p.icon}</span>
+          <span className="text-xs mt-1">
+            {typeof p.shortLabel === "object" ? p.shortLabel[lang] || p.shortLabel.en : p.shortLabel}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+
+  const panelClass =
+    "ccg-card ccg-glass p-4 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm ring-1 ring-black/5 dark:ring-white/10";
+  const subCardClass =
+    "ccg-card ccg-glass-soft p-3 rounded-2xl border border-gray-200/60 dark:border-white/10 shadow-sm";
+  const knobBase =
+    "ccg-card ccg-glass-soft p-3 rounded-2xl border border-gray-200/60 dark:border-white/10 shadow-sm text-left transition";
+  const knobActive = "ccg-knob-active ring-2 ring-blue-500/20 dark:ring-blue-400/20";
+
+  const errObj =
+    error && typeof error === "object"
+      ? error
+      : error
+        ? { code: "ERROR", message: String(error), hint: "", source: "client" }
+        : null;
+
+  const inputPane = (
+    <div className="ccg-card ccg-glass p-4 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm ring-1 ring-black/5 dark:ring-white/10">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+        <h2 className="font-bold text-base">{lang === "fa" ? "📝 درخواست شما" : "📝 Your Request"}</h2>
+        <button
+          onClick={clearAll}
+          className="px-2 py-1 text-xs bg-gray-100/70 dark:bg-black/30 rounded-xl hover:opacity-90 transition border border-gray-200/60 dark:border-white/10"
+          type="button"
+        >
+          🗑️ {lang === "fa" ? "پاک کردن" : "Clear"}
+        </button>
+      </div>
+
+      <textarea
+        value={input}
+        onChange={(e) => setInput(e.target.value)}
+        placeholder={lang === "fa" ? "مثال: میخوام سیستمم ۱ ساعت دیگه خاموش بشه" : "Example: Shutdown the system in 1 hour"}
+        dir={isRTL ? "rtl" : "ltr"}
+        className={`w-full h-44 p-3 text-sm border border-gray-300/70 dark:border-white/10 rounded-xl resize-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 bg-white/70 dark:bg-black/30 ${
+          isRTL ? "text-right" : "text-left"
+        }`}
+        rows={4}
+      />
+
+      {errObj && (
+        <div className="mt-3 rounded-xl border border-rose-200/70 bg-rose-50/80 p-3 text-rose-800 dark:border-rose-700/40 dark:bg-rose-900/20 dark:text-rose-200 animate-fadeIn">
+          <div className="text-xs font-semibold">
+            {errObj.message}
+            {errObj.code ? <span className="ml-2 opacity-70">({errObj.code})</span> : null}
+          </div>
+          {errObj.hint ? <div className="mt-1 text-xs opacity-95">💡 {errObj.hint}</div> : null}
+        </div>
+      )}
+
+      <button
+        onClick={loading ? cancelGenerate : generate}
+        disabled={!loading && !String(input || "").trim()}
+        className={`
+          mt-4 w-full py-3 rounded-2xl font-semibold text-sm transition
+          ${
+            loading
+              ? "bg-rose-600 text-white hover:opacity-90"
+              : !String(input || "").trim()
+                ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed"
+                : `bg-gradient-to-r ${getPlatformColor(platform)} text-white hover:opacity-90`
+          }
+        `}
+        type="button"
+      >
+        {loading ? (
+          <div className="flex items-center justify-center gap-2">
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            <span>{lang === "fa" ? "لغو تولید" : "Cancel"}</span>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-base">🚀</span>
+            <span>{lang === "fa" ? "تولید خروجی" : "Generate"}</span>
+          </div>
+        )}
+      </button>
+
+      {loading ? (
+        <div className="mt-2 text-[11px] text-gray-600 dark:text-gray-300">
+          {lang === "fa" ? "برای لغو، دوباره روی دکمه کلیک کنید." : "Click again to cancel the request."}
+        </div>
+      ) : null}
+    </div>
+  );
+
+  const resizer = (
+    <div
+      className="ccg-resizer"
+      role="separator"
+      aria-orientation="vertical"
+      tabIndex={0}
+      onMouseDown={onMouseDownResizer}
+      onTouchStart={() => {
+        draggingRef.current = true;
+        document.body.classList.add("ccg-noselect");
+      }}
+      title={lang === "fa" ? "کشیدن برای تغییر اندازه" : "Drag to resize"}
+    >
+      <div className="ccg-resizer-handle" />
+    </div>
+  );
+
+  const outputPane = (
+    <div className="ccg-card ccg-glass p-4 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm ring-1 ring-black/5 dark:ring-white/10">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <h2 className="font-bold text-base">{lang === "fa" ? "✨ نتیجه" : "✨ Result"}</h2>
+      </div>
+
+      {tool ? (
+        <ToolResult tool={tool} uiLang={lang} />
+      ) : output ? (
+        <CodeBlock code={output} language="markdown" showCopy={true} maxHeight="520px" />
+      ) : (
+        <div className="text-center py-10 text-gray-600 dark:text-gray-300">
+          <div className="text-3xl mb-2">✨</div>
+          <div className="text-sm mb-1">{lang === "fa" ? "آماده برای تولید!" : "Ready!"}</div>
+          <div className="text-xs">
+            {lang === "fa" ? "درخواست خود را بنویسید و تولید را بزنید" : "Write a request and click Generate"}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className={`space-y-4 md:space-y-6 ${dirClass}`}>
+      <div className="ccg-container">
+        <FeedbackButton />
+      </div>
+
+      <div className="ccg-container">
+        <div className={panelClass}>
+          <h2 className="font-bold text-base mb-3">{lang === "fa" ? "🎯 پلتفرم هدف" : "🎯 Target Platform"}</h2>
+
+          {renderPlatformButtons()}
+
+          {platform === "other" && (
+            <div className="mt-3 p-3 rounded-2xl ccg-glass-soft border border-gray-200/60 dark:border-white/10">
+              <div className="text-sm font-medium mb-2">{lang === "fa" ? "🔧 انتخاب سیستم عامل" : "🔧 Select OS"}</div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                {SUPPORTED_OTHER_OS.map((os) => (
+                  <button
+                    key={os.value}
+                    onClick={() => setOtherOS(os.value)}
+                    className={`
+                      flex flex-col items-center p-2 rounded-xl transition text-center
+                      ${
+                        otherOS === os.value
+                          ? "bg-gradient-to-b from-purple-500 to-pink-500 text-white shadow"
+                          : "ccg-glass-soft border border-gray-200/60 dark:border-white/10 hover:opacity-90"
+                      }
+                    `}
+                    title={os.label}
+                    type="button"
+                  >
+                    <span className="text-lg mb-1">{os.icon}</span>
+                    <span className="text-xs">{os.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mt-4">
+            <div className="text-xs font-medium mb-2">{lang === "fa" ? "🧭 نوع خروجی" : "🧭 Output Mode"}</div>
+
+            <div className="ccg-seg">
+              {outputModes.map((m) => {
+                const active = outputMode === m.value;
+                return (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => onSetOutputMode(m.value)}
+                    className={`ccg-seg-item ${active ? "is-active" : ""}`}
+                    aria-pressed={active}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span>{m.icon}</span>
+                      <span className="font-semibold text-sm">{m.label}</span>
+                    </div>
+                    <div className="text-[11px] opacity-80 mt-0.5">{m.sub}</div>
+                  </button>
+                );
+              })}
+              <div
+                className="ccg-seg-indicator"
+                style={{
+                  width: "calc((100% - 8px) / 3)",
+                  transform:
+                    lang === "fa"
+                      ? outputMode === "command"
+                        ? "translateX(200%)"
+                        : outputMode === "script"
+                          ? "translateX(100%)"
+                          : "translateX(0%)"
+                      : outputMode === "command"
+                        ? "translateX(0%)"
+                        : outputMode === "script"
+                          ? "translateX(100%)"
+                          : "translateX(200%)",
+                  pointerEvents: "none",
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className={subCardClass}>
+              <div className="text-xs font-semibold mb-2">{lang === "fa" ? "Shell / CLI" : "Shell / CLI"}</div>
+              <select
+                value={cli}
+                onChange={(e) => setCli(e.target.value)}
+                className="w-full p-2.5 text-sm border border-gray-300/70 dark:border-white/10 rounded-xl bg-white/70 dark:bg-black/30 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                disabled={outputMode === "python"}
+              >
+                {cliOptions.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+
+              <div className="mt-2 text-xs text-gray-600 dark:text-gray-300">
+                {outputMode === "python"
+                  ? lang === "fa"
+                    ? "در حالت پایتون، این گزینه بی‌اثر است."
+                    : "CLI is disabled in Python mode."
+                  : lang === "fa"
+                    ? "این انتخاب روی سبک خروجی اثر می‌گذارد."
+                    : "This affects output style."}
+              </div>
+            </div>
+
+            {platform === "network" && (
+              <div className={subCardClass}>
+                <div className="text-xs font-semibold mb-2">{lang === "fa" ? "تنظیمات دیفالت شبکه" : "Network Defaults"}</div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <div className="text-[11px] opacity-80 mb-1">{lang === "fa" ? "Vendor" : "Vendor"}</div>
+                    <select
+                      value={netVendor}
+                      onChange={(e) => setNetVendor(e.target.value)}
+                      className="w-full p-2.5 text-sm border border-gray-300/70 dark:border-white/10 rounded-xl bg-white/70 dark:bg-black/30 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                      disabled={loading}
+                    >
+                      {NETWORK_VENDORS.map((v) => (
+                        <option key={v.value} value={v.value}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <div className="text-[11px] opacity-80 mb-1">{lang === "fa" ? "Device Type" : "Device Type"}</div>
+                    <select
+                      value={deviceType}
+                      onChange={(e) => setDeviceType(e.target.value)}
+                      className="w-full p-2.5 text-sm border border-gray-300/70 dark:border-white/10 rounded-xl bg-white/70 dark:bg-black/30 focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                      disabled={loading}
+                    >
+                      {NETWORK_DEVICE_TYPES.map((d) => (
+                        <option key={d.value} value={d.value}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mt-2 text-xs text-gray-600 dark:text-gray-300">
+                  {lang === "fa"
+                    ? "Vendor و Device Type روی OS Type/Version در تنظیمات تخصصی اثر می‌گذارند."
+                    : "Vendor/Device Type also drive OS Type/Version in advanced settings."}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (outputMode !== "command") return;
+                setMoreCommands((v) => !v);
+              }}
+              className={`${knobBase} ${moreCommands ? knobActive : "hover:opacity-95"} ${
+                outputMode !== "command" ? "opacity-40 cursor-not-allowed" : ""
+              }`}
+              disabled={loading || outputMode !== "command"}
+              title={outputMode !== "command" ? (lang === "fa" ? "فقط در حالت کامند فعال است" : "Only in Command mode") : ""}
+            >
+              <div className="text-sm font-semibold">{lang === "fa" ? "کامندهای بیشتر" : "More commands"}</div>
+              <div className="text-xs opacity-80">
+                {lang === "fa" ? "جایگزین‌های بیشتری پیشنهاد می‌شود." : "More alternatives will be suggested."}
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMoreDetails((v) => !v)}
+              className={`${knobBase} ${moreDetails ? knobActive : "hover:opacity-95"}`}
+              disabled={loading}
+              title={lang === "fa" ? "در همه حالت‌ها قابل استفاده است" : "Available in all modes"}
+            >
+              <div className="text-sm font-semibold">{lang === "fa" ? "توضیحات بیشتر" : "More details"}</div>
+              <div className="text-xs opacity-80">
+                {lang === "fa" ? "توضیحات و هشدارها مفصل‌تر می‌شوند." : "Explanation and warnings become more detailed."}
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Advanced toggle */}
+      <div className="ccg-container">
+        <button
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="w-full ccg-card ccg-glass p-3 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm ring-1 ring-black/5 dark:ring-white/10 hover:opacity-95 transition"
+          type="button"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                  showAdvanced ? "bg-blue-500" : "bg-gray-200 dark:bg-gray-700"
+                }`}
+              >
+                <span className="text-white text-sm">⚙️</span>
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-left">{lang === "fa" ? "تنظیمات تخصصی" : "Advanced Settings"}</div>
+                <div className="text-xs text-gray-600 dark:text-gray-300 text-left">
+                  {lang === "fa" ? "فقط در صورت فعال‌سازی اعمال می‌شود" : "Applied only when enabled"}
+                </div>
+              </div>
+            </div>
+            <span className="text-sm">{showAdvanced ? "▲" : "▼"}</span>
+          </div>
         </button>
 
-        {error && (
-          <div className="text-red-500 text-sm">{error}</div>
+        {showAdvanced && (
+          <div className="mt-3 animate-fadeIn">
+            <div className="ccg-card ccg-glass p-4 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm ring-1 ring-black/5 dark:ring-white/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold">{lang === "fa" ? "فعال‌سازی تنظیمات تخصصی" : "Enable advanced settings"}</div>
+                <button
+                  type="button"
+                  onClick={() => setAdvancedEnabled(!advancedEnabled)}
+                  className={`px-3 py-1 rounded-xl text-sm transition ${
+                    advancedEnabled ? "bg-green-500 text-white" : "bg-gray-100 dark:bg-gray-800"
+                  }`}
+                >
+                  {advancedEnabled ? (lang === "fa" ? "فعال ✅" : "Enabled ✅") : lang === "fa" ? "غیرفعال" : "Disabled"}
+                </button>
+              </div>
+
+              <AdvancedSettings
+                platform={platform === "other" ? "other" : platform}
+                settings={advancedSettings}
+                onChange={setAdvancedSettings}
+                networkVendor={platform === "network" ? netVendor : undefined}
+                networkDeviceType={platform === "network" ? deviceType : undefined}
+              />
+
+              <div className="text-xs text-gray-600 dark:text-gray-300">
+                {lang === "fa"
+                  ? "اگر فعال نباشد، این تنظیمات وارد payload نمی‌شود."
+                  : "If not enabled, advanced settings are not included in payload."}
+              </div>
+            </div>
+          </div>
         )}
+      </div>
 
-        {/* OUTPUT */}
-        {tool ? (
-          <ToolResult tool={tool} uiLang={lang} />
-        ) : output ? (
-          <CodeBlock code={output} language="markdown" />
-        ) : null}
+      {/* Split pane */}
+      <div className="ccg-container">
+        <div
+          ref={splitWrapRef}
+          className={`ccg-split ${isRTL ? "is-rtl" : "is-ltr"}`}
+          style={{ "--split": `${splitPct}%` }}
+        >
+          {isRTL ? (
+            <>
+              {outputPane}
+              {resizer}
+              {inputPane}
+            </>
+          ) : (
+            <>
+              {inputPane}
+              {resizer}
+              {outputPane}
+            </>
+          )}
+        </div>
+      </div>
 
+      {/* Persist info */}
+      <div className="ccg-container">
+        <div className="ccg-card ccg-glass-soft p-3 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm">
+          <div className="text-xs text-gray-700 dark:text-gray-200 flex items-center gap-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span>
+              {lang === "fa"
+                ? "وضعیت شما ذخیره شد. بعد از ریفرش تنظیمات حفظ می‌شوند."
+                : "Your status is saved. Settings persist after refresh."}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );
