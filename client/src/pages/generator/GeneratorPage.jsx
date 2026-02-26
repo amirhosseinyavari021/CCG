@@ -118,7 +118,7 @@ function toBullets(text) {
     .map((x) => x.replace(/^[-*]\s+/, "").trim())
     .map((x) => x.replace(/^>\s?/, "").trim())
     .filter(Boolean)
-    .filter((x) => !/^#{1,6}\s+/i.test(x)); // حذف headingهای خام اگر تو bullets افتادن
+    .filter((x) => !/^#{1,6}\s+/i.test(x));
 }
 
 function looksLikeChitChatLine(line) {
@@ -139,7 +139,10 @@ function looksLikeChitChatLine(line) {
 
 function filterChitChat(arr) {
   const a = Array.isArray(arr) ? arr : [];
-  return a.map((x) => String(x || "").trim()).filter(Boolean).filter((x) => !looksLikeChitChatLine(x));
+  return a
+    .map((x) => String(x || "").trim())
+    .filter(Boolean)
+    .filter((x) => !looksLikeChitChatLine(x));
 }
 
 function firstFencedCodeBlock(md) {
@@ -229,10 +232,18 @@ function isWarningTextLine(line) {
 function coerceCommandItem(x) {
   if (typeof x === "string") return x.trim();
   if (x && typeof x === "object") {
-    // رایج‌ترین حالت‌ها
-    const v = x.command || x.cmd || x.value || x.text || x.code || x.script || x?.primary?.command;
+    // رایج‌ترین حالت‌ها + robust keys
+    const v =
+      x.command ||
+      x.cmd ||
+      x.value ||
+      x.text ||
+      x.code ||
+      x.script ||
+      x?.primary?.command ||
+      x?.primary_command;
+
     if (typeof v === "string") return v.trim();
-    // fallback: اگر یک فیلد یگانه داشت
     const ks = Object.keys(x);
     if (ks.length === 1 && typeof x[ks[0]] === "string") return String(x[ks[0]]).trim();
   }
@@ -257,62 +268,27 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
     (typeof res?.pythonScript === "string" && res.pythonScript.trim()) ||
     (typeof res?.python_script === "string" && res.python_script.trim()) ||
     "";
+
   const isPython = Boolean(pyRaw) || outputMode === "python";
+  const isScriptMode = outputMode === "script";
 
   // ---------- Python mode ----------
   if (isPython) {
-    const expRaw =
-      extractSection(md, ["Explanation", "توضیح", "توضیحات", "شرح"]) ||
-      asTextValue(res?.explanation || res?.explanations || res?.description);
-    const warnRaw =
-      extractSection(md, ["Warning", "Warnings", "هشدار", "هشدارها"]) ||
-      asTextValue(res?.warnings || res?.warning || res?.alert || res?.alerts);
-    const notesRaw =
-      extractSection(md, ["More Details", "توضیحات بیشتر", "📌 More Details", "📌 توضیحات بیشتر", "Details", "جزئیات بیشتر"]) ||
-      extractSection(md, ["Notes", "توضیحات", "نکات"]) ||
-      asTextValue(res?.notes || res?.note || res?.details || res?.moreDetails) ||
-      stripCodeBlocks(md);
-
-    let explanation = filterChitChat(toBullets(expRaw));
-    let warnings = filterChitChat(toBullets(warnRaw));
-    let notes = filterChitChat(toBullets(notesRaw));
-
-    if (!warnings.length) {
-      warnings = filterChitChat(extractLabelLines(md, ["warning", "warnings", "هشدار", "هشدارها"]));
-    }
-    if (!warnings.length) {
-      warnings = filterChitChat(extractWarningLikeLines(md));
-    }
-    if (!explanation.length) {
-      explanation = filterChitChat(extractLabelLines(md, ["explanation", "details", "توضیح", "توضیحات", "شرح"]));
-    }
-    if (explanation.length) {
-      const movedToWarnings = explanation.filter((x) => isWarningTextLine(x));
-      const keptExplanation = explanation.filter((x) => !isWarningTextLine(x));
-      if (movedToWarnings.length) {
-        warnings = [...warnings, ...movedToWarnings];
-        explanation = keptExplanation;
-      }
-    }
-    if (!notes.length) {
-      notes = filterChitChat(
-        extractLabelLines(md, ["note", "notes", "more details", "detail", "نکته", "نکات", "توضیحات بیشتر"])
-      );
-    }
-
-    warnings = [...new Set(warnings.map((x) => String(x || "").trim()).filter(Boolean))];
-    explanation = [...new Set(explanation.map((x) => String(x || "").trim()).filter(Boolean))];
-    notes = [...new Set(notes.map((x) => String(x || "").trim()).filter(Boolean))];
-
+    const notesRaw = extractSection(md, ["Notes", "توضیحات"]) || stripCodeBlocks(md);
+    const fenced = firstFencedCodeBlock(md);
     return {
       title: lang === "fa" ? "نتیجه" : "Result",
       cli: "python",
       lang: "python",
       pythonScript: true,
-      python_script: pyRaw || firstFencedCodeBlock(md).code || (Array.isArray(res?.commands) ? coerceCommandItem(res.commands[0]) : ""),
-      notes,
-      warnings,
-      explanation,
+      python_script:
+        pyRaw ||
+        fenced.code ||
+        (Array.isArray(res?.commands) ? coerceCommandItem(res.commands[0]) : "") ||
+        "",
+      notes: filterChitChat(toBullets(notesRaw)),
+      warnings: [],
+      explanation: [],
       alternatives: [],
       primary_command: "",
     };
@@ -329,9 +305,7 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
   let primary = commandsArr.length ? coerceCommandItem(commandsArr[0]) : "";
   let alts = moreArr.map(coerceCommandItem).filter(Boolean);
   const mdBlocks = allFencedCodeBlocks(md);
-  const isScriptMode = outputMode === "script";
 
-  // اگر بک‌اند commands نداد، از اولین codeblock داخل markdown بردار
   if (!primary) {
     const block = mdBlocks[0] || firstFencedCodeBlock(md);
     if (block.code) primary = block.code;
@@ -359,7 +333,6 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
     if (altBullets.length) alts = altBullets;
   }
 
-  // توضیح/هشدار/توضیحات بیشتر از headingها
   const expRaw =
     extractSection(md, ["Explanation", "توضیح", "توضیحات", "شرح"]) ||
     asTextValue(res?.explanation || res?.explanations || res?.description);
@@ -367,6 +340,7 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
   const warnRaw =
     extractSection(md, ["Warning", "Warnings", "هشدار", "هشدارها"]) ||
     asTextValue(res?.warnings || res?.warning || res?.alert || res?.alerts);
+
   const notesRaw =
     extractSection(md, ["More Details", "توضیحات بیشتر", "📌 More Details", "📌 توضیحات بیشتر", "Details", "جزئیات بیشتر"]) ||
     extractSection(md, ["Notes", "توضیحات", "نکات"]) ||
@@ -380,7 +354,6 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
   if (!warnings.length) {
     warnings = filterChitChat(extractLabelLines(md, ["warning", "warnings", "هشدار", "هشدارها"]));
   }
-
   if (!warnings.length) {
     warnings = filterChitChat(extractWarningLikeLines(md));
   }
@@ -405,9 +378,8 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
     }
   }
 
-  // اگر exp/warn متن داشت ولی bullet نشد
-  if (!explanation.length && expRaw.trim()) explanation.push(expRaw.trim());
-  if (!warnings.length && warnRaw.trim()) warnings.push(warnRaw.trim());
+  if (!explanation.length && String(expRaw || "").trim()) explanation.push(String(expRaw).trim());
+  if (!warnings.length && String(warnRaw || "").trim()) warnings.push(String(warnRaw).trim());
 
   alts = [...new Set(alts.map((x) => String(x || "").trim()).filter(Boolean))].filter((x) => x !== primary);
   warnings = [...new Set(warnings.map((x) => String(x || "").trim()).filter(Boolean))];
@@ -426,8 +398,6 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
     notes = Array.isArray(prevTool.notes) ? prevTool.notes : notes;
   }
 
-  // اگر outputMode == script و primary چند خطه/کد است، ok.
-  // UI ToolResult خودش تفکیک می‌کند.
   return {
     title: lang === "fa" ? "نتیجه" : "Result",
     cli: String(cliGuess || "bash").toLowerCase(),
@@ -445,7 +415,7 @@ function clamp(n, a, b) {
   return Math.max(a, Math.min(b, n));
 }
 
-/** --------- Client-side Precheck (anti token-waste) --------- */
+/** --------- Client-side Precheck --------- */
 const PRECHECK = { minChars: 8, minWords: 2 };
 
 function countWords(s) {
@@ -573,10 +543,7 @@ function formatApiErrorForUI(err, lang) {
     return {
       code: "BAD_REQUEST",
       message: lang === "fa" ? "⚠️ درخواست نامعتبر است" : "⚠️ Invalid request",
-      hint:
-        lang === "fa"
-          ? "لطفاً درخواست را واضح‌تر بنویس و جزئیات لازم را اضافه کن."
-          : "Please rewrite with clearer details.",
+      hint: lang === "fa" ? "لطفاً درخواست را واضح‌تر بنویس و جزئیات لازم را اضافه کن." : "Please rewrite with clearer details.",
       source: "api",
       status,
     };
@@ -703,7 +670,7 @@ export default function GeneratorPage() {
     // server expects outputType in {tool, command, python}
     if (mode === "python") return "python";
     if (mode === "command") return "command";
-    return "tool"; // script mode -> tool (structured output) but cli reflects chosen shell
+    return "tool"; // script mode -> tool (structured output)
   }
 
   function pickNetworkOsType(s) {
@@ -740,7 +707,16 @@ export default function GeneratorPage() {
     const netOsVersion = platform === "network" ? pickNetworkOsVersion(advancedSettings) : "";
 
     const normalizedInput = normalizeSpaces(input);
-    const requestKey = JSON.stringify({ normalizedInput, outputMode, platform: finalPlatform, cli: baseCli, advancedEnabled, advanced: advancedEnabled ? compactAdvanced(advancedSettings) : {} });
+
+    const requestKey = JSON.stringify({
+      normalizedInput,
+      outputMode,
+      platform: finalPlatform,
+      cli: baseCli,
+      advancedEnabled,
+      advanced: advancedEnabled ? compactAdvanced(advancedSettings) : {},
+    });
+
     const last = lastRequestRef.current;
     const sameBase = Boolean(last && last.requestKey === requestKey);
     const refineTarget =
@@ -923,10 +899,9 @@ export default function GeneratorPage() {
     error && typeof error === "object"
       ? error
       : error
-      ? { code: "ERROR", message: String(error), hint: "", source: "client" }
-      : null;
+        ? { code: "ERROR", message: String(error), hint: "", source: "client" }
+        : null;
 
-  // ---- panes (DOM order will swap for RTL) ----
   const inputPane = (
     <div className="ccg-card ccg-glass p-4 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm ring-1 ring-black/5 dark:ring-white/10">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
@@ -970,8 +945,8 @@ export default function GeneratorPage() {
             loading
               ? "bg-rose-600 text-white hover:opacity-90"
               : !String(input || "").trim()
-              ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed"
-              : `bg-gradient-to-r ${getPlatformColor(platform)} text-white hover:opacity-90`
+                ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed"
+                : `bg-gradient-to-r ${getPlatformColor(platform)} text-white hover:opacity-90`
           }
         `}
         type="button"
@@ -1028,7 +1003,9 @@ export default function GeneratorPage() {
         <div className="text-center py-10 text-gray-600 dark:text-gray-300">
           <div className="text-3xl mb-2">✨</div>
           <div className="text-sm mb-1">{lang === "fa" ? "آماده برای تولید!" : "Ready!"}</div>
-          <div className="text-xs">{lang === "fa" ? "درخواست خود را بنویسید و تولید را بزنید" : "Write a request and click Generate"}</div>
+          <div className="text-xs">
+            {lang === "fa" ? "درخواست خود را بنویسید و تولید را بزنید" : "Write a request and click Generate"}
+          </div>
         </div>
       )}
     </div>
@@ -1104,13 +1081,13 @@ export default function GeneratorPage() {
                       ? outputMode === "command"
                         ? "translateX(200%)"
                         : outputMode === "script"
-                        ? "translateX(100%)"
-                        : "translateX(0%)"
+                          ? "translateX(100%)"
+                          : "translateX(0%)"
                       : outputMode === "command"
-                      ? "translateX(0%)"
-                      : outputMode === "script"
-                      ? "translateX(100%)"
-                      : "translateX(200%)",
+                        ? "translateX(0%)"
+                        : outputMode === "script"
+                          ? "translateX(100%)"
+                          : "translateX(200%)",
                   pointerEvents: "none",
                 }}
               />
@@ -1139,8 +1116,8 @@ export default function GeneratorPage() {
                     ? "در حالت پایتون، این گزینه بی‌اثر است."
                     : "CLI is disabled in Python mode."
                   : lang === "fa"
-                  ? "این انتخاب روی سبک خروجی اثر می‌گذارد."
-                  : "This affects output style."}
+                    ? "این انتخاب روی سبک خروجی اثر می‌گذارد."
+                    : "This affects output style."}
               </div>
             </div>
 
@@ -1205,7 +1182,9 @@ export default function GeneratorPage() {
               title={outputMode !== "command" ? (lang === "fa" ? "فقط در حالت کامند فعال است" : "Only in Command mode") : ""}
             >
               <div className="text-sm font-semibold">{lang === "fa" ? "کامندهای بیشتر" : "More commands"}</div>
-              <div className="text-xs opacity-80">{lang === "fa" ? "جایگزین‌های بیشتری پیشنهاد می‌شود." : "More alternatives will be suggested."}</div>
+              <div className="text-xs opacity-80">
+                {lang === "fa" ? "جایگزین‌های بیشتری پیشنهاد می‌شود." : "More alternatives will be suggested."}
+              </div>
             </button>
 
             <button
@@ -1216,7 +1195,9 @@ export default function GeneratorPage() {
               title={lang === "fa" ? "در همه حالت‌ها قابل استفاده است" : "Available in all modes"}
             >
               <div className="text-sm font-semibold">{lang === "fa" ? "توضیحات بیشتر" : "More details"}</div>
-              <div className="text-xs opacity-80">{lang === "fa" ? "توضیحات و هشدارها مفصل‌تر می‌شوند." : "Explanation and warnings become more detailed."}</div>
+              <div className="text-xs opacity-80">
+                {lang === "fa" ? "توضیحات و هشدارها مفصل‌تر می‌شوند." : "Explanation and warnings become more detailed."}
+              </div>
             </button>
           </div>
         </div>
@@ -1274,7 +1255,9 @@ export default function GeneratorPage() {
               />
 
               <div className="text-xs text-gray-600 dark:text-gray-300">
-                {lang === "fa" ? "اگر فعال نباشد، این تنظیمات وارد payload نمی‌شود." : "If not enabled, advanced settings are not included in payload."}
+                {lang === "fa"
+                  ? "اگر فعال نباشد، این تنظیمات وارد payload نمی‌شود."
+                  : "If not enabled, advanced settings are not included in payload."}
               </div>
             </div>
           </div>
@@ -1283,7 +1266,11 @@ export default function GeneratorPage() {
 
       {/* Split pane */}
       <div className="ccg-container">
-        <div ref={splitWrapRef} className={`ccg-split ${isRTL ? "is-rtl" : "is-ltr"}`} style={{ "--split": `${splitPct}%` }}>
+        <div
+          ref={splitWrapRef}
+          className={`ccg-split ${isRTL ? "is-rtl" : "is-ltr"}`}
+          style={{ "--split": `${splitPct}%` }}
+        >
           {isRTL ? (
             <>
               {outputPane}
