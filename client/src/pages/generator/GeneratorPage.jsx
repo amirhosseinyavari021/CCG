@@ -242,6 +242,7 @@ function coerceCommandItem(x) {
       x.script ||
       x?.primary?.command ||
       x?.primary_command;
+
     if (typeof v === "string") return v.trim();
     const ks = Object.keys(x);
     if (ks.length === 1 && typeof x[ks[0]] === "string") return String(x[ks[0]]).trim();
