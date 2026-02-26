@@ -229,7 +229,16 @@ function isWarningTextLine(line) {
 function coerceCommandItem(x) {
   if (typeof x === "string") return x.trim();
   if (x && typeof x === "object") {
-    const v = x.command || x.cmd || x.value || x.text;
+    // رایج‌ترین حالت‌ها + robust keys
+    const v =
+      x.command ||
+      x.cmd ||
+      x.value ||
+      x.text ||
+      x.code ||
+      x.script ||
+      x?.primary?.command ||
+      x?.primary_command;
     if (typeof v === "string") return v.trim();
     const ks = Object.keys(x);
     if (ks.length === 1 && typeof x[ks[0]] === "string") return String(x[ks[0]]).trim();
@@ -251,19 +260,28 @@ function asTextValue(v) {
 function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null, refineTarget = "") {
   const md = String(res?.markdown || res?.output || res?.result || "").trim();
 
-  const py = String(res?.pythonScript || res?.python_script || "").trim();
-  const isPython = Boolean(py) || outputMode === "python";
+  const pyRaw =
+    (typeof res?.pythonScript === "string" && res.pythonScript.trim()) ||
+    (typeof res?.python_script === "string" && res.python_script.trim()) ||
+    "";
+
+  const isPython = Boolean(pyRaw) || outputMode === "python";
   const isScriptMode = outputMode === "script";
 
   // ---------- Python mode ----------
   if (isPython) {
     const notesRaw = extractSection(md, ["Notes", "توضیحات"]) || stripCodeBlocks(md);
+    const fenced = firstFencedCodeBlock(md);
     return {
       title: lang === "fa" ? "نتیجه" : "Result",
       cli: "python",
       lang: "python",
       pythonScript: true,
-      python_script: py || firstFencedCodeBlock(md).code,
+      python_script:
+        pyRaw ||
+        fenced.code ||
+        (Array.isArray(res?.commands) ? coerceCommandItem(res.commands[0]) : "") ||
+        "",
       notes: filterChitChat(toBullets(notesRaw)),
       warnings: [],
       explanation: [],
