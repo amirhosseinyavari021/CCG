@@ -32,8 +32,6 @@ function toLines(value) {
 function pickAltCommand(alt) {
   if (!alt) return "";
   if (typeof alt === "string") return alt;
-  // common shapes:
-  // { command, lang, title } OR { code } OR { text }
   return alt.command || alt.code || alt.text || alt.value || "";
 }
 
@@ -85,17 +83,28 @@ function CodeCard({ title, lang, code, badge, dir }) {
 
 function MdCard({ title, icon, children, danger = false }) {
   return (
-    <div className={`ccg-card p-4 sm:p-5 ${danger ? "border-red-500/35 bg-red-500/5" : ""}`}>
+    <div className={`ccg-card p-4 sm:p-5 ${danger ? "border-red-500/50 bg-red-500/10 ring-1 ring-red-500/25" : ""}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm sm:text-base font-semibold flex items-center gap-2">
           <span className="opacity-90">{icon}</span>
           <span>{title}</span>
         </div>
       </div>
-      <div className={`prose dark:prose-invert max-w-none ${danger ? "text-red-100" : ""}`}>
-        {children}
-      </div>
+      <div className={`prose dark:prose-invert max-w-none ${danger ? "text-red-100" : ""}`}>{children}</div>
     </div>
+  );
+}
+
+function LinesList({ lines = [], dense = false }) {
+  if (!Array.isArray(lines) || !lines.length) return null;
+  return (
+    <ul className={`list-disc ${dense ? "space-y-1" : "space-y-2"} pe-5`}>
+      {lines.map((line, idx) => (
+        <li key={idx} className="leading-7">
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(line || "")}</ReactMarkdown>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -107,26 +116,24 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
     const primary = t.primary || t.primaryCommand || t.primary_command || t.command || null;
 
     const primaryCommand =
-      typeof primary === "string"
-        ? primary
-        : primary?.command || primary?.code || primary?.text || "";
+      typeof primary === "string" ? primary : primary?.command || primary?.code || primary?.text || "";
 
-    const primaryLang =
-      (typeof primary === "object" ? primary?.lang : null) || t.primaryLang || t.lang || "";
+    const primaryLang = (typeof primary === "object" ? primary?.lang : null) || t.primaryLang || t.lang || "";
 
     const explanations = toLines(t.explanations || t.explanation || t.description || "");
-    const warnings = toLines(t.warnings);
-    const notes = toLines(t.notes || t.moreDetails || "");
+
+    // robust warning + notes sources
+    const warnings = toLines(t.warnings || t.warning || t.alert || t.alerts || "");
+    const notes = toLines(t.notes || t.note || t.moreDetails || t.details || "");
 
     const alternatives = Array.isArray(t.alternatives)
       ? t.alternatives
       : Array.isArray(t.moreCommands)
-        ? t.moreCommands
-        : [];
+      ? t.moreCommands
+      : [];
 
     const script =
-      asText(t.script || t.python_script || "").trim() ||
-      (typeof t.pythonScript === "string" ? t.pythonScript.trim() : "");
+      asText(t.script || t.python_script || "").trim() || (typeof t.pythonScript === "string" ? t.pythonScript.trim() : "");
 
     const isScriptLike =
       Boolean(script) ||
@@ -169,7 +176,7 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
       ) : null}
 
       {/* Script (if any) */}
-      {(normalized.script || normalized.isScriptLike) ? (
+      {normalized.script || normalized.isScriptLike ? (
         <CodeCard
           title={uiLang === "fa" ? "اسکریپت" : "Script"}
           lang={normalized.primaryLang || "bash"}
@@ -181,42 +188,28 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
       {/* Explanations */}
       {normalized.explanations.length ? (
         <MdCard title={uiLang === "fa" ? "توضیحات" : "Explanation"} icon="🧾">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{normalized.explanations.join("\n")}</ReactMarkdown>
+          <LinesList lines={normalized.explanations} />
         </MdCard>
       ) : null}
 
       {/* Warnings */}
       {normalized.warnings.length ? (
         <MdCard title={uiLang === "fa" ? "هشدارها" : "Warnings"} icon="⚠️" danger>
-          <ul>
-            {normalized.warnings.map((w, i) => (
-              <li key={i}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{w}</ReactMarkdown>
-              </li>
-            ))}
-          </ul>
+          <LinesList lines={normalized.warnings} />
         </MdCard>
       ) : null}
 
       {/* Notes */}
       {normalized.notes.length ? (
         <MdCard title={uiLang === "fa" ? "نکات" : "Notes"} icon="📌">
-          <ul>
-            {normalized.notes.map((n, i) => (
-              <li key={i}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{n}</ReactMarkdown>
-              </li>
-            ))}
-          </ul>
+          <LinesList lines={normalized.notes} />
         </MdCard>
       ) : null}
 
       {/* Alternatives */}
       {normalized.alternatives.length ? (
         <div className="space-y-3">
-          <div className="text-sm font-semibold opacity-90">
-            {uiLang === "fa" ? "جایگزین‌ها" : "Alternatives"}
-          </div>
+          <div className="text-sm font-semibold opacity-90">{uiLang === "fa" ? "جایگزین‌ها" : "Alternatives"}</div>
           {normalized.alternatives.map((alt, idx) => {
             const cmd = pickAltCommand(alt);
             const lang = (typeof alt === "object" && alt?.lang) || "bash";
@@ -232,7 +225,6 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
           })}
         </div>
       ) : null}
-
     </div>
   );
 }
