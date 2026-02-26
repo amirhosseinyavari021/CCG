@@ -125,17 +125,22 @@ export function formatOutput(input, opts = {}) {
   const parsed = tryParseJSON(rawText);
 
   if (parsed && isObj(parsed)) {
-    const mode = s(parsed.mode).toLowerCase();
-    const command = s(parsed.command).trim();
+    const tool = isObj(parsed.tool) ? parsed.tool : null;
+    const src = tool || parsed;
 
-    const alternatives = uniq(parsed.alternatives || parsed.moreCommands || []);
-    const details = uniq(parsed.details || parsed.moreDetails || []);
+    const mode = s(parsed.mode || src.mode).toLowerCase();
+    const command = s(src.command || src?.primary?.command || src?.primary_command).trim();
 
-    const warning = s(parsed.warning).trim();
-    const explanation = s(parsed.explanation).trim();
+    const alternatives = uniq(src.alternatives || src.moreCommands || []);
+    const details = uniq(src.details || src.moreDetails || src.notes || []);
 
-    const pythonScript = s(parsed.pythonScript || parsed.script).trim();
-    const pythonNotes = s(parsed.pythonNotes || parsed.notes).trim();
+    const warning = s(src.warning || (Array.isArray(src.warnings) ? src.warnings.join("\n") : src.warnings)).trim();
+    const explanation = s(
+      src.explanation || (Array.isArray(src.explanations) ? src.explanations.join("\n") : src.explanations)
+    ).trim();
+
+    const pythonScript = s(src.pythonScript || src.script || src?.primary?.command).trim();
+    const pythonNotes = s(src.pythonNotes || src.notes).trim();
 
     if (mode === "python" || pythonScript) {
       return {
@@ -162,6 +167,9 @@ export function formatOutput(input, opts = {}) {
       markdown: md,
       commands: command ? [command] : [],
       moreCommands: finalAlternatives,
+      warnings: warning ? splitLines(warning) : [],
+      explanation: explanation ? splitLines(explanation) : [],
+      notes: details,
       pythonScript: "",
     };
   }

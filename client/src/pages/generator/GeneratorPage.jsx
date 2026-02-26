@@ -248,11 +248,12 @@ function asTextValue(v) {
   }
 }
 
-function buildToolFromResponse(res, lang, cliGuess, outputMode) {
+function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null, refineTarget = "") {
   const md = String(res?.markdown || res?.output || res?.result || "").trim();
 
   const py = String(res?.pythonScript || res?.python_script || "").trim();
   const isPython = Boolean(py) || outputMode === "python";
+  const isScriptMode = outputMode === "script";
 
   // ---------- Python mode ----------
   if (isPython) {
@@ -275,8 +276,8 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode) {
   const moreArr = Array.isArray(res?.moreCommands)
     ? res.moreCommands
     : Array.isArray(res?.alternatives)
-    ? res.alternatives
-    : [];
+      ? res.alternatives
+      : [];
 
   let primary = commandsArr.length ? coerceCommandItem(commandsArr[0]) : "";
   let alts = moreArr.map(coerceCommandItem).filter(Boolean);
@@ -287,7 +288,7 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode) {
     if (block.code) primary = block.code;
   }
 
-  if (!alts.length) {
+  if (!isScriptMode && !alts.length) {
     const fromBlocks = mdBlocks
       .map((b) => b.code)
       .filter(Boolean)
@@ -295,7 +296,7 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode) {
     if (fromBlocks.length) alts = fromBlocks;
   }
 
-  if (!alts.length) {
+  if (!isScriptMode && !alts.length) {
     const altRaw = extractSection(md, [
       "Alternative Commands",
       "Alternatives",
@@ -318,14 +319,7 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode) {
     asTextValue(res?.warnings || res?.warning || res?.alert || res?.alerts);
 
   const notesRaw =
-    extractSection(md, [
-      "More Details",
-      "توضیحات بیشتر",
-      "📌 More Details",
-      "📌 توضیحات بیشتر",
-      "Details",
-      "جزئیات بیشتر",
-    ]) ||
+    extractSection(md, ["More Details", "توضیحات بیشتر", "📌 More Details", "📌 توضیحات بیشتر", "Details", "جزئیات بیشتر"]) ||
     extractSection(md, ["Notes", "توضیحات", "نکات"]) ||
     asTextValue(res?.notes || res?.note || res?.details || res?.moreDetails) ||
     "";
@@ -351,7 +345,7 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode) {
     explanation = filterChitChat(extractLabelLines(md, ["explanation", "details", "توضیح", "توضیحات", "شرح"]));
   }
 
-  // اگر مدل هشدار را داخل توضیحات ریخته بود، جدا کن
+  // اگر مدل هشدار را داخل توضیحات ریخته بود، جدا کن تا کارت هشدار حتماً نمایش داده شود
   if (explanation.length) {
     const movedToWarnings = explanation.filter((x) => isWarningTextLine(x));
     const keptExplanation = explanation.filter((x) => !isWarningTextLine(x));
@@ -361,21 +355,32 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode) {
     }
   }
 
-  if (!explanation.length && expRaw.trim()) explanation.push(expRaw.trim());
-  if (!warnings.length && warnRaw.trim()) warnings.push(warnRaw.trim());
+  if (!explanation.length && String(expRaw || "").trim()) explanation.push(String(expRaw).trim());
+  if (!warnings.length && String(warnRaw || "").trim()) warnings.push(String(warnRaw).trim());
 
   alts = [...new Set(alts.map((x) => String(x || "").trim()).filter(Boolean))].filter((x) => x !== primary);
-
   warnings = [...new Set(warnings.map((x) => String(x || "").trim()).filter(Boolean))];
   explanation = [...new Set(explanation.map((x) => String(x || "").trim()).filter(Boolean))];
   notes = [...new Set(notes.map((x) => String(x || "").trim()).filter(Boolean))];
+
+  if (prevTool && refineTarget === "details") {
+    primary = prevTool.primary_command || primary;
+    alts = Array.isArray(prevTool.alternatives) ? prevTool.alternatives : alts;
+  }
+
+  if (prevTool && refineTarget === "commands") {
+    primary = prevTool.primary_command || primary;
+    explanation = Array.isArray(prevTool.explanation) ? prevTool.explanation : explanation;
+    warnings = Array.isArray(prevTool.warnings) ? prevTool.warnings : warnings;
+    notes = Array.isArray(prevTool.notes) ? prevTool.notes : notes;
+  }
 
   return {
     title: lang === "fa" ? "نتیجه" : "Result",
     cli: String(cliGuess || "bash").toLowerCase(),
     pythonScript: false,
     primary_command: primary,
-    alternatives: alts,
+    alternatives: isScriptMode ? [] : alts,
     explanation,
     warnings,
     notes,
@@ -588,6 +593,7 @@ export default function GeneratorPage() {
   const draggingRef = useRef(false);
 
   const abortRef = useRef(null);
+  const lastRequestRef = useRef(null);
 
   useEffect(() => {
     const allowed = new Set(cliOptions.map((x) => String(x).toLowerCase()));
@@ -677,6 +683,24 @@ export default function GeneratorPage() {
     const netOsType = platform === "network" ? pickNetworkOsType(advancedSettings) : "";
     const netOsVersion = platform === "network" ? pickNetworkOsVersion(advancedSettings) : "";
 
+    const normalizedInput = normalizeSpaces(input);
+    const requestKey = JSON.stringify({
+      normalizedInput,
+      outputMode,
+      platform: finalPlatform,
+      cli: baseCli,
+      advancedEnabled,
+      advanced: advancedEnabled ? compactAdvanced(advancedSettings) : {},
+    });
+    const last = lastRequestRef.current;
+    const sameBase = Boolean(last && last.requestKey === requestKey);
+    const refineTarget =
+      sameBase && outputMode === "command" && moreCommands && !last.moreCommands
+        ? "commands"
+        : sameBase && moreDetails && !last.moreDetails
+          ? "details"
+          : "";
+
     const payload = {
       mode: "generate",
       modeStyle: "generator",
@@ -703,7 +727,10 @@ export default function GeneratorPage() {
       advancedEnabled: Boolean(advancedEnabled),
       advanced: advancedEnabled ? compactAdvanced(advancedSettings) : undefined,
 
-      user_request: normalizeSpaces(input),
+      refineTarget: refineTarget || undefined,
+      previousTool: refineTarget && tool ? tool : undefined,
+
+      user_request: normalizedInput,
       timestamp: new Date().toISOString(),
     };
 
@@ -713,12 +740,14 @@ export default function GeneratorPage() {
       const markdown = String(result?.markdown || result?.output || result?.result || "").trim();
       setOutput(markdown);
 
-      const built = buildToolFromResponse(result, lang, payload.cli, outputMode);
+      const built = buildToolFromResponse(result, lang, payload.cli, outputMode, tool, refineTarget);
       setTool(built);
+      lastRequestRef.current = { requestKey, moreCommands, moreDetails };
     } catch (err) {
       setError(formatApiErrorForUI(err, lang));
       setOutput("");
       setTool(null);
+      lastRequestRef.current = null;
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
       setLoading(false);
@@ -845,8 +874,8 @@ export default function GeneratorPage() {
     error && typeof error === "object"
       ? error
       : error
-      ? { code: "ERROR", message: String(error), hint: "", source: "client" }
-      : null;
+        ? { code: "ERROR", message: String(error), hint: "", source: "client" }
+        : null;
 
   const inputPane = (
     <div className="ccg-card ccg-glass p-4 rounded-2xl border border-gray-200/70 dark:border-white/10 shadow-sm ring-1 ring-black/5 dark:ring-white/10">
@@ -891,8 +920,8 @@ export default function GeneratorPage() {
             loading
               ? "bg-rose-600 text-white hover:opacity-90"
               : !String(input || "").trim()
-              ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed"
-              : `bg-gradient-to-r ${getPlatformColor(platform)} text-white hover:opacity-90`
+                ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed"
+                : `bg-gradient-to-r ${getPlatformColor(platform)} text-white hover:opacity-90`
           }
         `}
         type="button"
@@ -1027,13 +1056,13 @@ export default function GeneratorPage() {
                       ? outputMode === "command"
                         ? "translateX(200%)"
                         : outputMode === "script"
-                        ? "translateX(100%)"
-                        : "translateX(0%)"
+                          ? "translateX(100%)"
+                          : "translateX(0%)"
                       : outputMode === "command"
-                      ? "translateX(0%)"
-                      : outputMode === "script"
-                      ? "translateX(100%)"
-                      : "translateX(200%)",
+                        ? "translateX(0%)"
+                        : outputMode === "script"
+                          ? "translateX(100%)"
+                          : "translateX(200%)",
                   pointerEvents: "none",
                 }}
               />
@@ -1062,8 +1091,8 @@ export default function GeneratorPage() {
                     ? "در حالت پایتون، این گزینه بی‌اثر است."
                     : "CLI is disabled in Python mode."
                   : lang === "fa"
-                  ? "این انتخاب روی سبک خروجی اثر می‌گذارد."
-                  : "This affects output style."}
+                    ? "این انتخاب روی سبک خروجی اثر می‌گذارد."
+                    : "This affects output style."}
               </div>
             </div>
 
@@ -1128,7 +1157,9 @@ export default function GeneratorPage() {
               title={outputMode !== "command" ? (lang === "fa" ? "فقط در حالت کامند فعال است" : "Only in Command mode") : ""}
             >
               <div className="text-sm font-semibold">{lang === "fa" ? "کامندهای بیشتر" : "More commands"}</div>
-              <div className="text-xs opacity-80">{lang === "fa" ? "جایگزین‌های بیشتری پیشنهاد می‌شود." : "More alternatives will be suggested."}</div>
+              <div className="text-xs opacity-80">
+                {lang === "fa" ? "جایگزین‌های بیشتری پیشنهاد می‌شود." : "More alternatives will be suggested."}
+              </div>
             </button>
 
             <button
@@ -1199,7 +1230,9 @@ export default function GeneratorPage() {
               />
 
               <div className="text-xs text-gray-600 dark:text-gray-300">
-                {lang === "fa" ? "اگر فعال نباشد، این تنظیمات وارد payload نمی‌شود." : "If not enabled, advanced settings are not included in payload."}
+                {lang === "fa"
+                  ? "اگر فعال نباشد، این تنظیمات وارد payload نمی‌شود."
+                  : "If not enabled, advanced settings are not included in payload."}
               </div>
             </div>
           </div>
