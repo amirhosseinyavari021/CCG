@@ -1,5 +1,7 @@
 // server/routes/chatRoutes.js
 import express from "express";
+import mongoose from "mongoose";
+
 import { runAI } from "../utils/aiClient.js";
 import { rateLimit } from "../middleware/rateLimit.js";
 
@@ -29,17 +31,86 @@ function normLang(x) {
   return s(x).toLowerCase() === "en" ? "en" : "fa";
 }
 
-// Safe-call wrapper (تا اگر signature توی store فرق داشت، کمتر بشکنه)
-async function callMaybe(fn, argsObj, argsAlt) {
+function isValidId(id) {
+  return mongoose.isValidObjectId(String(id || ""));
+}
+
+async function safeCall(fn, primaryArgs, fallbackArgs) {
   try {
-    return await fn(argsObj);
+    return await fn(...primaryArgs);
+  } catch (e1) {
+    try {
+      return await fn(...fallbackArgs);
+    } catch (e2) {
+      throw e2;
+    }
+  }
+}
+
+/**
+ * ✅ appendMessage wrapper (signature-safe)
+ * supports:
+ * 1) appendMessage(threadId, role, content, meta)
+ * 2) appendMessage(threadId, {role, content, ...})
+ * 3) appendMessage({threadId, role, content, ...})
+ */
+async function appendMsg(threadId, { role, content, editedFromMessageId }) {
+  const tid = s(threadId).trim();
+  const r = s(role).trim();
+  const c = typeof content === "string" ? content : s(content);
+  const meta = { editedFromMessageId: editedFromMessageId || null };
+
+  // Variant 1
+  try {
+    return await appendMessage(tid, r, c, meta);
+  } catch {}
+
+  // Variant 2
+  try {
+    return await appendMessage(tid, { role: r, content: c, ...meta });
+  } catch {}
+
+  // Variant 3
+  return await appendMessage({ threadId: tid, role: r, content: c, ...meta });
+}
+
+/**
+ * ✅ Extract a displayable string from any AI result shape
+ * prevents saving "[object Object]"
+ */
+function extractAIText(aiResult) {
+  if (typeof aiResult === "string") return aiResult;
+  if (!aiResult) return "";
+
+  const direct =
+    aiResult.markdown ??
+    aiResult.output ??
+    aiResult.text ??
+    aiResult.content ??
+    aiResult.message ??
+    aiResult.data?.markdown ??
+    aiResult.data?.output ??
+    aiResult.data?.output_md ??
+    aiResult.data?.text ??
+    aiResult.result?.markdown ??
+    aiResult.result?.output ??
+    aiResult.result?.text;
+
+  if (typeof direct === "string") return direct;
+
+  const c0 = aiResult.choices?.[0];
+  const nested = c0?.message?.content ?? c0?.text;
+  if (typeof nested === "string") return nested;
+
+  try {
+    return JSON.stringify(aiResult, null, 2);
   } catch {
-    return await fn(argsAlt);
+    return String(aiResult);
   }
 }
 
 const MAX_INPUT_CHARS = Number(process.env.CHAT_MAX_CHARS || 32000);
-const MAX_HISTORY_MESSAGES = Number(process.env.CHAT_MAX_HISTORY_MESSAGES || 20);
+const MAX_HISTORY_MESSAGES = Number(process.env.CHAT_MAX_HISTORY_MESSAGES || 18);
 
 const chatLimiter = rateLimit({
   windowMs: Number(process.env.CHAT_RATE_WINDOW_MS || 60_000),
@@ -47,230 +118,204 @@ const chatLimiter = rateLimit({
 });
 
 /* =========================
-   PROMPT BUILDER
+   CHAT PROMPT (NOT GENERATOR)
 ========================= */
 function buildChatPrompt({ lang = "fa", messages = [] } = {}) {
   const fa = lang !== "en";
 
   const system = fa
-    ? `
-تو «CCG Technical Assistant» هستی.
-
-ماموریت:
-- تحلیل ارور و لاگ
-- تحلیل و بهبود کد
-- راه‌حل عملی و مرحله‌ای
-
-قوانین:
-- پاسخ‌ها کوتاه، کاربردی و حرفه‌ای.
-- اگر پروژه بزرگ خواسته شد، ابتدا معماری و ساختار فایل‌ها را بده، سپس مرحله‌ای ادامه بده.
-- اگر خارج از حوزه فنی بود، خیلی کوتاه رد کن.
-- اگر اطلاعات کم بود، حداکثر 3 سؤال دقیق بپرس.
-- هرگز خروجی بیش‌ازحد حجیم تولید نکن؛ مرحله‌ای پیش برو.
-
-خروجی فقط Markdown.
-`
-    : `
-You are CCG Technical Assistant.
-
-Mission:
-- Analyze logs/errors
-- Improve and explain code
-- Provide practical step-by-step fixes
-
+    ? `تو «CCG Chat» هستی.
+قواعد:
+- این مسیر فقط «چت معمولی» است، نه Command Generator.
+- خروجی را مثل فرم generator (✅ دستور اصلی/هشدار/جایگزین) تولید نکن.
+- اگر کاربر small-talk گفت (مثل: خوبی؟ مرسی)، طبیعی و کوتاه جواب بده.
+- اگر سؤال فنی/DevOps/Linux بود، مرحله‌ای پاسخ بده و اگر لازم شد دستور بده.
+- چیزی را از خودت نساز؛ اگر اطلاعات لازم داری سوال دقیق بپرس.`
+    : `You are "CCG Chat".
 Rules:
-- Keep responses practical and concise.
-- For large projects, provide architecture first, then continue step-by-step.
-- If out of scope, briefly refuse.
-- Ask up to 3 precise questions if needed.
-- Avoid excessively large outputs; work incrementally.
+- This endpoint is plain chat, NOT the command generator.
+- Do NOT output generator template sections.
+- For small talk, answer naturally and briefly.
+- For technical questions, answer step-by-step; include commands only when needed.
+- Do not invent logs/files; ask targeted questions if needed.`;
 
-Output pure Markdown.
-`;
-
-  const convo = messages
+  const convo = (Array.isArray(messages) ? messages : [])
+    .filter((m) => m && (m.role === "user" || m.role === "assistant"))
     .slice(-MAX_HISTORY_MESSAGES)
-    .map((m) => `${m.role === "assistant" ? "Assistant" : "User"}:\n${m.content}`)
+    .map((m) => `${String(m.role || "").toUpperCase()}:\n${s(m.content)}`)
     .join("\n\n");
 
   return `SYSTEM:\n${system}\n\nCONVERSATION:\n${convo}\n\nAssistant:\n`;
 }
 
 /* =========================
-   META / RETENTION
+   RETENTION
 ========================= */
 router.get("/retention", (_req, res) => {
-  return res.json({
-    ok: true,
-    ...retentionInfo(),
-  });
+  return res.json({ ok: true, ...retentionInfo() });
 });
 
 /* =========================
-   THREADS API (برای UI)
-   مطابق aiService.js:
-   GET    /api/chat/threads
-   POST   /api/chat/threads
-   GET    /api/chat/threads/:id/messages
-   PATCH  /api/chat/threads/:id
-   DELETE /api/chat/threads/:id
+   THREADS
 ========================= */
-
-// list threads
 router.get("/threads", async (req, res) => {
   const lang = normLang(req.query.lang);
-
   try {
-    // بعضی storeها listThreads({lang}) دارند، بعضی listThreads(lang)
-    const r = await callMaybe(listThreads, { lang }, lang);
-
+    const r = await safeCall(listThreads, [{ lang }], [lang]);
     const threads = Array.isArray(r?.threads) ? r.threads : Array.isArray(r) ? r : [];
     return res.json({ ok: true, threads });
   } catch (e) {
-    return res.status(500).json({ ok: false, error: { code: "THREADS_LIST_FAILED", requestId: req.requestId } });
+    return res.status(500).json({
+      ok: false,
+      error: { code: "THREADS_LIST_FAILED", message: s(e?.message), requestId: req.requestId },
+    });
   }
 });
 
-// create thread
 router.post("/threads", async (req, res) => {
-  const body = req.body || {};
-  const lang = normLang(body.lang);
-  const title = s(body.title).trim();
+  const lang = normLang(req.body?.lang);
+  const title = s(req.body?.title).trim();
 
   try {
     const thread = await createThread({ lang, title });
     return res.json({ ok: true, thread });
-  } catch {
-    return res.status(500).json({ ok: false, error: { code: "THREAD_CREATE_FAILED", requestId: req.requestId } });
+  } catch (e) {
+    return res.status(500).json({
+      ok: false,
+      error: { code: "THREAD_CREATE_FAILED", message: s(e?.message), requestId: req.requestId },
+    });
   }
 });
 
-// get messages
 router.get("/threads/:threadId/messages", async (req, res) => {
   const threadId = s(req.params.threadId).trim();
-  if (!threadId) return res.status(400).json({ ok: false });
+  if (!threadId) return res.status(400).json({ ok: false, error: { code: "MISSING_THREAD_ID", requestId: req.requestId } });
+  if (!isValidId(threadId)) return res.status(400).json({ ok: false, error: { code: "INVALID_THREAD_ID", requestId: req.requestId } });
 
   try {
     const thread = await getThread(threadId);
-    if (!thread) return res.status(404).json({ ok: false });
+    if (!thread) return res.status(404).json({ ok: false, error: { code: "THREAD_NOT_FOUND", requestId: req.requestId } });
 
-    const messages = await getMessages(threadId, { limit: 500 });
+    const messages = await safeCall(getMessages, [threadId, { limit: 500 }], [threadId]);
     return res.json({ ok: true, thread, messages: messages || [] });
-  } catch {
-    return res.status(500).json({ ok: false, error: { code: "MESSAGES_GET_FAILED", requestId: req.requestId } });
+  } catch (e) {
+    return res.status(500).json({
+      ok: false,
+      error: { code: "MESSAGES_GET_FAILED", message: s(e?.message), requestId: req.requestId },
+    });
   }
 });
 
-// rename thread
 router.patch("/threads/:threadId", async (req, res) => {
   const threadId = s(req.params.threadId).trim();
   const title = s(req.body?.title).trim().slice(0, 80);
 
-  if (!threadId || !title) return res.status(400).json({ ok: false });
+  if (!threadId || !title) return res.status(400).json({ ok: false, error: { code: "BAD_REQUEST", requestId: req.requestId } });
+  if (!isValidId(threadId)) return res.status(400).json({ ok: false, error: { code: "INVALID_THREAD_ID", requestId: req.requestId } });
 
   try {
     const r = await renameThread(threadId, title);
     const thread = r?.thread || (await getThread(threadId));
     return res.json({ ok: true, thread });
-  } catch {
-    return res.status(500).json({ ok: false, error: { code: "THREAD_RENAME_FAILED", requestId: req.requestId } });
+  } catch (e) {
+    return res.status(500).json({
+      ok: false,
+      error: { code: "THREAD_RENAME_FAILED", message: s(e?.message), requestId: req.requestId },
+    });
   }
 });
 
-// delete thread
 router.delete("/threads/:threadId", async (req, res) => {
   const threadId = s(req.params.threadId).trim();
-  if (!threadId) return res.status(400).json({ ok: false });
+  if (!threadId) return res.status(400).json({ ok: false, error: { code: "MISSING_THREAD_ID", requestId: req.requestId } });
+  if (!isValidId(threadId)) return res.status(400).json({ ok: false, error: { code: "INVALID_THREAD_ID", requestId: req.requestId } });
 
   try {
     await deleteThread(threadId);
     return res.json({ ok: true });
-  } catch {
-    return res.status(500).json({ ok: false, error: { code: "THREAD_DELETE_FAILED", requestId: req.requestId } });
+  } catch (e) {
+    return res.status(500).json({
+      ok: false,
+      error: { code: "THREAD_DELETE_FAILED", message: s(e?.message), requestId: req.requestId },
+    });
   }
 });
 
 /* =========================
-   MAIN CHAT ENDPOINT
-   POST /api/chat
+   CHAT SEND
 ========================= */
-router.post("/", chatLimiter, async (req, res) => {
-  const body = req.body || {};
-  const lang = normLang(body.lang);
+async function buildHistory(threadId) {
+  const raw = await safeCall(getMessages, [threadId, { limit: 500 }], [threadId]);
+  const msgs = Array.isArray(raw) ? raw : raw?.messages || [];
+  return msgs.slice(-MAX_HISTORY_MESSAGES).map((m) => ({ role: m.role, content: m.content }));
+}
 
-  const message = s(body.message).trim();
-  const regenerate = body.regenerate === true;
-
-  if (!regenerate && message.length > MAX_INPUT_CHARS) {
-    return res.status(413).json({ ok: false });
-  }
-
-  let threadId = s(body.threadId || body.sessionId || "").trim();
-  let th = threadId ? await getThread(threadId) : null;
-
-  if (!th) {
-    const created = await createThread({ lang, title: "" });
-    th = created;
-    threadId = String(created._id);
-  }
-
+async function runChatOnce({ threadId, lang, message, regenerate, editedFromMessageId, requestId }) {
   if (regenerate) {
-    const rr = await bumpRegen(threadId);
-    if (!rr?.ok) return res.status(429).json({ ok: false });
-
     await popTrailingAssistant(threadId);
+    await bumpRegen(threadId);
   } else {
-    if (!message) return res.status(400).json({ ok: false });
-
-    await appendMessage(threadId, "user", message);
     await resetRegen(threadId);
-
-    const history0 = await getMessages(threadId, { limit: MAX_HISTORY_MESSAGES });
-    if ((history0 || []).filter((m) => m.role === "user").length === 1) {
-      await setThreadTitleIfEmpty(threadId, message.slice(0, 44));
-    }
   }
 
-  const history = await getMessages(threadId, { limit: MAX_HISTORY_MESSAGES });
+  if (!regenerate) {
+    await appendMsg(threadId, {
+      role: "user",
+      content: message,
+      editedFromMessageId: editedFromMessageId || null,
+    });
+  }
 
-  const prompt = buildChatPrompt({
-    lang,
-    messages: (history || []).map((m) => ({ role: m.role, content: m.content })),
-  });
+  const history = await buildHistory(threadId);
+  const prompt = buildChatPrompt({ lang, messages: history });
+
+  // ✅ AI call (may return string or object)
+  const aiResult = await runAI(prompt, { mode: "chat", lang, requestId });
+
+  // ✅ Extract real text and DO NOT run generator formatter here
+  const rawText = extractAIText(aiResult);
+
+  // ✅ Plain chat markdown/text
+  const answer = s(rawText).trim() || (lang === "fa" ? "پاسخی دریافت نشد." : "No response received.");
+
+  await appendMsg(threadId, { role: "assistant", content: answer, editedFromMessageId: null });
 
   try {
-    const ai = await runAI({
-      mode: "chat",
-      lang,
-      prompt,
-      requestId: req.requestId,
-    });
+    await setLastAssistant(threadId, answer);
+  } catch {}
 
-    if (ai?.error) {
-      return res.status(502).json({ ok: false });
+  try {
+    await setThreadTitleIfEmpty(threadId, message, lang);
+  } catch {}
+
+  const thread = await getThread(threadId);
+
+  return { ok: true, markdown: answer, output: answer, thread, regenCount: Number(thread?.regenCount || 0) };
+}
+
+router.post("/threads/:threadId/messages", chatLimiter, async (req, res) => {
+  const threadId = s(req.params.threadId).trim();
+  const lang = normLang(req.body?.lang);
+  const message = s(req.body?.message).trim();
+  const regenerate = Boolean(req.body?.regenerate);
+  const editedFromMessageId = req.body?.editedFromMessageId ? s(req.body.editedFromMessageId) : null;
+
+  if (!threadId) return res.status(400).json({ ok: false, error: { code: "MISSING_THREAD_ID", requestId: req.requestId } });
+  if (!isValidId(threadId)) return res.status(400).json({ ok: false, error: { code: "INVALID_THREAD_ID", requestId: req.requestId } });
+
+  try {
+    const thread = await getThread(threadId);
+    if (!thread) return res.status(404).json({ ok: false, error: { code: "THREAD_NOT_FOUND", requestId: req.requestId } });
+
+    if (!regenerate) {
+      if (!message) return res.status(400).json({ ok: false, error: { code: "EMPTY_MESSAGE", requestId: req.requestId } });
+      if (message.length > MAX_INPUT_CHARS) return res.status(413).json({ ok: false, error: { code: "MESSAGE_TOO_LARGE", requestId: req.requestId } });
     }
 
-    const output = String(ai.output || "").trim();
-
-    const saved = await appendMessage(threadId, "assistant", output);
-    await setLastAssistant(threadId, saved?._id || null);
-
-    const updatedTh = await getThread(threadId);
-
-    return res.json({
-      ok: true,
-      threadId,
-      sessionId: threadId,
-      markdown: output,
-      retention: retentionInfo(),
-      threadTTL: {
-        retentionDays: retentionInfo().retentionDays,
-        expiresAt: updatedTh?.expiresAt,
-      },
-      regenCount: Number(updatedTh?.regenCount || 0),
-    });
-  } catch {
-    return res.status(500).json({ ok: false });
+    const result = await runChatOnce({ threadId, lang, message, regenerate, editedFromMessageId, requestId: req.requestId });
+    return res.json(result);
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: { code: "CHAT_FAILED", message: s(e?.message), requestId: req.requestId } });
   }
 });
 

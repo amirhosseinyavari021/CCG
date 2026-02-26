@@ -26,6 +26,17 @@ function s(v) {
   return v === null || v === undefined ? "" : String(v);
 }
 
+function toThreadId(v) {
+  if (!v) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number") return String(v);
+  if (typeof v === "object") {
+    const cand = v._id ?? v.id ?? v.threadId;
+    if (cand) return String(cand);
+  }
+  return String(v);
+}
+
 function looksLikeTinySnippet(code) {
   const t = String(code || "").trim();
   if (!t) return true;
@@ -283,7 +294,7 @@ export default function ChatPage() {
 
   const inFlightAbortRef = useRef(null);
   const activeStreamCancelRef = useRef(null);
-  const stopByUserRef = useRef(false); // ✅ مهم
+  const stopByUserRef = useRef(false);
 
   const scrollRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -329,7 +340,10 @@ export default function ChatPage() {
     return [...pinned, ...normal];
   }, [threads, threadsQuery, pinnedSet]);
 
-  const activeThread = useMemo(() => threads.find((t) => String(t._id) === String(activeThreadId)), [threads, activeThreadId]);
+  const activeThread = useMemo(() => {
+    const a = toThreadId(activeThreadId);
+    return threads.find((t) => String(t._id) === a) || null;
+  }, [threads, activeThreadId]);
 
   async function refreshThreads(nextActiveId) {
     const r = await listChatThreads({ lang });
@@ -337,10 +351,10 @@ export default function ChatPage() {
     setThreads(list);
 
     if (nextActiveId) {
-      setActiveThreadId(nextActiveId);
+      setActiveThreadId(String(nextActiveId));
       return;
     }
-    if (!activeThreadId && list.length) setActiveThreadId(list[0]._id);
+    if (!activeThreadId && list.length) setActiveThreadId(String(list[0]._id));
   }
 
   async function loadRetention() {
@@ -351,8 +365,11 @@ export default function ChatPage() {
   }
 
   async function loadMessages(threadId) {
-    if (!threadId) return;
-    const r = await getChatMessages({ threadId });
+    const tid = toThreadId(threadId);
+    if (!tid) return;
+
+    // ✅ IMPORTANT: aiService expects (threadId), not ({threadId})
+    const r = await getChatMessages(tid, { lang });
     const msgs = r?.messages || [];
     setMessages(
       msgs.map((m) => ({
@@ -373,7 +390,8 @@ export default function ChatPage() {
   }, [lang]);
 
   useEffect(() => {
-    if (activeThreadId) loadMessages(activeThreadId);
+    const tid = toThreadId(activeThreadId);
+    if (tid) loadMessages(tid);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeThreadId]);
 
@@ -392,12 +410,17 @@ export default function ChatPage() {
       activeStreamCancelRef.current = null;
     }
 
-    // ✅ اگر پیام در حال فکر کردن است، تبدیلش کن به "متوقف شد"
     setMessages((prev) => {
       const next = [...prev];
       for (let i = next.length - 1; i >= 0; i--) {
         if (next[i]?.role === "assistant" && (next[i]?.isThinking || next[i]?.streaming)) {
-          next[i] = { ...next[i], isThinking: false, streaming: false, content: lang === "fa" ? "⛔ متوقف شد" : "⛔ Stopped", isError: false };
+          next[i] = {
+            ...next[i],
+            isThinking: false,
+            streaming: false,
+            content: lang === "fa" ? "⛔ متوقف شد" : "⛔ Stopped",
+            isError: false,
+          };
           break;
         }
       }
@@ -410,8 +433,10 @@ export default function ChatPage() {
   const newChat = async () => {
     stopByUserRef.current = false;
     stopAll();
+
     const r = await createChatThread({ lang });
-    const id = r?.thread?._id;
+    const id = toThreadId(r?.thread?._id);
+
     if (id) {
       await refreshThreads(id);
       await loadMessages(id);
@@ -422,7 +447,13 @@ export default function ChatPage() {
     } else {
       setMessages((prev) => [
         ...prev,
-        { id: `a-${Date.now()}`, role: "assistant", content: lang === "fa" ? "❌ ساخت چت جدید ناموفق بود." : "❌ Failed to create a new chat.", ts: new Date().toISOString(), isError: true },
+        {
+          id: `a-${Date.now()}`,
+          role: "assistant",
+          content: lang === "fa" ? "❌ ساخت چت جدید ناموفق بود." : "❌ Failed to create a new chat.",
+          ts: new Date().toISOString(),
+          isError: true,
+        },
       ]);
     }
   };
@@ -451,24 +482,32 @@ export default function ChatPage() {
   const closeThreadMenu = () => setThreadMenu((p) => ({ ...p, open: false }));
 
   const openRenameModal = (threadId) => {
-    const t = threads.find((x) => String(x._id) === String(threadId));
+    const tid = String(threadId);
+    const t = threads.find((x) => String(x._id) === tid);
     const title = String(t?.title || "").trim() || (lang === "fa" ? "چت جدید" : "New chat");
-    setRenameModal({ open: true, threadId: String(threadId), value: title });
+    setRenameModal({ open: true, threadId: tid, value: title });
   };
 
   const submitRename = async () => {
-    const tid = renameModal.threadId;
+    const tid = toThreadId(renameModal.threadId);
     const title = String(renameModal.value || "").trim().slice(0, 44);
     if (!tid || !title) return;
 
     try {
-      await renameChatThread({ threadId: tid, title, lang }); // ✅ lang هم پاس می‌دیم
+      // ✅ IMPORTANT: aiService expects (threadId, title)
+      await renameChatThread(tid, title, { lang });
       setRenameModal({ open: false, threadId: "", value: "" });
       await refreshThreads();
     } catch {
       setMessages((prev) => [
         ...prev,
-        { id: `a-${Date.now()}`, role: "assistant", content: lang === "fa" ? "❌ تغییر نام ناموفق بود." : "❌ Rename failed.", ts: new Date().toISOString(), isError: true },
+        {
+          id: `a-${Date.now()}`,
+          role: "assistant",
+          content: lang === "fa" ? "❌ تغییر نام ناموفق بود." : "❌ Rename failed.",
+          ts: new Date().toISOString(),
+          isError: true,
+        },
       ]);
     }
   };
@@ -476,30 +515,44 @@ export default function ChatPage() {
   const openDeleteModal = (threadId) => setDeleteModal({ open: true, threadId: String(threadId) });
 
   const confirmDelete = async () => {
-    const threadId = deleteModal.threadId;
+    const threadId = toThreadId(deleteModal.threadId);
     if (!threadId) return;
 
     stopByUserRef.current = false;
     stopAll();
 
     try {
-      await deleteChatThread({ threadId });
+      // ✅ IMPORTANT: aiService expects (threadId)
+      await deleteChatThread(threadId, { lang });
 
       if (pinnedSet.has(String(threadId))) {
         setPinnedIds((prev) => (Array.isArray(prev) ? prev.filter((x) => String(x) !== String(threadId)) : []));
       }
 
       setDeleteModal({ open: false, threadId: "" });
-      await refreshThreads();
 
-      const remaining = threads.filter((t) => String(t._id) !== String(threadId));
-      setActiveThreadId(remaining[0]?._id || "");
+      // refresh then decide next active
+      const r = await listChatThreads({ lang });
+      const list = r?.threads || [];
+      setThreads(list);
+
+      const nextActive = list[0]?._id ? String(list[0]._id) : "";
+      setActiveThreadId(nextActive);
       setMobileSidebarOpen(false);
+
+      if (nextActive) await loadMessages(nextActive);
+      else setMessages([]);
     } catch {
       setDeleteModal({ open: false, threadId: "" });
       setMessages((prev) => [
         ...prev,
-        { id: `a-${Date.now()}`, role: "assistant", content: lang === "fa" ? "❌ حذف گفتگو ناموفق بود." : "❌ Delete failed.", ts: new Date().toISOString(), isError: true },
+        {
+          id: `a-${Date.now()}`,
+          role: "assistant",
+          content: lang === "fa" ? "❌ حذف گفتگو ناموفق بود." : "❌ Delete failed.",
+          ts: new Date().toISOString(),
+          isError: true,
+        },
       ]);
     }
   };
@@ -577,8 +630,11 @@ export default function ChatPage() {
       <div key={m.id || idx} className={`flex gap-3 ${isBot ? "" : "flex-row-reverse"}`}>
         <div
           className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-            isBot ? (m.isError ? "bg-gradient-to-br from-red-500 to-rose-500" : "bg-gradient-to-br from-blue-500 to-cyan-500")
-                 : "bg-gradient-to-br from-purple-500 to-pink-500"
+            isBot
+              ? m.isError
+                ? "bg-gradient-to-br from-red-500 to-rose-500"
+                : "bg-gradient-to-br from-blue-500 to-cyan-500"
+              : "bg-gradient-to-br from-purple-500 to-pink-500"
           }`}
         >
           <span className="text-white text-sm">{isBot ? "🤖" : "👤"}</span>
@@ -652,9 +708,11 @@ export default function ChatPage() {
   };
 
   const ensureThread = async () => {
-    if (activeThreadId) return activeThreadId;
+    const current = toThreadId(activeThreadId);
+    if (current) return current;
+
     const r = await createChatThread({ lang });
-    const id = r?.thread?._id;
+    const id = toThreadId(r?.thread?._id);
     if (id) {
       await refreshThreads(id);
       return id;
@@ -675,7 +733,13 @@ export default function ChatPage() {
       setLoading(false);
       setMessages((prev) => [
         ...prev,
-        { id: `a-${Date.now()}`, role: "assistant", content: lang === "fa" ? "❌ ساخت چت جدید ناموفق بود." : "❌ Failed to create chat thread.", ts: new Date().toISOString(), isError: true },
+        {
+          id: `a-${Date.now()}`,
+          role: "assistant",
+          content: lang === "fa" ? "❌ ساخت چت جدید ناموفق بود." : "❌ Failed to create chat thread.",
+          ts: new Date().toISOString(),
+          isError: true,
+        },
       ]);
       return;
     }
@@ -705,8 +769,10 @@ export default function ChatPage() {
     setTimeout(() => scrollToBottom("smooth"), 30);
 
     try {
+      // ✅ IMPORTANT: sendChatMessage(threadId, body, opts)
       const result = await sendChatMessage(
-        { threadId, lang, message: text, regenerate: false, editedFromMessageId: editedFrom },
+        threadId,
+        { lang, message: text, regenerate: false, editedFromMessageId: editedFrom },
         { timeoutMs: 120_000, signal: controller.signal }
       );
 
@@ -739,7 +805,6 @@ export default function ChatPage() {
         },
       });
     } catch (e) {
-      // ✅ اگر کاربر stop زده، هیچ اروری نشان نده
       const aborted = stopByUserRef.current || inFlightAbortRef.current?.signal?.aborted || e?.name === "AbortError";
       if (aborted) {
         setMessages((prev) => prev.map((m) => (m.id === botLocalId ? { ...m, isThinking: false, content: lang === "fa" ? "⛔ متوقف شد" : "⛔ Stopped" } : m)));
@@ -760,7 +825,8 @@ export default function ChatPage() {
   };
 
   const doRegenerate = async () => {
-    if (!activeThreadId || loading) return;
+    const threadId = toThreadId(activeThreadId);
+    if (!threadId || loading) return;
 
     stopByUserRef.current = false;
     setLoading(true);
@@ -778,12 +844,14 @@ export default function ChatPage() {
     setTimeout(() => scrollToBottom("smooth"), 30);
 
     try {
+      // ✅ IMPORTANT: sendChatMessage(threadId, body, opts)
       const result = await sendChatMessage(
-        { threadId: activeThreadId, lang, message: "", regenerate: true },
+        threadId,
+        { lang, message: "", regenerate: true },
         { timeoutMs: 120_000, signal: controller.signal }
       );
 
-      await refreshThreads(activeThreadId);
+      await refreshThreads(threadId);
 
       const finalText =
         result?.markdown ||
@@ -802,7 +870,7 @@ export default function ChatPage() {
           setMessages((prev) => prev.map((m) => (m.id === botLocalId ? { ...m, content: finalText, streaming: false } : m)));
           activeStreamCancelRef.current = null;
           inFlightAbortRef.current = null;
-          await loadMessages(activeThreadId);
+          await loadMessages(threadId);
         },
       });
     } catch (e) {
@@ -830,13 +898,11 @@ export default function ChatPage() {
     }
   };
 
-  // ✅ پیشنهاد نام‌گذاری بعد از اولین رفت‌وبرگشت (بدون AI-call)
   const shouldSuggestRename = useMemo(() => {
     if (!activeThread) return false;
-    if (!messages || messages.length < 2) return false; // حداقل یک user + یک assistant
+    if (!messages || messages.length < 2) return false;
     const t = String(activeThread.title || "").trim();
     if (!t) return true;
-    // اگر عنوان خیلی شبیه عنوان خودکار کوتاه باشد، پیشنهاد بده
     if (t.length <= 12) return true;
     return false;
   }, [activeThread, messages]);
@@ -872,7 +938,7 @@ export default function ChatPage() {
 
       <div className="flex-1 overflow-auto px-3 pb-3 space-y-2">
         {filteredThreads.map((t) => {
-          const isActive = String(t._id) === String(activeThreadId);
+          const isActive = String(t._id) === toThreadId(activeThreadId);
           const title = String(t.title || "").trim() || (lang === "fa" ? "چت جدید" : "New chat");
           const isPinned = pinnedSet.has(String(t._id));
 
@@ -886,7 +952,7 @@ export default function ChatPage() {
                 "transition cursor-pointer",
               ].join(" ")}
               onClick={() => {
-                setActiveThreadId(t._id);
+                setActiveThreadId(String(t._id));
                 setMobileSidebarOpen(false);
               }}
             >
@@ -1051,7 +1117,6 @@ export default function ChatPage() {
                 </div>
               </div>
 
-              {/* ✅ پیشنهاد نام‌گذاری */}
               {shouldSuggestRename ? (
                 <div className="px-4 pt-3">
                   <div className="rounded-2xl border border-white/10 bg-black/10 dark:bg-white/5 backdrop-blur-xl px-4 py-3 flex items-center justify-between gap-3">
@@ -1061,7 +1126,7 @@ export default function ChatPage() {
                     <button
                       type="button"
                       className="rounded-xl px-3 py-2 text-xs font-semibold bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:opacity-90"
-                      onClick={() => openRenameModal(activeThreadId)}
+                      onClick={() => openRenameModal(toThreadId(activeThreadId))}
                     >
                       {lang === "fa" ? "تغییر نام" : "Rename"}
                     </button>
@@ -1109,7 +1174,9 @@ export default function ChatPage() {
                     onClick={doSend}
                     disabled={loading || !input.trim()}
                     className={`px-4 py-3 rounded-xl font-medium text-sm transition flex items-center justify-center gap-2 ${
-                      loading || !input.trim() ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed" : "bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:opacity-90"
+                      loading || !input.trim()
+                        ? "bg-gray-300 dark:bg-gray-700 cursor-not-allowed"
+                        : "bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:opacity-90"
                     }`}
                   >
                     {loading ? (
