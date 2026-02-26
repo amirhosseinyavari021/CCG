@@ -32,8 +32,6 @@ function toLines(value) {
 function pickAltCommand(alt) {
   if (!alt) return "";
   if (typeof alt === "string") return alt;
-  // common shapes:
-  // { command, lang, title } OR { code } OR { text }
   return alt.command || alt.code || alt.text || alt.value || "";
 }
 
@@ -55,7 +53,9 @@ function CopyButton({ text, label = "کپی", copiedLabel = "کپی شد" }) {
       type="button"
       onClick={onCopy}
       className={`px-3 py-1 rounded-lg text-xs font-semibold border transition ${
-        copied ? "bg-emerald-500/25 border-emerald-400/40 text-emerald-100" : "bg-white/10 hover:bg-white/15 border-white/10"
+        copied
+          ? "bg-emerald-500/25 border-emerald-400/40 text-emerald-100"
+          : "bg-white/10 hover:bg-white/15 border-white/10"
       }`}
     >
       {copied ? copiedLabel : label}
@@ -92,20 +92,14 @@ function CodeCard({ title, lang, code, badge, dir, copyLabel, copiedLabel }) {
 
 function MdCard({ title, icon, children, danger = false }) {
   return (
-    <div
-      className={`ccg-card p-4 sm:p-5 ${
-        danger ? "border-red-500/50 bg-red-500/10 ring-1 ring-red-500/25" : ""
-      }`}
-    >
+    <div className={`ccg-card p-4 sm:p-5 ${danger ? "border-red-500/50 bg-red-500/10 ring-1 ring-red-500/25" : ""}`}>
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm sm:text-base font-semibold flex items-center gap-2">
           <span className="opacity-90">{icon}</span>
           <span>{title}</span>
         </div>
       </div>
-      <div className={`prose dark:prose-invert max-w-none ${danger ? "text-red-100" : ""}`}>
-        {children}
-      </div>
+      <div className={`prose dark:prose-invert max-w-none ${danger ? "text-red-100" : ""}`}>{children}</div>
     </div>
   );
 }
@@ -123,6 +117,12 @@ function LinesList({ lines = [], dense = false }) {
   );
 }
 
+function isWarningishLine(s) {
+  const t = String(s || "").trim();
+  if (!t) return false;
+  return /(^|\s)(⚠|warning|warnings|هشدار|هشدارها|خطر|احتیاط)/i.test(t);
+}
+
 export default function ToolResult({ tool, uiLang = "fa" }) {
   const dir = uiLang === "fa" ? "rtl" : "ltr";
 
@@ -131,18 +131,19 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
     const primary = t.primary || t.primaryCommand || t.primary_command || t.command || null;
 
     const primaryCommand =
-      typeof primary === "string"
-        ? primary
-        : primary?.command || primary?.code || primary?.text || "";
+      typeof primary === "string" ? primary : primary?.command || primary?.code || primary?.text || "";
 
-    const primaryLang =
-      (typeof primary === "object" ? primary?.lang : null) || t.primaryLang || t.lang || "";
+    const primaryLang = (typeof primary === "object" ? primary?.lang : null) || t.primaryLang || t.lang || "";
 
-    const explanations = toLines(t.explanations || t.explanation || t.description || "");
-    const warnings = toLines(t.warnings || t.warning || t.alert || "");
-    const warningFromExplanation = explanations.filter((x) => /(^|\s)(⚠|warning|هشدار|خطر|احتیاط)/i.test(x));
-    const cleanExplanations = explanations.filter((x) => !/(^|\s)(⚠|warning|هشدار|خطر|احتیاط)/i.test(x));
-    const notes = toLines(t.notes || t.note || t.moreDetails || "");
+    const explanationsRaw = toLines(t.explanations || t.explanation || t.description || "");
+    const warningsRaw = toLines(t.warnings || t.warning || t.alert || t.alerts || "");
+    const notes = toLines(t.notes || t.note || t.moreDetails || t.details || "");
+
+    // اگر مدل هشدارها را داخل توضیحات ریخته باشد، جدا کنیم تا کارت هشدار حتماً نمایش داده شود
+    const warningFromExplanation = explanationsRaw.filter((x) => isWarningishLine(x));
+    const explanations = explanationsRaw.filter((x) => !isWarningishLine(x));
+
+    const warnings = [...new Set([...(warningsRaw || []), ...warningFromExplanation])];
 
     const alternatives = Array.isArray(t.alternatives)
       ? t.alternatives
@@ -164,8 +165,8 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
       title: t.title || (uiLang === "fa" ? "نتیجه" : "Result"),
       primaryCommand,
       primaryLang,
-      explanations: cleanExplanations,
-      warnings: [...new Set([...(warnings || []), ...warningFromExplanation])],
+      explanations,
+      warnings,
       notes,
       alternatives,
       script,
@@ -197,7 +198,7 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
       ) : null}
 
       {/* Script (if any) */}
-      {(normalized.script || normalized.isScriptLike) ? (
+      {normalized.script || normalized.isScriptLike ? (
         <CodeCard
           title={uiLang === "fa" ? "اسکریپت" : "Script"}
           lang={normalized.primaryLang || "bash"}
@@ -232,9 +233,7 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
       {/* Alternatives */}
       {normalized.alternatives.length ? (
         <div className="space-y-3">
-          <div className="text-sm font-semibold opacity-90">
-            {uiLang === "fa" ? "جایگزین‌ها" : "Alternatives"}
-          </div>
+          <div className="text-sm font-semibold opacity-90">{uiLang === "fa" ? "جایگزین‌ها" : "Alternatives"}</div>
           {normalized.alternatives.map((alt, idx) => {
             const cmd = pickAltCommand(alt);
             const lang = (typeof alt === "object" && alt?.lang) || "bash";
@@ -252,7 +251,6 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
           })}
         </div>
       ) : null}
-
     </div>
   );
 }
