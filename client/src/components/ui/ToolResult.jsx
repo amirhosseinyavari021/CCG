@@ -256,4 +256,4 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
       ) : null}
     </div>
   );
-}ر
+}
