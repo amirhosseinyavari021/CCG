@@ -232,6 +232,7 @@ function isWarningTextLine(line) {
 function coerceCommandItem(x) {
   if (typeof x === "string") return x.trim();
   if (x && typeof x === "object") {
+    // رایج‌ترین حالت‌ها + robust keys
     const v =
       x.command ||
       x.cmd ||
@@ -241,6 +242,7 @@ function coerceCommandItem(x) {
       x.script ||
       x?.primary?.command ||
       x?.primary_command;
+
     if (typeof v === "string") return v.trim();
     const ks = Object.keys(x);
     if (ks.length === 1 && typeof x[ks[0]] === "string") return String(x[ks[0]]).trim();
@@ -282,7 +284,9 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
   // ---------- Python mode ----------
   if (isPython) {
     const pythonBody =
-      pyRaw || firstFencedCodeBlock(md).code || (Array.isArray(res?.commands) ? coerceCommandItem(res.commands[0]) : "");
+      pyRaw ||
+      firstFencedCodeBlock(md).code ||
+      (Array.isArray(res?.commands) ? coerceCommandItem(res.commands[0]) : "");
 
     const expRaw =
       extractSection(md, ["Explanation", "توضیح", "توضیحات", "شرح"]) ||
@@ -313,8 +317,10 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
 
     if (!warnings.length) warnings = filterChitChat(extractLabelLines(md, ["warning", "warnings", "هشدار", "هشدارها"]));
     if (!warnings.length) warnings = filterChitChat(extractWarningLikeLines(md));
-    if (!explanation.length) explanation = filterChitChat(extractLabelLines(md, ["explanation", "details", "توضیح", "توضیحات", "شرح"]));
-    if (!notes.length) notes = filterChitChat(extractLabelLines(md, ["note", "notes", "more details", "detail", "نکته", "نکات", "توضیحات بیشتر"]));
+    if (!explanation.length)
+      explanation = filterChitChat(extractLabelLines(md, ["explanation", "details", "توضیح", "توضیحات", "شرح"]));
+    if (!notes.length)
+      notes = filterChitChat(extractLabelLines(md, ["note", "notes", "more details", "detail", "نکته", "نکات", "توضیحات بیشتر"]));
 
     // اگر هشدار داخل توضیحات بود جداش کن
     if (explanation.length) {
@@ -403,8 +409,10 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
 
   if (!warnings.length) warnings = filterChitChat(extractLabelLines(md, ["warning", "warnings", "هشدار", "هشدارها"]));
   if (!warnings.length) warnings = filterChitChat(extractWarningLikeLines(md));
-  if (!notes.length) notes = filterChitChat(extractLabelLines(md, ["note", "notes", "more details", "detail", "نکته", "نکات", "توضیحات بیشتر"]));
-  if (!explanation.length) explanation = filterChitChat(extractLabelLines(md, ["explanation", "details", "توضیح", "توضیحات", "شرح"]));
+  if (!notes.length)
+    notes = filterChitChat(extractLabelLines(md, ["note", "notes", "more details", "detail", "نکته", "نکات", "توضیحات بیشتر"]));
+  if (!explanation.length)
+    explanation = filterChitChat(extractLabelLines(md, ["explanation", "details", "توضیح", "توضیحات", "شرح"]));
 
   // اگر هشدار داخل توضیحات بود جداش کن
   if (explanation.length) {

@@ -148,6 +148,50 @@ Rules:
   return `SYSTEM:\n${system}\n\nCONVERSATION:\n${convo}\n\nAssistant:\n`;
 }
 
+function looksLikeGeneratorJson(text = "") {
+  const raw = s(text).trim();
+  if (!raw) return false;
+
+  try {
+    const parsed = JSON.parse(raw);
+    const tool = parsed && typeof parsed === "object" ? parsed.tool : null;
+    return !!(tool && typeof tool === "object" && (tool.primary || tool.alternatives || tool.command || tool.pythonScript));
+  } catch {
+    return false;
+  }
+}
+
+function buildChatRepairPrompt({ lang = "fa", badOutput = "", lastUserMessage = "" } = {}) {
+  const fa = lang !== "en";
+  if (fa) {
+    return [
+      "خروجی قبلی اشتباه بوده و به فرمت جنریتور برگشته است.",
+      "فقط یک پاسخ چت فنی معمولی برگردان (Markdown عادی، بدون JSON).",
+      "حوزه مجاز: تحلیل خطا/لاگ + راه‌حل مرحله‌ای، یا تحلیل/توضیح کد و اسکریپت.",
+      "اگر پیام کاربر خارج از این حوزه است، خیلی کوتاه بگو فقط همین حوزه‌ها پشتیبانی می‌شود.",
+      "",
+      "پیام آخر کاربر:",
+      s(lastUserMessage).trim() || "(خالی)",
+      "",
+      "خروجی اشتباه قبلی:",
+      s(badOutput).trim(),
+    ].join("\n");
+  }
+
+  return [
+    "The previous output was wrong and used generator JSON format.",
+    "Return only a normal technical chat response (plain Markdown, no JSON).",
+    "Allowed scope: error/log analysis with step-by-step fixes, or code/script analysis and explanation.",
+    "If user request is out of scope, briefly say only these scopes are supported.",
+    "",
+    "Last user message:",
+    s(lastUserMessage).trim() || "(empty)",
+    "",
+    "Bad previous output:",
+    s(badOutput).trim(),
+  ].join("\n");
+}
+
 /* =========================
    RETENTION
 ========================= */
@@ -276,7 +320,20 @@ async function runChatOnce({ threadId, lang, message, regenerate, editedFromMess
   const rawText = extractAIText(aiResult);
 
   // ✅ Plain chat markdown/text
-  const answer = s(rawText).trim() || (lang === "fa" ? "پاسخی دریافت نشد." : "No response received.");
+  let answer = s(rawText).trim() || (lang === "fa" ? "پاسخی دریافت نشد." : "No response received.");
+
+  // اگر به هر دلیل شبیه JSON جنریتور شد، یک بار repair کنیم (اختیاری اما امن)
+  if (looksLikeGeneratorJson(answer)) {
+    const repair = await runAI(buildChatRepairPrompt({ lang, badOutput: answer, lastUserMessage: message }), {
+      mode: "chat",
+      lang,
+      requestId,
+    });
+    const repaired = s(extractAIText(repair)).trim();
+    if (repaired && !looksLikeGeneratorJson(repaired)) {
+      answer = repaired;
+    }
+  }
 
   await appendMsg(threadId, { role: "assistant", content: answer, editedFromMessageId: null });
 
@@ -289,7 +346,6 @@ async function runChatOnce({ threadId, lang, message, regenerate, editedFromMess
   } catch {}
 
   const thread = await getThread(threadId);
-
   return { ok: true, markdown: answer, output: answer, thread, regenCount: Number(thread?.regenCount || 0) };
 }
 
@@ -309,7 +365,8 @@ router.post("/threads/:threadId/messages", chatLimiter, async (req, res) => {
 
     if (!regenerate) {
       if (!message) return res.status(400).json({ ok: false, error: { code: "EMPTY_MESSAGE", requestId: req.requestId } });
-      if (message.length > MAX_INPUT_CHARS) return res.status(413).json({ ok: false, error: { code: "MESSAGE_TOO_LARGE", requestId: req.requestId } });
+      if (message.length > MAX_INPUT_CHARS)
+        return res.status(413).json({ ok: false, error: { code: "MESSAGE_TOO_LARGE", requestId: req.requestId } });
     }
 
     const result = await runChatOnce({ threadId, lang, message, regenerate, editedFromMessageId, requestId: req.requestId });
