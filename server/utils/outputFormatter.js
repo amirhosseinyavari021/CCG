@@ -633,3 +633,4 @@ export async function normalizeCompareMarkdown(md, opts = {}) {
   t = collapseExtraBlankLines(t).trim() + "\n";
   return t;
 }
+

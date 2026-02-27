@@ -32,8 +32,6 @@ function toLines(value) {
 function pickAltCommand(alt) {
   if (!alt) return "";
   if (typeof alt === "string") return alt;
-  // common shapes:
-  // { command, lang, title } OR { code } OR { text }
   return alt.command || alt.code || alt.text || alt.value || "";
 }
 
@@ -55,7 +53,9 @@ function CopyButton({ text, label = "کپی", copiedLabel = "کپی شد" }) {
       type="button"
       onClick={onCopy}
       className={`px-3 py-1 rounded-lg text-xs font-semibold border transition ${
-        copied ? "bg-emerald-500/25 border-emerald-400/40 text-emerald-100" : "bg-white/10 hover:bg-white/15 border-white/10"
+        copied
+          ? "bg-emerald-500/25 border-emerald-400/40 text-emerald-100"
+          : "bg-white/10 hover:bg-white/15 border-white/10"
       }`}
     >
       {copied ? copiedLabel : label}
@@ -116,11 +116,19 @@ function LinesList({ lines = [], dense = false }) {
     <ul className={`list-disc ${dense ? "space-y-1" : "space-y-2"} pe-5`}>
       {lines.map((line, idx) => (
         <li key={idx} className="leading-7">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(line || "")}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {String(line || "")}
+          </ReactMarkdown>
         </li>
       ))}
     </ul>
   );
+}
+
+function isWarningishLine(s) {
+  const t = String(s || "").trim();
+  if (!t) return false;
+  return /(^|\s)(⚠|warning|warnings|هشدار|هشدارها|خطر|احتیاط)/i.test(t);
 }
 
 export default function ToolResult({ tool, uiLang = "fa" }) {
@@ -128,7 +136,8 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
 
   const normalized = useMemo(() => {
     const t = tool || {};
-    const primary = t.primary || t.primaryCommand || t.primary_command || t.command || null;
+    const primary =
+      t.primary || t.primaryCommand || t.primary_command || t.command || null;
 
     const primaryCommand =
       typeof primary === "string"
@@ -136,41 +145,57 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
         : primary?.command || primary?.code || primary?.text || "";
 
     const primaryLang =
-      (typeof primary === "object" ? primary?.lang : null) || t.primaryLang || t.lang || "";
+      (typeof primary === "object" ? primary?.lang : null) ||
+      t.primaryLang ||
+      t.lang ||
+      "";
 
-    const explanations = toLines(t.explanations || t.explanation || t.description || "");
-    const warnings = toLines(t.warnings || t.warning || t.alert || "");
-    const warningFromExplanation = explanations.filter((x) => /(^|\s)(⚠|warning|هشدار|خطر|احتیاط)/i.test(x));
-    const cleanExplanations = explanations.filter((x) => !/(^|\s)(⚠|warning|هشدار|خطر|احتیاط)/i.test(x));
-    const notes = toLines(t.notes || t.note || t.moreDetails || "");
+    const explanationsRaw = toLines(
+      t.explanations || t.explanation || t.description || ""
+    );
+    const warningsRaw = toLines(
+      t.warnings || t.warning || t.alert || t.alerts || ""
+    );
+    const notes = toLines(
+      t.notes || t.note || t.moreDetails || t.details || ""
+    );
+
+    const warningFromExplanation = explanationsRaw.filter((x) =>
+      isWarningishLine(x)
+    );
+    const explanations = explanationsRaw.filter(
+      (x) => !isWarningishLine(x)
+    );
+    const warnings = [
+      ...new Set([...(warningsRaw || []), ...warningFromExplanation]),
+    ];
 
     const alternatives = Array.isArray(t.alternatives)
       ? t.alternatives
       : Array.isArray(t.moreCommands)
-        ? t.moreCommands
-        : [];
+      ? t.moreCommands
+      : [];
 
     const script =
-      (typeof t.script === "string" ? t.script.trim() : "") ||
-      (typeof t.python_script === "string" ? t.python_script.trim() : "") ||
-      (typeof t.pythonScript === "string" ? t.pythonScript.trim() : "");
-
-    const hasPythonScriptText =
-      (typeof t.python_script === "string" && t.python_script.trim().length > 0) ||
-      (typeof t.pythonScript === "string" && t.pythonScript.trim().length > 0);
+      asText(t.script || t.python_script || "").trim() ||
+      (typeof t.pythonScript === "string"
+        ? t.pythonScript.trim()
+        : "");
 
     const isScriptLike =
       Boolean(script) ||
-      hasPythonScriptText ||
+      Boolean(t.python_script) ||
       Boolean(t.isScript) ||
-      (typeof primaryCommand === "string" && primaryCommand.includes("\n") && !alternatives.length);
+      (typeof primaryCommand === "string" &&
+        primaryCommand.includes("\n") &&
+        !alternatives.length);
 
     return {
       title: t.title || (uiLang === "fa" ? "نتیجه" : "Result"),
       primaryCommand,
       primaryLang,
-      explanations: cleanExplanations,
-      warnings: [...new Set([...(warnings || []), ...warningFromExplanation])],
+      explanations,
+      warnings,
       notes,
       alternatives,
       script,
@@ -181,14 +206,15 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
   if (!tool) {
     return (
       <div className="flex items-center justify-center h-64 text-slate-400 border-2 border-dashed rounded-2xl">
-        {uiLang === "fa" ? "نتیجه اینجا نمایش داده می‌شود…" : "Results will appear here…"}
+        {uiLang === "fa"
+          ? "نتیجه اینجا نمایش داده می‌شود…"
+          : "Results will appear here…"}
       </div>
     );
   }
 
   return (
     <div className="space-y-4" dir={dir}>
-      {/* Primary command */}
       {normalized.primaryCommand && !normalized.isScriptLike ? (
         <CodeCard
           title={uiLang === "fa" ? "کامند اصلی" : "Primary Command"}
@@ -201,8 +227,7 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
         />
       ) : null}
 
-      {/* Script (if any) */}
-      {(normalized.script || normalized.isScriptLike) ? (
+      {normalized.script || normalized.isScriptLike ? (
         <CodeCard
           title={uiLang === "fa" ? "اسکریپت" : "Script"}
           lang={normalized.primaryLang || "bash"}
@@ -213,28 +238,34 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
         />
       ) : null}
 
-      {/* Explanations */}
       {normalized.explanations.length ? (
-        <MdCard title={uiLang === "fa" ? "توضیحات" : "Explanation"} icon="🧾">
+        <MdCard
+          title={uiLang === "fa" ? "توضیحات" : "Explanation"}
+          icon="🧾"
+        >
           <LinesList lines={normalized.explanations} />
         </MdCard>
       ) : null}
 
-      {/* Warnings */}
       {normalized.warnings.length ? (
-        <MdCard title={uiLang === "fa" ? "هشدارها" : "Warnings"} icon="⚠️" danger>
+        <MdCard
+          title={uiLang === "fa" ? "هشدارها" : "Warnings"}
+          icon="⚠️"
+          danger
+        >
           <LinesList lines={normalized.warnings} />
         </MdCard>
       ) : null}
 
-      {/* Notes */}
       {normalized.notes.length ? (
-        <MdCard title={uiLang === "fa" ? "نکات" : "Notes"} icon="📌">
+        <MdCard
+          title={uiLang === "fa" ? "نکات" : "Notes"}
+          icon="📌"
+        >
           <LinesList lines={normalized.notes} />
         </MdCard>
       ) : null}
 
-      {/* Alternatives */}
       {normalized.alternatives.length ? (
         <div className="space-y-3">
           <div className="text-sm font-semibold opacity-90">
@@ -242,11 +273,15 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
           </div>
           {normalized.alternatives.map((alt, idx) => {
             const cmd = pickAltCommand(alt);
-            const lang = (typeof alt === "object" && alt?.lang) || "bash";
+            const lang =
+              (typeof alt === "object" && alt?.lang) || "bash";
             return (
               <CodeCard
                 key={idx}
-                title={(uiLang === "fa" ? "جایگزین" : "Alternative") + ` #${idx + 1}`}
+                title={
+                  (uiLang === "fa" ? "جایگزین" : "Alternative") +
+                  ` #${idx + 1}`
+                }
                 lang={lang}
                 code={cmd}
                 dir="ltr"
@@ -257,7 +292,6 @@ export default function ToolResult({ tool, uiLang = "fa" }) {
           })}
         </div>
       ) : null}
-
     </div>
   );
 }
