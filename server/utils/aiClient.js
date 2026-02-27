@@ -6,6 +6,7 @@
 
 import { buildGeneratorPrompt, buildComparatorPrompt } from "./promptBuilder.js";
 import { callOpenAICompat } from "./openaiCompat.js";
+import { buildFallbackPrompt, toPromptVariables } from "./promptTransformer.js";
 
 function s(v) {
   return v === null || v === undefined ? "" : String(v);
@@ -52,9 +53,42 @@ function getCompatConfig(provider, ctx = {}) {
   return { apiKey, model, baseUrl, extraHeaders: {} };
 }
 
+
+function buildChatPromptByMode(ctx = {}) {
+  const lang = s(ctx.lang || "fa").toLowerCase() === "en" ? "en" : "fa";
+  const text = s(ctx.user_request || ctx.userRequest || ctx.input || ctx.message || ctx.text || "").trim();
+
+  if (lang === "en") {
+    return [
+      "You are CCG Technical Assistant.",
+      "Scope: 1) Analyze errors/logs and provide step-by-step fixes. 2) Analyze/explain code and scripts.",
+      "If request is outside this scope, briefly refuse and ask for a relevant technical input.",
+      "Output plain Markdown (no JSON).",
+      "",
+      "User message:",
+      text || "(empty)",
+    ].join("\n");
+  }
+
+  return [
+    "تو CCG Technical Assistant هستی.",
+    "حوزه کاری فقط: 1) تحلیل خطا/لاگ و ارائه راه‌حل مرحله‌ای. 2) تحلیل و توضیح کد/اسکریپت.",
+    "اگر درخواست خارج از این حوزه بود، کوتاه رد کن و از کاربر ورودی فنی مرتبط بخواه.",
+    "خروجی فقط Markdown باشد (نه JSON).",
+    "",
+    "پیام کاربر:",
+    text || "(خالی)",
+  ].join("\n");
+}
+
 function buildPromptByMode(ctx = {}) {
   const mode = s(ctx.mode || "generate").toLowerCase().trim();
+  if (mode === "generate") {
+    const vars = toPromptVariables(ctx);
+    return buildFallbackPrompt(vars);
+  }
   if (mode === "compare") return buildComparatorPrompt(ctx);
+  if (mode === "chat") return buildChatPromptByMode(ctx);
   return buildGeneratorPrompt(ctx);
 }
 
@@ -140,5 +174,4 @@ export async function runAI(vars = {}) {
     ms: Date.now() - t0,
   };
 }
-
 

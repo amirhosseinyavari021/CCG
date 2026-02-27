@@ -96,6 +96,72 @@ Output pure Markdown.
   return `SYSTEM:\n${system}\n\nCONVERSATION:\n${convo}\n\nAssistant:\n`;
 }
 
+
+function extractGeneratorTool(text = "") {
+  const raw = s(text).trim();
+  if (!raw) return null;
+
+  const candidates = [raw];
+
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) candidates.push(String(fenced[1]).trim());
+
+  if (raw.includes("{") && raw.includes("}")) {
+    const first = raw.indexOf("{");
+    const last = raw.lastIndexOf("}");
+    if (last > first) candidates.push(raw.slice(first, last + 1).trim());
+  }
+
+  for (const item of candidates) {
+    try {
+      const parsed = JSON.parse(item);
+      const tool = parsed && typeof parsed === "object" ? parsed.tool : null;
+      if (tool && typeof tool === "object" && (tool.primary || tool.alternatives || tool.command || tool.pythonScript)) {
+        return tool;
+      }
+    } catch {
+      // keep trying
+    }
+  }
+
+  return null;
+}
+
+function looksLikeGeneratorJson(text = "") {
+  return !!extractGeneratorTool(text);
+}
+
+function buildChatRepairPrompt({ lang = "fa", badOutput = "", lastUserMessage = "" } = {}) {
+  const fa = lang !== "en";
+  if (fa) {
+    return [
+      "خروجی قبلی اشتباه بوده و به فرمت جنریتور برگشته است.",
+      "فقط یک پاسخ چت فنی معمولی برگردان (Markdown عادی، بدون JSON).",
+      "حوزه مجاز: تحلیل خطا/لاگ + راه‌حل مرحله‌ای، یا تحلیل/توضیح کد و اسکریپت.",
+      "اگر پیام کاربر خارج از این حوزه است، خیلی کوتاه بگو فقط همین حوزه‌ها پشتیبانی می‌شود.",
+      "",
+      "پیام آخر کاربر:",
+      s(lastUserMessage).trim() || "(خالی)",
+      "",
+      "خروجی اشتباه قبلی:",
+      s(badOutput).trim(),
+    ].join("\n");
+  }
+
+  return [
+    "The previous output was wrong and used generator JSON format.",
+    "Return only a normal technical chat response (plain Markdown, no JSON).",
+    "Allowed scope: error/log analysis with step-by-step fixes, or code/script analysis and explanation.",
+    "If user request is out of scope, briefly say only these scopes are supported.",
+    "",
+    "Last user message:",
+    s(lastUserMessage).trim() || "(empty)",
+    "",
+    "Bad previous output:",
+    s(badOutput).trim(),
+  ].join("\n");
+}
+
 /* =========================
    META / RETENTION
 ========================= */
@@ -250,7 +316,25 @@ router.post("/", chatLimiter, async (req, res) => {
       return res.status(502).json({ ok: false });
     }
 
-    const output = String(ai.output || "").trim();
+    let output = String(ai.output || "").trim();
+
+    if (looksLikeGeneratorJson(output)) {
+      const repair = await runAI({
+        mode: "chat",
+        lang,
+        prompt: buildChatRepairPrompt({ lang, badOutput: output, lastUserMessage: message }),
+        requestId: req.requestId,
+      });
+      const repaired = String(repair?.output || "").trim();
+      if (repaired && !looksLikeGeneratorJson(repaired)) {
+        output = repaired;
+      } else if (looksLikeGeneratorJson(output)) {
+        output =
+          lang === "fa"
+            ? "متوجه شدم. لطفاً خطا/لاگ یا تکه کد/اسکریپت را بفرست تا مرحله‌به‌مرحله تحلیل و رفعش کنیم."
+            : "Got it. Please share the error/log or code/script snippet so we can analyze and fix it step by step.";
+      }
+    }
 
     const saved = await appendMessage(threadId, "assistant", output);
     await setLastAssistant(threadId, saved?._id || null);
