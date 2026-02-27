@@ -441,6 +441,8 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
     notes = Array.isArray(prevTool.notes) ? prevTool.notes : notes;
   }
 
+  // اگر outputMode == script و primary چند خطه/کد است، ok.
+  // UI ToolResult خودش تفکیک می‌کند.
   return {
     title: lang === "fa" ? "نتیجه" : "Result",
     cli: String(cliGuess || "bash").toLowerCase(),

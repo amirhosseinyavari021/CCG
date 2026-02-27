@@ -148,17 +148,38 @@ Rules:
   return `SYSTEM:\n${system}\n\nCONVERSATION:\n${convo}\n\nAssistant:\n`;
 }
 
-function looksLikeGeneratorJson(text = "") {
+function extractGeneratorTool(text = "") {
   const raw = s(text).trim();
-  if (!raw) return false;
+  if (!raw) return null;
 
-  try {
-    const parsed = JSON.parse(raw);
-    const tool = parsed && typeof parsed === "object" ? parsed.tool : null;
-    return !!(tool && typeof tool === "object" && (tool.primary || tool.alternatives || tool.command || tool.pythonScript));
-  } catch {
-    return false;
+  const candidates = [raw];
+
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) candidates.push(String(fenced[1]).trim());
+
+  if (raw.includes("{") && raw.includes("}")) {
+    const first = raw.indexOf("{");
+    const last = raw.lastIndexOf("}");
+    if (last > first) candidates.push(raw.slice(first, last + 1).trim());
   }
+
+  for (const item of candidates) {
+    try {
+      const parsed = JSON.parse(item);
+      const tool = parsed && typeof parsed === "object" ? parsed.tool : null;
+      if (tool && typeof tool === "object" && (tool.primary || tool.alternatives || tool.command || tool.pythonScript)) {
+        return tool;
+      }
+    } catch {
+      // keep trying
+    }
+  }
+
+  return null;
+}
+
+function looksLikeGeneratorJson(text = "") {
+  return !!extractGeneratorTool(text);
 }
 
 function buildChatRepairPrompt({ lang = "fa", badOutput = "", lastUserMessage = "" } = {}) {
