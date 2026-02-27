@@ -53,7 +53,6 @@ function getCompatConfig(provider, ctx = {}) {
   return { apiKey, model, baseUrl, extraHeaders: {} };
 }
 
-
 function buildChatPromptByMode(ctx = {}) {
   const lang = s(ctx.lang || "fa").toLowerCase() === "en" ? "en" : "fa";
   const text = s(ctx.user_request || ctx.userRequest || ctx.input || ctx.message || ctx.text || "").trim();
@@ -99,13 +98,13 @@ function asNumber(x, d) {
 
 /**
  * runAI(vars)
- * Accepts either:
- * - { prompt: "..." }  (direct)
+ * Accepts:
+ * - { prompt: "..." } (direct)
  * OR
- * - any object that includes enough fields for promptBuilder (mode/lang/input_a/input_b/user_request/...)
+ * - any object that includes enough fields for promptBuilder (mode/lang/input_a/input_b/user_request/...).
  *
  * Returns:
- * { output, error, raw, meta }
+ * { output, error, raw, meta, ms }
  */
 export async function runAI(vars = {}) {
   const t0 = Date.now();
@@ -137,7 +136,13 @@ export async function runAI(vars = {}) {
   const temperature =
     typeof ctx.temperature === "number" ? ctx.temperature : asNumber(process.env.AI_TEMPERATURE, 0.3);
 
-  const maxTokens = asNumber(process.env.CCG_MAX_OUTPUT_TOKENS, 3200);
+  // ✅ allow per-call max_tokens (needed for AI-Guard)
+  const maxTokens =
+    typeof ctx.max_tokens === "number"
+      ? ctx.max_tokens
+      : typeof ctx.maxTokens === "number"
+        ? ctx.maxTokens
+        : asNumber(process.env.CCG_MAX_OUTPUT_TOKENS, 3200);
 
   const timeoutMs = asNumber(process.env.AI_HTTP_TIMEOUT_MS, 35000);
   const maxRetries = asNumber(process.env.AI_HTTP_MAX_RETRIES, 1);
@@ -174,4 +179,3 @@ export async function runAI(vars = {}) {
     ms: Date.now() - t0,
   };
 }
-
