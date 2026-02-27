@@ -284,7 +284,6 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
   // ---------- Python mode ----------
   if (isPython) {
     const pythonBody =
-      pyRaw || firstFencedCodeBlock(md).code || (Array.isArray(res?.commands) ? coerceCommandItem(res.commands[0]) : "");
       pyRaw ||
       firstFencedCodeBlock(md).code ||
       (Array.isArray(res?.commands) ? coerceCommandItem(res.commands[0]) : "");
@@ -292,9 +291,6 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
     const expRaw =
       extractSection(md, ["Explanation", "توضیح", "توضیحات", "شرح"]) ||
       asTextValue(res?.explanation || res?.explanations || res?.description);
-    const warnRaw =
-      extractSection(md, ["Warning", "Warnings", "هشدار", "هشدارها"]) ||
-      asTextValue(res?.warnings || res?.warning || res?.alert || res?.alerts);
 
     const warnRaw =
       extractSection(md, ["Warning", "Warnings", "هشدار", "هشدارها"]) ||
@@ -328,12 +324,11 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
     if (!explanation.length) {
       explanation = filterChitChat(extractLabelLines(md, ["explanation", "details", "توضیح", "توضیحات", "شرح"]));
     }
-    if (!warnings.length) warnings = filterChitChat(extractLabelLines(md, ["warning", "warnings", "هشدار", "هشدارها"]));
-    if (!warnings.length) warnings = filterChitChat(extractWarningLikeLines(md));
-    if (!explanation.length)
-      explanation = filterChitChat(extractLabelLines(md, ["explanation", "details", "توضیح", "توضیحات", "شرح"]));
-    if (!notes.length)
-      notes = filterChitChat(extractLabelLines(md, ["note", "notes", "more details", "detail", "نکته", "نکات", "توضیحات بیشتر"]));
+    if (!notes.length) {
+      notes = filterChitChat(
+        extractLabelLines(md, ["note", "notes", "more details", "detail", "نکته", "نکات", "توضیحات بیشتر"])
+      );
+    }
 
     // اگر هشدار داخل توضیحات بود جداش کن
     if (explanation.length) {
@@ -343,11 +338,6 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
         warnings = [...warnings, ...movedToWarnings];
         explanation = keptExplanation;
       }
-    }
-    if (!notes.length) {
-      notes = filterChitChat(
-        extractLabelLines(md, ["note", "notes", "more details", "detail", "نکته", "نکات", "توضیحات بیشتر"])
-      );
     }
 
     warnings = [...new Set(warnings.map((x) => String(x || "").trim()).filter(Boolean))];
@@ -378,8 +368,8 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
 
   let primary = commandsArr.length ? coerceCommandItem(commandsArr[0]) : "";
   let alts = moreArr.map(coerceCommandItem).filter(Boolean);
+
   const mdBlocks = allFencedCodeBlocks(md);
-  const isScriptMode = outputMode === "script";
 
   if (!primary) {
     const block = mdBlocks[0] || firstFencedCodeBlock(md);
@@ -430,7 +420,6 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
   if (!warnings.length) {
     warnings = filterChitChat(extractLabelLines(md, ["warning", "warnings", "هشدار", "هشدارها"]));
   }
-
   if (!warnings.length) {
     warnings = filterChitChat(extractWarningLikeLines(md));
   }
@@ -445,14 +434,6 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
     explanation = filterChitChat(extractLabelLines(md, ["explanation", "details", "توضیح", "توضیحات", "شرح"]));
   }
 
-  // اگر مدل هشدار را داخل توضیحات ریخته بود، جدا کن تا کارت هشدار حتماً نمایش داده شود
-  if (!warnings.length) warnings = filterChitChat(extractLabelLines(md, ["warning", "warnings", "هشدار", "هشدارها"]));
-  if (!warnings.length) warnings = filterChitChat(extractWarningLikeLines(md));
-  if (!notes.length)
-    notes = filterChitChat(extractLabelLines(md, ["note", "notes", "more details", "detail", "نکته", "نکات", "توضیحات بیشتر"]));
-  if (!explanation.length)
-    explanation = filterChitChat(extractLabelLines(md, ["explanation", "details", "توضیح", "توضیحات", "شرح"]));
-
   // اگر هشدار داخل توضیحات بود جداش کن
   if (explanation.length) {
     const movedToWarnings = explanation.filter((x) => isWarningTextLine(x));
@@ -461,23 +442,6 @@ function buildToolFromResponse(res, lang, cliGuess, outputMode, prevTool = null,
       warnings = [...warnings, ...movedToWarnings];
       explanation = keptExplanation;
     }
-  }
-
-  alts = [...new Set(alts.map((x) => String(x || "").trim()).filter(Boolean))].filter((x) => x !== primary);
-  warnings = [...new Set(warnings.map((x) => String(x || "").trim()).filter(Boolean))];
-  explanation = [...new Set(explanation.map((x) => String(x || "").trim()).filter(Boolean))];
-  notes = [...new Set(notes.map((x) => String(x || "").trim()).filter(Boolean))];
-
-  if (prevTool && refineTarget === "details") {
-    primary = prevTool.primary_command || primary;
-    alts = Array.isArray(prevTool.alternatives) ? prevTool.alternatives : alts;
-  }
-
-  if (prevTool && refineTarget === "commands") {
-    primary = prevTool.primary_command || primary;
-    explanation = Array.isArray(prevTool.explanation) ? prevTool.explanation : explanation;
-    warnings = Array.isArray(prevTool.warnings) ? prevTool.warnings : warnings;
-    notes = Array.isArray(prevTool.notes) ? prevTool.notes : notes;
   }
 
   alts = [...new Set(alts.map((x) => String(x || "").trim()).filter(Boolean))].filter((x) => x !== primary);
@@ -808,7 +772,6 @@ export default function GeneratorPage() {
     const netOsVersion = platform === "network" ? pickNetworkOsVersion(advancedSettings) : "";
 
     const normalizedInput = normalizeSpaces(input);
-    const requestKey = JSON.stringify({ normalizedInput, outputMode, platform: finalPlatform, cli: baseCli, advancedEnabled, advanced: advancedEnabled ? compactAdvanced(advancedSettings) : {} });
 
     const requestKey = JSON.stringify({
       normalizedInput,
@@ -1368,11 +1331,7 @@ export default function GeneratorPage() {
 
       {/* Split pane */}
       <div className="ccg-container">
-        <div
-          ref={splitWrapRef}
-          className={`ccg-split ${isRTL ? "is-rtl" : "is-ltr"}`}
-          style={{ "--split": `${splitPct}%` }}
-        >
+        <div ref={splitWrapRef} className={`ccg-split ${isRTL ? "is-rtl" : "is-ltr"}`} style={{ "--split": `${splitPct}%` }}>
           {isRTL ? (
             <>
               {outputPane}

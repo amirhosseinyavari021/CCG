@@ -23,6 +23,9 @@ import {
 
 const router = express.Router();
 
+/* =========================
+   HELPERS
+========================= */
 function s(v) {
   return v === null || v === undefined ? "" : String(v);
 }
@@ -60,17 +63,14 @@ async function appendMsg(threadId, { role, content, editedFromMessageId }) {
   const c = typeof content === "string" ? content : s(content);
   const meta = { editedFromMessageId: editedFromMessageId || null };
 
-  // Variant 1
   try {
     return await appendMessage(tid, r, c, meta);
   } catch {}
 
-  // Variant 2
   try {
     return await appendMessage(tid, { role: r, content: c, ...meta });
   } catch {}
 
-  // Variant 3
   return await appendMessage({ threadId: tid, role: r, content: c, ...meta });
 }
 
@@ -118,26 +118,34 @@ const chatLimiter = rateLimit({
 });
 
 /* =========================
-   CHAT PROMPT (NOT GENERATOR)
+   CHAT PROMPT (PLAIN CHAT)
+   - گارد سخت نداریم
+   - ولی هدف/ترجیح رو می‌گیم
 ========================= */
 function buildChatPrompt({ lang = "fa", messages = [] } = {}) {
   const fa = lang !== "en";
 
   const system = fa
     ? `تو «CCG Chat» هستی.
-قواعد:
-- این مسیر فقط «چت معمولی» است، نه Command Generator.
+هدف اصلی:
+- کمک به تحلیل ارور/لاگ‌های Command/Script/Deploy و راهنمایی مرحله‌ای تا حل مشکل.
+- تحلیل کد/اسکریپت و توضیح روان + پیشنهاد اصلاح.
+
+قواعد خروجی:
 - خروجی را مثل فرم generator (✅ دستور اصلی/هشدار/جایگزین) تولید نکن.
-- اگر کاربر small-talk گفت (مثل: خوبی؟ مرسی)، طبیعی و کوتاه جواب بده.
-- اگر سؤال فنی/DevOps/Linux بود، مرحله‌ای پاسخ بده و اگر لازم شد دستور بده.
-- چیزی را از خودت نساز؛ اگر اطلاعات لازم داری سوال دقیق بپرس.`
+- اگر سوال غیرمرتبط بود، می‌تونی جواب بدی؛ اما اولویت همیشه با حوزه‌های بالا است.
+- چیزی را از خودت نساز؛ اگر اطلاعات لازم داری سوال دقیق بپرس.
+- پاسخ‌ها کوتاه، عملی و مرحله‌ای باشند.`
     : `You are "CCG Chat".
-Rules:
-- This endpoint is plain chat, NOT the command generator.
-- Do NOT output generator template sections.
-- For small talk, answer naturally and briefly.
-- For technical questions, answer step-by-step; include commands only when needed.
-- Do not invent logs/files; ask targeted questions if needed.`;
+Primary goals:
+- Analyze errors/logs from commands/scripts/deployments and guide step-by-step until resolved.
+- Analyze code/scripts and provide clear explanations + suggested fixes.
+
+Output rules:
+- Do NOT output the generator template (primary/warnings/alternatives).
+- If the user asks something unrelated you may answer, but prioritize the goals above.
+- Do not invent details; ask targeted questions when needed.
+- Keep answers practical and step-by-step.`;
 
   const convo = (Array.isArray(messages) ? messages : [])
     .filter((m) => m && (m.role === "user" || m.role === "assistant"))
@@ -147,7 +155,6 @@ Rules:
 
   return `SYSTEM:\n${system}\n\nCONVERSATION:\n${convo}\n\nAssistant:\n`;
 }
-
 
 function extractGeneratorTool(text = "") {
   const raw = s(text).trim();
@@ -168,14 +175,15 @@ function extractGeneratorTool(text = "") {
     try {
       const parsed = JSON.parse(item);
       const tool = parsed && typeof parsed === "object" ? parsed.tool : null;
-      if (tool && typeof tool === "object" && (tool.primary || tool.alternatives || tool.command || tool.pythonScript)) {
+      if (
+        tool &&
+        typeof tool === "object" &&
+        (tool.primary || tool.alternatives || tool.command || tool.pythonScript)
+      ) {
         return tool;
       }
-    } catch {
-      // keep trying
-    }
+    } catch {}
   }
-
   return null;
 }
 
@@ -187,10 +195,9 @@ function buildChatRepairPrompt({ lang = "fa", badOutput = "", lastUserMessage = 
   const fa = lang !== "en";
   if (fa) {
     return [
-      "خروجی قبلی اشتباه بوده و به فرمت جنریتور برگشته است.",
-      "فقط یک پاسخ چت فنی معمولی برگردان (Markdown عادی، بدون JSON).",
-      "حوزه مجاز: تحلیل خطا/لاگ + راه‌حل مرحله‌ای، یا تحلیل/توضیح کد و اسکریپت.",
-      "اگر پیام کاربر خارج از این حوزه است، خیلی کوتاه بگو فقط همین حوزه‌ها پشتیبانی می‌شود.",
+      "خروجی قبلی اشتباه بوده و به فرمت جنریتور/JSON برگشته است.",
+      "فقط یک پاسخ چت معمولی بده (Markdown ساده، بدون JSON و بدون فرم generator).",
+      "پاسخ باید مرتبط با پیام کاربر باشد و اگر نیاز به اطلاعات بیشتر است سوال دقیق بپرس.",
       "",
       "پیام آخر کاربر:",
       s(lastUserMessage).trim() || "(خالی)",
@@ -201,10 +208,9 @@ function buildChatRepairPrompt({ lang = "fa", badOutput = "", lastUserMessage = 
   }
 
   return [
-    "The previous output was wrong and used generator JSON format.",
-    "Return only a normal technical chat response (plain Markdown, no JSON).",
-    "Allowed scope: error/log analysis with step-by-step fixes, or code/script analysis and explanation.",
-    "If user request is out of scope, briefly say only these scopes are supported.",
+    "Previous output was wrong and used generator JSON format.",
+    "Return only a normal chat response (plain Markdown, no JSON, no generator template).",
+    "Ask targeted questions if more info is needed.",
     "",
     "Last user message:",
     s(lastUserMessage).trim() || "(empty)",
@@ -308,7 +314,7 @@ router.delete("/threads/:threadId", async (req, res) => {
 });
 
 /* =========================
-   CHAT SEND
+   CHAT CORE
 ========================= */
 async function buildHistory(threadId) {
   const raw = await safeCall(getMessages, [threadId, { limit: 500 }], [threadId]);
@@ -335,22 +341,19 @@ async function runChatOnce({ threadId, lang, message, regenerate, editedFromMess
   const history = await buildHistory(threadId);
   const prompt = buildChatPrompt({ lang, messages: history });
 
-  // ✅ AI call (may return string or object)
+  // ✅ AI call
   const aiResult = await runAI(prompt, { mode: "chat", lang, requestId });
 
-  // ✅ Extract real text and DO NOT run generator formatter here
+  // ✅ Extract real text
   const rawText = extractAIText(aiResult);
-
-  // ✅ Plain chat markdown/text
   let answer = s(rawText).trim() || (lang === "fa" ? "پاسخی دریافت نشد." : "No response received.");
 
-  // اگر به هر دلیل شبیه JSON جنریتور شد، یک بار repair کنیم (اختیاری اما امن)
+  // ✅ If it looks like generator JSON, repair once
   if (looksLikeGeneratorJson(answer)) {
-    const repair = await runAI(buildChatRepairPrompt({ lang, badOutput: answer, lastUserMessage: message }), {
-      mode: "chat",
-      lang,
-      requestId,
-    });
+    const repair = await runAI(
+      buildChatRepairPrompt({ lang, badOutput: answer, lastUserMessage: message }),
+      { mode: "chat", lang, requestId }
+    );
     const repaired = s(extractAIText(repair)).trim();
     if (repaired && !looksLikeGeneratorJson(repaired)) {
       answer = repaired;
@@ -371,25 +374,9 @@ async function runChatOnce({ threadId, lang, message, regenerate, editedFromMess
   return { ok: true, markdown: answer, output: answer, thread, regenCount: Number(thread?.regenCount || 0) };
 }
 
-    let output = String(ai.output || "").trim();
-
-    if (looksLikeGeneratorJson(output)) {
-      const repair = await runAI({
-        mode: "chat",
-        lang,
-        prompt: buildChatRepairPrompt({ lang, badOutput: output, lastUserMessage: message }),
-        requestId: req.requestId,
-      });
-      const repaired = String(repair?.output || "").trim();
-      if (repaired && !looksLikeGeneratorJson(repaired)) {
-        output = repaired;
-      } else if (looksLikeGeneratorJson(output)) {
-        output =
-          lang === "fa"
-            ? "متوجه شدم. لطفاً خطا/لاگ یا تکه کد/اسکریپت را بفرست تا مرحله‌به‌مرحله تحلیل و رفعش کنیم."
-            : "Got it. Please share the error/log or code/script snippet so we can analyze and fix it step by step.";
-      }
-    }
+/* =========================
+   THREAD MESSAGE ENDPOINT (UI)
+========================= */
 router.post("/threads/:threadId/messages", chatLimiter, async (req, res) => {
   const threadId = s(req.params.threadId).trim();
   const lang = normLang(req.body?.lang);
@@ -406,14 +393,75 @@ router.post("/threads/:threadId/messages", chatLimiter, async (req, res) => {
 
     if (!regenerate) {
       if (!message) return res.status(400).json({ ok: false, error: { code: "EMPTY_MESSAGE", requestId: req.requestId } });
-      if (message.length > MAX_INPUT_CHARS)
+      if (message.length > MAX_INPUT_CHARS) {
         return res.status(413).json({ ok: false, error: { code: "MESSAGE_TOO_LARGE", requestId: req.requestId } });
+      }
     }
 
     const result = await runChatOnce({ threadId, lang, message, regenerate, editedFromMessageId, requestId: req.requestId });
     return res.json(result);
   } catch (e) {
-    return res.status(500).json({ ok: false, error: { code: "CHAT_FAILED", message: s(e?.message), requestId: req.requestId } });
+    return res.status(500).json({
+      ok: false,
+      error: { code: "CHAT_FAILED", message: s(e?.message), requestId: req.requestId },
+    });
+  }
+});
+
+/* =========================
+   LEGACY ENDPOINT (برای UI های قدیمی / cache)
+   POST /api/chat
+========================= */
+router.post("/", chatLimiter, async (req, res) => {
+  const lang = normLang(req.body?.lang);
+  const message = s(req.body?.message).trim();
+
+  // optional legacy fields
+  const incomingThreadId = s(req.body?.threadId || req.body?.sessionId || "").trim();
+  const title = s(req.body?.title || "").trim();
+
+  if (!message) return res.status(400).json({ ok: false, error: { code: "EMPTY_MESSAGE", requestId: req.requestId } });
+  if (message.length > MAX_INPUT_CHARS) return res.status(413).json({ ok: false, error: { code: "MESSAGE_TOO_LARGE", requestId: req.requestId } });
+
+  try {
+    let threadId = incomingThreadId;
+
+    if (!threadId || !isValidId(threadId)) {
+      const th = await createThread({ lang, title });
+      threadId = th?._id;
+    } else {
+      const exists = await getThread(threadId);
+      if (!exists) {
+        const th = await createThread({ lang, title });
+        threadId = th?._id;
+      }
+    }
+
+    const result = await runChatOnce({
+      threadId,
+      lang,
+      message,
+      regenerate: false,
+      editedFromMessageId: null,
+      requestId: req.requestId,
+    });
+
+    // Legacy-friendly shape:
+    return res.json({
+      ok: true,
+      threadId,
+      sessionId: threadId,
+      markdown: result.markdown,
+      output: result.output,
+      thread: result.thread,
+      retention: retentionInfo(),
+      regenCount: result.regenCount,
+    });
+  } catch (e) {
+    return res.status(500).json({
+      ok: false,
+      error: { code: "CHAT_FAILED", message: s(e?.message), requestId: req.requestId },
+    });
   }
 });
 
