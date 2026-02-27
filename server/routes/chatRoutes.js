@@ -148,6 +148,7 @@ Rules:
   return `SYSTEM:\n${system}\n\nCONVERSATION:\n${convo}\n\nAssistant:\n`;
 }
 
+
 function extractGeneratorTool(text = "") {
   const raw = s(text).trim();
   if (!raw) return null;
@@ -370,6 +371,25 @@ async function runChatOnce({ threadId, lang, message, regenerate, editedFromMess
   return { ok: true, markdown: answer, output: answer, thread, regenCount: Number(thread?.regenCount || 0) };
 }
 
+    let output = String(ai.output || "").trim();
+
+    if (looksLikeGeneratorJson(output)) {
+      const repair = await runAI({
+        mode: "chat",
+        lang,
+        prompt: buildChatRepairPrompt({ lang, badOutput: output, lastUserMessage: message }),
+        requestId: req.requestId,
+      });
+      const repaired = String(repair?.output || "").trim();
+      if (repaired && !looksLikeGeneratorJson(repaired)) {
+        output = repaired;
+      } else if (looksLikeGeneratorJson(output)) {
+        output =
+          lang === "fa"
+            ? "متوجه شدم. لطفاً خطا/لاگ یا تکه کد/اسکریپت را بفرست تا مرحله‌به‌مرحله تحلیل و رفعش کنیم."
+            : "Got it. Please share the error/log or code/script snippet so we can analyze and fix it step by step.";
+      }
+    }
 router.post("/threads/:threadId/messages", chatLimiter, async (req, res) => {
   const threadId = s(req.params.threadId).trim();
   const lang = normLang(req.body?.lang);

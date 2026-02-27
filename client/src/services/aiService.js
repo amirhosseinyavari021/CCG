@@ -241,9 +241,22 @@ export async function deleteChatThread(threadId, opts = {}) {
   return fetchJSON(url, { method: "DELETE", timeoutMs: opts.timeoutMs ?? 30_000, signal: opts.signal });
 }
 
-export async function sendChatMessage(threadId, body = {}, opts = {}) {
-  const id = encodeURIComponent(asStr(threadId));
-  const url = withBase(`/api/chat/threads/${id}/messages`);
+export async function sendChatMessage(threadOrBody, bodyOrOpts = {}, maybeOpts = {}) {
+  // Backward compatible signatures:
+  // 1) sendChatMessage({ threadId, lang, message, regenerate }, opts)
+  // 2) sendChatMessage(threadId, body, opts)
+  const firstIsBody = isPlainObject(threadOrBody);
+
+  const body = firstIsBody
+    ? threadOrBody
+    : {
+        ...(isPlainObject(bodyOrOpts) ? bodyOrOpts : {}),
+        threadId: asStr(threadOrBody),
+      };
+
+  const opts = firstIsBody ? (isPlainObject(bodyOrOpts) ? bodyOrOpts : {}) : maybeOpts;
+
+  const url = withBase("/api/chat");
   const raw = await fetchJSON(url, {
     method: "POST",
     body,
