@@ -12,6 +12,18 @@ function getOwner(req) {
   return { ownerType: "guest", ownerId: gid || "unknown" };
 }
 
+function pickUserLimit(req, limitUser) {
+  // limitUser can be:
+  // - number
+  // - { free: number, pro: number }
+  const plan = s(req.session?.plan || "free").toLowerCase() === "pro" ? "pro" : "free";
+  if (typeof limitUser === "object" && limitUser) {
+    const v = plan === "pro" ? limitUser.pro : limitUser.free;
+    return Number(v);
+  }
+  return Number(limitUser);
+}
+
 export function quota({ bucket, limitUser, limitGuest }) {
   return async (req, res, next) => {
     try {
@@ -19,9 +31,8 @@ export function quota({ bucket, limitUser, limitGuest }) {
       const dayKey = utcDayKey(new Date());
       const resetAtUtc = nextUtcMidnightMs(new Date());
 
-      const limit = ownerType === "guest" ? Number(limitGuest) : Number(limitUser);
+      const limit = ownerType === "guest" ? Number(limitGuest) : pickUserLimit(req, limitUser);
 
-      // اگر limit = Infinity یا <=0 یعنی چک نکن
       if (!Number.isFinite(limit) || limit <= 0) {
         res.setHeader("X-Quota-Limit", "unlimited");
         res.setHeader("X-Quota-Remaining", "unlimited");
@@ -43,47 +54,31 @@ export function quota({ bucket, limitUser, limitGuest }) {
         res.setHeader("X-Quota-Remaining", "0");
         res.setHeader("X-Quota-Reset", String(resetAtUtc));
 
-        // guest -> نیاز به لاگین
-        if (ownerType === "guest") {
-          return res.status(401).json({
-            ok: false,
-            error: {
-              code: "GUEST_LIMIT_REACHED",
-              userMessage: "برای ادامه استفاده باید وارد حساب کاربری شوی.",
-              requestId: req.requestId,
-            },
-            quota: { bucket, limit, remaining: 0, resetAtUtc },
-          });
-        }
-
         return res.status(429).json({
           ok: false,
           error: {
-            code: "DAILY_LIMIT_REACHED",
-            userMessage: "سقف استفاده امروزت تمام شده. فردا دوباره امتحان کن.",
+            code: "QUOTA_EXCEEDED",
+            userMessage: "سهمیه روزانه این سرویس تموم شده. فردا دوباره امتحان کن.",
+            bucket,
+            limit,
+            used,
             requestId: req.requestId,
           },
-          quota: { bucket, limit, remaining: 0, resetAtUtc },
         });
       }
 
-      // increment
       counters[bucket] = used + 1;
       doc.counters = counters;
       await doc.save();
 
-      const remaining = Math.max(0, limit - (used + 1));
-
       res.setHeader("X-Quota-Limit", String(limit));
-      res.setHeader("X-Quota-Remaining", String(remaining));
+      res.setHeader("X-Quota-Remaining", String(Math.max(0, limit - (used + 1))));
       res.setHeader("X-Quota-Reset", String(resetAtUtc));
 
-      req.quota = { bucket, limit, remaining, resetAtUtc, used: used + 1 };
-      next();
+      return next();
     } catch (e) {
-      // در صورت خطای DB: برای اینکه UX نخوابه، next()
-      // ولی اگر می‌خوای سخت‌گیر باشه می‌تونیم 503 بدیم.
-      next();
+      // fail-open (سرویس نخوابه)
+      return next();
     }
   };
 }

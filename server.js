@@ -1,15 +1,18 @@
 /**
  * server.js (CCG_STABLE_V3.2.0+) - FINAL
- * نسخه نهایی با لاگینگ واضح‌تر، requestId استاندارد، و مدیریت خطای کامل
  */
 import "dotenv/config";
 import express from "express";
 import fs from "fs";
 import path from "path";
+import cookieSession from "cookie-session";
 
 import ccgRoutes from "./server/routes/ccgRoutes.js";
 import domainGuard from "./server/middleware/domainGuard.js";
 import chatRoutes from "./server/routes/chatRoutes.js";
+import authRoutes from "./server/routes/authRoutes.js";
+
+import { guestIdentity } from "./server/middleware/guestIdentity.js";
 import { connectMongo } from "./server/config/mongo.js";
 
 /* =========================
@@ -118,7 +121,7 @@ app.disable("x-powered-by");
 app.set("trust proxy", true);
 
 /* =========================
-   BODY PARSERS (قبل از لاگ)
+   BODY PARSERS
 ========================= */
 app.use(express.json({ limit: process.env.MAX_REQUEST_SIZE || "2mb" }));
 app.use(express.urlencoded({ extended: true, limit: process.env.MAX_REQUEST_SIZE || "2mb" }));
@@ -195,6 +198,22 @@ app.use((req, res, next) => {
 ========================= */
 app.use(domainGuard);
 
+// ✅ session for auth + quota (cookie-session موجوده تو dependencies)
+app.use(
+  cookieSession({
+    name: process.env.SESSION_COOKIE_NAME || "ccg_sess",
+    keys: [process.env.SESSION_KEY_1 || "ccg_dev_key_1", process.env.SESSION_KEY_2 || "ccg_dev_key_2"],
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: Number(process.env.SESSION_MAX_AGE_MS || 1000 * 60 * 60 * 24 * 30),
+  })
+);
+
+// ✅ guest identity (must be after session)
+app.use(guestIdentity);
+
 /* =========================
    ROUTES
 ========================= */
@@ -211,6 +230,7 @@ app.get("/api/health", (_req, res) => {
   });
 });
 
+app.use("/api/auth", authRoutes);
 app.use("/api/ccg", ccgRoutes);
 app.use("/api/chat", chatRoutes);
 
@@ -231,6 +251,7 @@ app.get("/api/info", (_req, res) => {
     status: "operational",
     endpoints: {
       health: "GET /api/health",
+      auth: "GET /api/auth/me",
       ccg: "POST /api/ccg",
       chat: "POST /api/chat",
       test: "POST /api/test",
@@ -241,6 +262,8 @@ app.get("/api/info", (_req, res) => {
       code_comparison: true,
       chat: true,
       multilingual: true,
+      auth: true,
+      guestQuota: true,
     },
     timestamp: new Date().toISOString(),
   });
@@ -337,6 +360,9 @@ const envToShow = [
   "AI_MAX_CONCURRENCY",
   "CHAT_RETENTION_DAYS",
   "CHAT_MAX_HISTORY_MESSAGES",
+  "AI_GUARD_ENABLED",
+  "AI_GUARD_MAX_TOKENS",
+  "AI_GUARD_TEMPERATURE",
   "MONGO_URI",
 ];
 
@@ -346,8 +372,18 @@ for (const key of envToShow) {
 logLine("info", "----------------------------------------");
 logLine("info", "SERVICE STATUS:");
 logLine("info", process.env.MONGO_URI ? "✅ MongoDB URI is configured" : "⚠️ MongoDB URI is NOT configured");
-logLine("info", process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.length > 30 ? "✅ OpenAI API Key is configured" : "⚠️ OpenAI API Key is NOT properly configured");
-logLine("info", process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY.length > 20 ? "✅ OpenRouter API Key is configured" : "⚠️ OpenRouter API Key is NOT properly configured");
+logLine(
+  "info",
+  process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY.length > 30
+    ? "✅ OpenAI API Key is configured"
+    : "⚠️ OpenAI API Key is NOT properly configured"
+);
+logLine(
+  "info",
+  process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY.length > 20
+    ? "✅ OpenRouter API Key is configured"
+    : "⚠️ OpenRouter API Key is NOT properly configured"
+);
 logLine("info", "============================================================");
 
 /* =========================
@@ -391,7 +427,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 
 process.on("unhandledRejection", (reason) => {
-  logLine("error", "UNHANDLED_REJECTION", { reason: safeWrite ? toOneLine(String(reason)) : String(reason) });
+  logLine("error", "UNHANDLED_REJECTION", { reason: toOneLine(String(reason)) });
 });
 
 process.on("uncaughtException", (err) => {

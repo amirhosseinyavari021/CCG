@@ -1,22 +1,49 @@
 // client/src/context/AuthContext.jsx
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { authMe, logout as apiLogout } from "../services/authService";
 
 const AuthContext = createContext(null);
 
-/**
- * این نسخه "مینیمال" هست تا UI گیر نکنه.
- * اگر بک‌اند احراز هویت واقعی داری، بعداً همینجا وصلش می‌کنیم.
- */
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [booted, setBooted] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    authMe()
+      .then((r) => {
+        if (!alive) return;
+        setUser(r?.user || null);
+      })
+      .catch(() => {
+        if (!alive) return;
+        setUser(null);
+      })
+      .finally(() => {
+        if (!alive) return;
+        setBooted(true);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const value = useMemo(
     () => ({
       user,
+      booted,
       setUser,
-      logout: () => setUser(null),
+      logout: async () => {
+        try {
+          await apiLogout();
+        } catch {}
+        setUser(null);
+      },
+      isLoggedIn: !!user,
+      plan: user?.plan || "free",
     }),
-    [user]
+    [user, booted]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

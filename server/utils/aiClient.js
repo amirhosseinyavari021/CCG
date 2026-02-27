@@ -13,11 +13,9 @@ function s(v) {
 }
 
 function pickProvider(ctx = {}) {
-  // explicit override wins
   const p = s(ctx.provider || process.env.AI_PROVIDER || "").toLowerCase().trim();
   if (p === "openrouter" || p === "openai") return p;
 
-  // if OpenRouter key exists -> prefer it (optional)
   const hasOR = !!s(process.env.OPENROUTER_API_KEY).trim();
   if (hasOR) return "openrouter";
 
@@ -59,9 +57,9 @@ function buildChatPromptByMode(ctx = {}) {
 
   if (lang === "en") {
     return [
-      "You are CCG Technical Assistant.",
+      'You are "CCG Chat".',
       "Scope: 1) Analyze errors/logs and provide step-by-step fixes. 2) Analyze/explain code and scripts.",
-      "If request is outside this scope, briefly refuse and ask for a relevant technical input.",
+      "If request is outside this scope, refuse briefly and ask for a relevant technical input.",
       "Output plain Markdown (no JSON).",
       "",
       "User message:",
@@ -70,7 +68,7 @@ function buildChatPromptByMode(ctx = {}) {
   }
 
   return [
-    "تو CCG Technical Assistant هستی.",
+    'تو "CCG Chat" هستی.',
     "حوزه کاری فقط: 1) تحلیل خطا/لاگ و ارائه راه‌حل مرحله‌ای. 2) تحلیل و توضیح کد/اسکریپت.",
     "اگر درخواست خارج از این حوزه بود، کوتاه رد کن و از کاربر ورودی فنی مرتبط بخواه.",
     "خروجی فقط Markdown باشد (نه JSON).",
@@ -98,8 +96,8 @@ function asNumber(x, d) {
 
 /**
  * runAI(vars)
- * Accepts:
- * - { prompt: "..." } (direct)
+ * Accepts either:
+ * - { prompt: "..." }  (direct)
  * OR
  * - any object that includes enough fields for promptBuilder (mode/lang/input_a/input_b/user_request/...).
  *
@@ -116,7 +114,6 @@ export async function runAI(vars = {}) {
   const provider = pickProvider(ctx);
   const { apiKey, model, baseUrl, extraHeaders } = getCompatConfig(provider, ctx);
 
-  // hard fail if key missing (fast)
   if (provider === "openrouter" && !apiKey) {
     return { output: "", error: "OPENROUTER_API_KEY_MISSING", meta: { provider, model }, ms: Date.now() - t0 };
   }
@@ -126,23 +123,17 @@ export async function runAI(vars = {}) {
 
   // Build prompt if not provided
   let prompt = s(ctx.prompt).trim();
-  if (!prompt) {
-    prompt = s(buildPromptByMode(ctx)).trim();
-  }
-  if (!prompt) {
-    return { output: "", error: "EMPTY_PROMPT", meta: { provider, model }, ms: Date.now() - t0 };
-  }
+  if (!prompt) prompt = s(buildPromptByMode(ctx)).trim();
+  if (!prompt) return { output: "", error: "EMPTY_PROMPT", meta: { provider, model }, ms: Date.now() - t0 };
 
   const temperature =
     typeof ctx.temperature === "number" ? ctx.temperature : asNumber(process.env.AI_TEMPERATURE, 0.3);
 
-  // ✅ allow per-call max_tokens (needed for AI-Guard)
+  // ✅ allow per-call override (e.g., guard)
   const maxTokens =
-    typeof ctx.max_tokens === "number"
-      ? ctx.max_tokens
-      : typeof ctx.maxTokens === "number"
-        ? ctx.maxTokens
-        : asNumber(process.env.CCG_MAX_OUTPUT_TOKENS, 3200);
+    asNumber(ctx.max_tokens, NaN) ||
+    asNumber(ctx.maxTokens, NaN) ||
+    asNumber(process.env.CCG_MAX_OUTPUT_TOKENS, 3200);
 
   const timeoutMs = asNumber(process.env.AI_HTTP_TIMEOUT_MS, 35000);
   const maxRetries = asNumber(process.env.AI_HTTP_MAX_RETRIES, 1);
