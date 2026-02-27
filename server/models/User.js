@@ -1,52 +1,19 @@
+// server/models/User.js
 import mongoose from "mongoose";
 
-const userSchema = new mongoose.Schema(
+const UserSchema = new mongoose.Schema(
   {
-    name: String,
-    family: String,
+    email: { type: String, required: true, unique: true, index: true, lowercase: true, trim: true },
+    passwordHash: { type: String, default: null },
+    emailVerified: { type: Boolean, default: false },
 
-    email: { type: String, unique: true, sparse: true },
-    password: String,
+    googleId: { type: String, default: null, unique: true, sparse: true, index: true },
 
-    phone: { type: String, unique: true, sparse: true },
-
-    provider: {
-      type: String,
-      enum: ["email", "google", "phone"],
-      default: "email",
-    },
-
-    googleId: String,
-    avatar: String,
-
-    // 🔐 Product Controls
-    role: {
-      type: String,
-      enum: ["expert", "learner"],
-      default: "learner",
-    },
-
-    lang: {
-      type: String,
-      enum: ["en", "fa"],
-      default: "en",
-    },
-
-    plan: {
-      type: String,
-      enum: ["free", "pro"],
-      default: "free",
-    },
-
-    usage: {
-      dailyUsed: { type: Number, default: 0 },
-      lastReset: { type: Date, default: new Date() },
-    },
-
-    otpCode: String,
-    otpExpires: Date,
+    plan: { type: String, default: "free", enum: ["free", "pro"] }, // فعلاً pro نداریم ولی آماده است
+    createdAt: { type: Date, default: Date.now },
+    lastLoginAt: { type: Date, default: null },
   },
-  { timestamps: true }
+  { minimize: false }
 );
 
-export default mongoose.model("User", userSchema);
+export default mongoose.models.User || mongoose.model("User", UserSchema);

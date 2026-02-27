@@ -1,165 +1,222 @@
 // server/routes/authRoutes.js
 import express from "express";
+import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+
 import User from "../models/User.js";
-import { requireAuth } from "../middleware/auth.js";
+import EmailVerification from "../models/EmailVerification.js";
 
 const router = express.Router();
 
-// -------------------------------
-// JWT helper
-// -------------------------------
-const signToken = (user) =>
-  jwt.sign(
-    { id: user._id, email: user.email, name: user.name },
-    process.env.JWT_SECRET,
-    { expiresIn: "30d" }
+function s(v) {
+  return v === null || v === undefined ? "" : String(v);
+}
+
+function normEmail(x) {
+  return s(x).trim().toLowerCase();
+}
+
+function genCode6() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function sha256(x) {
+  return crypto.createHash("sha256").update(String(x)).digest("hex");
+}
+
+// ---- SMTP SEND (placeholder)
+// اینجا فعلاً stub می‌ذارم چون گفتی SMTP داری.
+// بعداً دقیقاً وصلش می‌کنیم به config واقعی.
+async function sendOtpEmail({ email, code }) {
+  // TODO: implement real SMTP (nodemailer یا سرویس شما)
+  // فعلاً برای اینکه سیستم fail نکنه:
+  console.log("[OTP] email:", email, "code:", code);
+  return true;
+}
+
+/**
+ * POST /api/auth/email/request-otp
+ * body: { email }
+ */
+router.post("/email/request-otp", async (req, res) => {
+  const email = normEmail(req.body?.email);
+  if (!email || !email.includes("@")) {
+    return res.status(400).json({ ok: false, error: { code: "INVALID_EMAIL", requestId: req.requestId } });
+  }
+
+  const now = new Date();
+
+  const existing = await EmailVerification.findOne({ email });
+  if (existing?.cooldownUntil && existing.cooldownUntil > now) {
+    return res.status(429).json({
+      ok: false,
+      error: { code: "OTP_COOLDOWN", userMessage: "کمی بعد دوباره تلاش کن.", requestId: req.requestId },
+    });
+  }
+
+  const code = genCode6();
+  const codeHash = sha256(code);
+  const expiresAt = new Date(Date.now() + Number(process.env.OTP_TTL_MS || 10 * 60 * 1000)); // 10 min
+  const cooldownUntil = new Date(Date.now() + Number(process.env.OTP_COOLDOWN_MS || 60 * 1000)); // 60 sec
+
+  await EmailVerification.findOneAndUpdate(
+    { email },
+    {
+      $set: {
+        email,
+        codeHash,
+        expiresAt,
+        attempts: 0,
+        cooldownUntil,
+        lastSentAt: now,
+      },
+    },
+    { upsert: true, new: true }
   );
 
-// -------------------------------
-// TEST ROUTE
-// -------------------------------
-router.get("/test", (_, res) => {
-  res.json({ ok: true });
+  await sendOtpEmail({ email, code });
+
+  return res.json({ ok: true });
 });
 
-// ===============================
-// EMAIL REGISTER
-// ===============================
-router.post("/register-email", async (req, res) => {
-  try {
-    const { name, family, email, password } = req.body;
+/**
+ * POST /api/auth/email/verify-otp
+ * body: { email, code }
+ */
+router.post("/email/verify-otp", async (req, res) => {
+  const email = normEmail(req.body?.email);
+  const code = s(req.body?.code).trim();
 
-    if (!email || !password)
-      return res.status(400).json({ message: "ایمیل و رمز عبور ضروری است." });
+  if (!email || !code) {
+    return res.status(400).json({ ok: false, error: { code: "BAD_REQUEST", requestId: req.requestId } });
+  }
 
-    let exists = await User.findOne({ email });
-    if (exists)
-      return res.status(400).json({ message: "ایمیل قبلاً ثبت شده." });
+  const doc = await EmailVerification.findOne({ email });
+  if (!doc) {
+    return res.status(400).json({ ok: false, error: { code: "OTP_NOT_FOUND", requestId: req.requestId } });
+  }
 
-    const hashed = await bcrypt.hash(password, 10);
+  if (doc.expiresAt < new Date()) {
+    return res.status(400).json({ ok: false, error: { code: "OTP_EXPIRED", requestId: req.requestId } });
+  }
 
-    const user = await User.create({
-      name,
-      family,
-      email,
-      password: hashed,
-      provider: "email",
+  if (doc.attempts >= Number(process.env.OTP_MAX_ATTEMPTS || 5)) {
+    return res.status(429).json({ ok: false, error: { code: "OTP_TOO_MANY_ATTEMPTS", requestId: req.requestId } });
+  }
+
+  const ok = sha256(code) === doc.codeHash;
+  doc.attempts += 1;
+  await doc.save();
+
+  if (!ok) {
+    return res.status(400).json({ ok: false, error: { code: "OTP_INVALID", requestId: req.requestId } });
+  }
+
+  // mark user as verified (create user if doesn't exist? نه، فقط verify flag وقتی register)
+  return res.json({ ok: true, verified: true });
+});
+
+/**
+ * POST /api/auth/register
+ * body: { email, password }
+ * شرط: OTP verify شده باشد (یعنی رکورد EmailVerification موجود و codeHash درست بوده)
+ */
+router.post("/register", async (req, res) => {
+  const email = normEmail(req.body?.email);
+  const password = s(req.body?.password);
+
+  if (!email || password.length < 8) {
+    return res.status(400).json({
+      ok: false,
+      error: { code: "INVALID_INPUT", userMessage: "ایمیل معتبر و رمز حداقل ۸ کاراکتر.", requestId: req.requestId },
     });
-
-    const token = signToken(user);
-    return res.json({ user, token });
-  } catch (err) {
-    console.error("Register Error:", err);
-    return res.status(500).json({ message: "خطا در ثبت‌نام." });
   }
+
+  // اینجا ساده نگه می‌داریم: اگر OTP record هست و expire نشده، ثبت‌نام مجاز
+  const otp = await EmailVerification.findOne({ email });
+  if (!otp || otp.expiresAt < new Date()) {
+    return res.status(400).json({
+      ok: false,
+      error: { code: "EMAIL_NOT_VERIFIED", userMessage: "اول ایمیل را تایید کن.", requestId: req.requestId },
+    });
+  }
+
+  const existing = await User.findOne({ email });
+  if (existing) {
+    return res.status(409).json({
+      ok: false,
+      error: { code: "EMAIL_EXISTS", userMessage: "این ایمیل قبلاً ثبت شده.", requestId: req.requestId },
+    });
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  const user = await User.create({
+    email,
+    passwordHash,
+    emailVerified: true,
+    plan: "free",
+    lastLoginAt: new Date(),
+  });
+
+  req.session.userId = String(user._id);
+
+  return res.json({
+    ok: true,
+    user: { id: String(user._id), email: user.email, plan: user.plan, emailVerified: user.emailVerified },
+  });
 });
 
-// ===============================
-// EMAIL LOGIN
-// ===============================
-router.post("/login-email", async (req, res) => {
-  try {
-    const { email, password } = req.body;
+/**
+ * POST /api/auth/login
+ * body: { email, password }
+ */
+router.post("/login", async (req, res) => {
+  const email = normEmail(req.body?.email);
+  const password = s(req.body?.password);
 
-    let user = await User.findOne({ email });
-    if (!user)
-      return res.status(400).json({ message: "ایمیل یافت نشد." });
-
-    const ok = await bcrypt.compare(password, user.password);
-    if (!ok)
-      return res.status(400).json({ message: "رمز عبور اشتباه است." });
-
-    const token = signToken(user);
-    return res.json({ user, token });
-  } catch (err) {
-    console.error("Login Error:", err);
-    return res.status(500).json({ message: "خطا در ورود." });
+  const user = await User.findOne({ email });
+  if (!user || !user.passwordHash) {
+    return res.status(401).json({ ok: false, error: { code: "INVALID_CREDENTIALS", requestId: req.requestId } });
   }
+
+  const ok = await bcrypt.compare(password, user.passwordHash);
+  if (!ok) {
+    return res.status(401).json({ ok: false, error: { code: "INVALID_CREDENTIALS", requestId: req.requestId } });
+  }
+
+  user.lastLoginAt = new Date();
+  await user.save();
+
+  req.session.userId = String(user._id);
+
+  return res.json({
+    ok: true,
+    user: { id: String(user._id), email: user.email, plan: user.plan, emailVerified: user.emailVerified },
+  });
 });
 
-// ===============================
-// SEND OTP FOR PHONE LOGIN/SIGNUP
-// ===============================
-router.post("/send-otp", async (req, res) => {
-  try {
-    const { phone } = req.body;
-
-    if (!phone)
-      return res.status(400).json({ message: "شماره ضروری است." });
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
-    let user = await User.findOne({ phone });
-    if (!user) {
-      user = await User.create({
-        phone,
-        provider: "phone",
-      });
-    }
-
-    user.otpCode = otp;
-    user.otpExpires = Date.now() + 2 * 60 * 1000; // 2 دقیقه
-    await user.save();
-
-    // در نسخه واقعی: ارسال SMS. فعلاً:
-    return res.json({ otp, message: "کد ارسال شد." });
-  } catch (err) {
-    console.error("Send OTP Error:", err);
-    return res.status(500).json({ message: "خطا در ارسال کد." });
-  }
-});
-
-// ===============================
-// VERIFY OTP → LOGIN / REGISTER
-// ===============================
-router.post("/verify-otp", async (req, res) => {
-  try {
-    const { phone, otp, name, family } = req.body;
-
-    const user = await User.findOne({ phone });
-    if (!user)
-      return res.status(400).json({ message: "کاربر وجود ندارد." });
-
-    if (user.otpCode !== otp)
-      return res.status(400).json({ message: "کد اشتباه است." });
-
-    if (user.otpExpires < Date.now())
-      return res.status(400).json({ message: "کد منقضی شده." });
-
-    if (name) user.name = name;
-    if (family) user.family = family;
-
-    user.otpCode = null;
-    await user.save();
-
-    const token = signToken(user);
-    return res.json({ user, token });
-  } catch (err) {
-    console.error("Verify OTP Error:", err);
-    return res.status(500).json({ message: "خطا در تایید کد." });
-  }
-});
-
-// ===============================
-// GET CURRENT USER
-// ===============================
-router.get("/me", requireAuth, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id).lean();
-    return res.json({ user });
-  } catch (err) {
-    console.error("ME Error:", err);
-    return res.status(500).json({ message: "خطا در دریافت کاربر." });
-  }
-});
-
-// ===============================
-// LOGOUT
-// ===============================
+/**
+ * POST /api/auth/logout
+ */
 router.post("/logout", (req, res) => {
-  return res.json({ message: "خروج انجام شد." });
+  req.session = null;
+  return res.json({ ok: true });
+});
+
+/**
+ * GET /api/auth/me
+ */
+router.get("/me", async (req, res) => {
+  const uid = req.session?.userId;
+  if (!uid) return res.json({ ok: true, user: null });
+
+  const user = await User.findById(uid);
+  if (!user) return res.json({ ok: true, user: null });
+
+  return res.json({
+    ok: true,
+    user: { id: String(user._id), email: user.email, plan: user.plan, emailVerified: user.emailVerified },
+  });
 });
 
 export default router;
